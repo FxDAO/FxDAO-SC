@@ -1,0 +1,30 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "vaults",
+]
+
+[profile.release-with-logs]
+inherits = "release"
+debug-assertions = true
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true
+
+[workspace.dependencies.soroban-sdk]
+version = "0.6.0"
+git = "https://github.com/stellar/rs-soroban-sdk"
+rev = "bb7d186906dd584efc115d1a408c91a331a54f1b"
+
+[workspace.dependencies.soroban-auth]
+version = "0.6.0"
+git = "https://github.com/stellar/rs-soroban-sdk"
+rev = "bb7d186906dd584efc115d1a408c91a331a54f1b"
