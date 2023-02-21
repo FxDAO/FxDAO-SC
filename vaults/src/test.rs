@@ -379,6 +379,12 @@ fn test_pay_debt() {
     data.contract_client
         .s_p_state(&data.contract_admin, &mn_col_rte, &mn_v_c_amt, &op_col_rte);
 
+    // It should fail if the user doesn't have a Vault open
+    assert!(data
+        .contract_client
+        .try_pay_debt(&depositor, &(initial_debt / 2))
+        .is_err());
+
     data.contract_client
         .new_vault(&depositor, &initial_debt, &collateral_amount);
 
@@ -432,4 +438,88 @@ fn test_pay_debt() {
 
     assert_eq!(data.stable_token_client.balance(&depositor), 0);
     assert_eq!(data.collateral_token_client.balance(&contract_address), 0);
+}
+
+#[test]
+fn test_increment_collateral() {
+    let env = Env::default();
+    let data = create_data(&env);
+
+    data.contract_client.s_c_state(
+        &data.contract_admin,
+        &data.collateral_token_client.contract_id,
+        &data.native_token_client.contract_id,
+        &data.stable_token_client.contract_id,
+    );
+
+    let collateral_price: i128 = 20000000;
+    let depositor = Address::random(&env);
+    let initial_debt: i128 = 50000000000;
+    let collateral_amount: i128 = 50000000000;
+    let contract_address: Address =
+        Address::from_contract_id(&env, &data.contract_client.contract_id);
+
+    let mn_col_rte: i128 = 11000000;
+    let mn_v_c_amt: i128 = 50000000000;
+    let op_col_rte: i128 = 11500000;
+
+    data.contract_client
+        .s_p_c_prce(&data.contract_admin, &collateral_price);
+
+    data.collateral_token_client.mint(
+        &data.collateral_token_admin,
+        &depositor,
+        &(collateral_amount * 2),
+    );
+
+    data.stable_token_client
+        .mint(&data.stable_token_admin, &contract_address, &initial_debt);
+
+    data.contract_client
+        .s_p_state(&data.contract_admin, &mn_col_rte, &mn_v_c_amt, &op_col_rte);
+
+    // It should fail if the user doesn't have a Vault open
+    assert!(data
+        .contract_client
+        .try_incr_col(&depositor, &collateral_amount)
+        .is_err());
+
+    data.contract_client
+        .new_vault(&depositor, &initial_debt, &collateral_amount);
+
+    let current_protocol_stats: ProtStats = data.contract_client.g_p_stats();
+
+    assert_eq!(current_protocol_stats.tot_vaults, 1);
+    assert_eq!(current_protocol_stats.tot_debt, initial_debt);
+    assert_eq!(current_protocol_stats.tot_col, collateral_amount);
+
+    data.contract_client
+        .incr_col(&depositor, &collateral_amount);
+
+    // Check the function is requiring the sender approved this operation
+    assert_eq!(
+        env.recorded_top_authorizations(),
+        std::vec![(
+            // Address for which auth is performed
+            depositor.clone(),
+            // Identifier of the called contract
+            data.contract_client.contract_id.clone(),
+            // Name of the called function
+            symbol!("incr_col"),
+            // Arguments used (converted to the env-managed vector via `into_val`)
+            (depositor.clone(), collateral_amount.clone()).into_val(&env),
+        )]
+    );
+
+    let updated_protocol_stats: ProtStats = data.contract_client.g_p_stats();
+
+    assert_eq!(updated_protocol_stats.tot_vaults, 1);
+    assert_eq!(updated_protocol_stats.tot_debt, initial_debt);
+    assert_eq!(updated_protocol_stats.tot_col, collateral_amount * 2);
+
+    assert_eq!(data.collateral_token_client.balance(&depositor), 0);
+    assert_eq!(
+        data.collateral_token_client.balance(&contract_address),
+        collateral_amount * 2
+    );
 }

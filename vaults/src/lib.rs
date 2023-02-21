@@ -96,6 +96,8 @@ pub trait VaultsContractTrait {
     fn new_vault(env: Env, caller: Address, initial_debt: i128, collateral_amount: i128);
 
     fn pay_debt(env: Env, caller: Address, amount: i128);
+
+    fn incr_col(env: Env, caller: Address, amount: i128);
 }
 
 pub struct VaultsContract;
@@ -150,6 +152,7 @@ impl VaultsContractTrait for VaultsContract {
     }
 
     fn s_p_c_prce(env: Env, caller: Address, price: i128) {
+        // TODO: this method should be updated in the future once there are oracles in the network
         caller.require_auth();
         check_admin(&env, caller);
 
@@ -168,7 +171,7 @@ impl VaultsContractTrait for VaultsContract {
             env.storage()
                 .set(&DataKeys::ProtRate, &protocol_collateral_price);
         } else {
-            // TODO: if there last time the rate was changed was more than 15 minutes ago shut down the issuance of new debt
+            // TODO: if the last time the rate was changed was more than 15 minutes ago shut down the issuance of new debt
         }
     }
 
@@ -232,7 +235,7 @@ impl VaultsContractTrait for VaultsContract {
         update_protocol_stats(&env, protocol_stats);
     }
 
-    fn pay_debt(env: Env, caller: Address, amount: i128) {
+    fn pay_debt(env: Env, caller: Address, deposit_amount: i128) {
         caller.require_auth();
 
         let key = DataKeys::UserVault(caller.clone());
@@ -245,7 +248,7 @@ impl VaultsContractTrait for VaultsContract {
 
         let mut user_vault: UserVault = env.storage().get(&key).unwrap().unwrap();
 
-        if amount > user_vault.total_debt {
+        if deposit_amount > user_vault.total_debt {
             panic_with_error!(&env, SCErrors::DepositAmountIsMoreThanTotalDebt);
         }
 
@@ -254,12 +257,12 @@ impl VaultsContractTrait for VaultsContract {
         token::Client::new(&env, &core_state.stble_tokn).xfer(
             &caller,
             &env.current_contract_address(),
-            &amount,
+            &deposit_amount,
         );
 
         let mut protocol_stats: ProtStats = get_protocol_stats(&env);
 
-        if user_vault.total_debt == amount {
+        if user_vault.total_debt == deposit_amount {
             // If the amount is equal to the debt it means it is paid in full so we release the collateral and remove the vault
             protocol_stats.tot_vaults = protocol_stats.tot_vaults - 1;
             protocol_stats.tot_col = protocol_stats.tot_col - user_vault.total_col;
@@ -273,12 +276,42 @@ impl VaultsContractTrait for VaultsContract {
             env.storage().remove(&key);
         } else {
             // If amount is not enough to pay all the debt, we just updated the stats of the user's vault
-            user_vault.total_debt = user_vault.total_debt - amount;
+            user_vault.total_debt = user_vault.total_debt - deposit_amount;
             env.storage().set(&key, &user_vault);
         }
 
-        protocol_stats.tot_debt = protocol_stats.tot_debt - amount;
+        protocol_stats.tot_debt = protocol_stats.tot_debt - deposit_amount;
 
+        update_protocol_stats(&env, protocol_stats);
+    }
+
+    fn incr_col(env: Env, caller: Address, collateral_amount: i128) {
+        caller.require_auth();
+
+        let key = DataKeys::UserVault(caller.clone());
+
+        if !env.storage().has(&key) {
+            panic_with_error!(&env, SCErrors::UserDoesntHaveAVault);
+        }
+
+        // TODO: Add fee logic
+
+        let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
+
+        token::Client::new(&env, &core_state.colla_tokn).xfer(
+            &caller,
+            &env.current_contract_address(),
+            &collateral_amount,
+        );
+
+        let mut user_vault: UserVault = env.storage().get(&key).unwrap().unwrap();
+
+        let mut protocol_stats: ProtStats = get_protocol_stats(&env);
+
+        user_vault.total_col = user_vault.total_col + collateral_amount;
+        protocol_stats.tot_col = protocol_stats.tot_col + collateral_amount;
+
+        env.storage().set(&key, &user_vault);
         update_protocol_stats(&env, protocol_stats);
     }
 }
