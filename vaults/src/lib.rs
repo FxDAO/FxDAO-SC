@@ -57,7 +57,7 @@ pub enum DataKeys {
     ProtState,
     ProtRate,
     ProtStats,
-    VaultKey(Address),
+    UserVault(Address),
 }
 
 #[contracterror]
@@ -66,9 +66,11 @@ pub enum DataKeys {
 pub enum SCErrors {
     AlreadyInit = 0,
     Unauthorized = 1,
-    EntityAlreadyHasVault = 2,
+    UserAlreadyHasVault = 2,
     InvalidInitialDebtAmount = 3,
     InvalidOpeningCollateralRatio = 4,
+    UserDoesntHaveAVault = 5,
+    DepositAmountIsMoreThanTotalDebt = 6,
 }
 
 pub trait VaultsContractTrait {
@@ -92,6 +94,8 @@ pub trait VaultsContractTrait {
     fn g_p_stats(env: Env) -> ProtStats;
 
     fn new_vault(env: Env, caller: Address, initial_debt: i128, collateral_amount: i128);
+
+    fn pay_debt(env: Env, caller: Address, amount: i128);
 }
 
 pub struct VaultsContract;
@@ -175,14 +179,15 @@ impl VaultsContractTrait for VaultsContract {
     fn new_vault(env: Env, caller: Address, initial_debt: i128, collateral_amount: i128) {
         caller.require_auth();
 
-        let key = DataKeys::VaultKey(caller.clone());
+        let key = DataKeys::UserVault(caller.clone());
 
         if env.storage().has(&key) {
-            panic_with_error!(&env, SCErrors::EntityAlreadyHasVault);
+            panic_with_error!(&env, SCErrors::UserAlreadyHasVault);
         }
 
         // TODO: check if we are in panic mode once is implemented
         // TODO: check if collateral price has been updated lately
+        // TODO: Add fee logic
 
         let protocol_state: ProtocolState = get_protocol_state(&env);
 
@@ -226,6 +231,56 @@ impl VaultsContractTrait for VaultsContract {
 
         update_protocol_stats(&env, protocol_stats);
     }
+
+    fn pay_debt(env: Env, caller: Address, amount: i128) {
+        caller.require_auth();
+
+        let key = DataKeys::UserVault(caller.clone());
+
+        if !env.storage().has(&key) {
+            panic_with_error!(&env, SCErrors::UserDoesntHaveAVault);
+        }
+
+        // TODO: Add fee logic
+
+        let mut user_vault: UserVault = env.storage().get(&key).unwrap().unwrap();
+
+        if amount > user_vault.total_debt {
+            panic_with_error!(&env, SCErrors::DepositAmountIsMoreThanTotalDebt);
+        }
+
+        let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
+
+        token::Client::new(&env, &core_state.stble_tokn).xfer(
+            &caller,
+            &env.current_contract_address(),
+            &amount,
+        );
+
+        let mut protocol_stats: ProtStats = get_protocol_stats(&env);
+
+        if user_vault.total_debt == amount {
+            // If the amount is equal to the debt it means it is paid in full so we release the collateral and remove the vault
+            protocol_stats.tot_vaults = protocol_stats.tot_vaults - 1;
+            protocol_stats.tot_col = protocol_stats.tot_col - user_vault.total_col;
+
+            token::Client::new(&env, &core_state.colla_tokn).xfer(
+                &env.current_contract_address(),
+                &caller,
+                &user_vault.total_col,
+            );
+
+            env.storage().remove(&key);
+        } else {
+            // If amount is not enough to pay all the debt, we just updated the stats of the user's vault
+            user_vault.total_debt = user_vault.total_debt - amount;
+            env.storage().set(&key, &user_vault);
+        }
+
+        protocol_stats.tot_debt = protocol_stats.tot_debt - amount;
+
+        update_protocol_stats(&env, protocol_stats);
+    }
 }
 
 fn check_admin(env: &Env, caller: Address) {
@@ -260,6 +315,7 @@ fn valid_initial_debt(env: &Env, state: &ProtocolState, initial_debt: i128) {
     }
 }
 
+// TODO: consider remove both deposit_collateral and withdraw_stablecoin
 fn deposit_collateral(
     env: &Env,
     collateral_token: BytesN<32>,
@@ -275,11 +331,11 @@ fn deposit_collateral(
 
 fn withdraw_stablecoin(
     env: &Env,
-    native_token: BytesN<32>,
+    contract: BytesN<32>,
     recipient: &Address,
     stablecoin_amount: i128,
 ) {
-    token::Client::new(&env, &native_token).xfer(
+    token::Client::new(&env, &contract).xfer(
         &env.current_contract_address(),
         &recipient,
         &stablecoin_amount,
