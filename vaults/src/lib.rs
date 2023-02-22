@@ -1,3 +1,5 @@
+// TODO: Handle decimals
+
 #![no_std]
 
 mod token {
@@ -19,13 +21,13 @@ pub struct CoreState {
 #[contracttype]
 pub struct ProtocolState {
     // Min collateral ratio - ex: 1.10
-    mn_col_rte: i128,
+    mn_col_rte: u128,
 
     // Min vault creation amount - ex: 5000
-    mn_v_c_amt: i128,
+    mn_v_c_amt: u128,
 
     // Opening collateral ratio - ex: 1.15
-    op_col_rte: i128,
+    op_col_rte: u128,
 }
 
 #[contracttype]
@@ -34,21 +36,21 @@ pub struct ProtocolCollateralPrice {
     last_updte: u64,
 
     // This is the current price of the collateral in our protocol
-    current: i128,
+    current: u128,
 }
 
 #[contracttype]
 pub struct ProtStats {
     tot_vaults: i64,
-    tot_debt: i128,
-    tot_col: i128,
+    tot_debt: u128,
+    tot_col: u128,
 }
 
 #[contracttype]
 pub struct UserVault {
     id: Address,
-    total_debt: i128,
-    total_col: i128,
+    total_debt: u128,
+    total_col: u128,
 }
 
 #[contracttype]
@@ -71,8 +73,10 @@ pub enum SCErrors {
     InvalidOpeningCollateralRatio = 4,
     UserDoesntHaveAVault = 5,
     DepositAmountIsMoreThanTotalDebt = 6,
+    CollateralRateUnderMinimun = 7,
 }
 
+// TODO: Explain each function here
 pub trait VaultsContractTrait {
     fn s_c_state(
         env: Env,
@@ -86,18 +90,19 @@ pub trait VaultsContractTrait {
     fn g_c_state(env: Env) -> CoreState;
 
     fn g_p_state(env: Env) -> ProtocolState;
-    fn s_p_state(env: Env, caller: Address, mn_col_rte: i128, mn_v_c_amt: i128, op_col_rte: i128);
+    fn s_p_state(env: Env, caller: Address, mn_col_rte: u128, mn_v_c_amt: u128, op_col_rte: u128);
 
     fn g_p_c_prce(env: Env) -> ProtocolCollateralPrice;
-    fn s_p_c_prce(env: Env, caller: Address, rate: i128);
+    fn s_p_c_prce(env: Env, caller: Address, rate: u128);
 
     fn g_p_stats(env: Env) -> ProtStats;
 
-    fn new_vault(env: Env, caller: Address, initial_debt: i128, collateral_amount: i128);
+    fn new_vault(env: Env, caller: Address, initial_debt: u128, collateral_amount: u128);
 
-    fn pay_debt(env: Env, caller: Address, amount: i128);
+    fn pay_debt(env: Env, caller: Address, amount: u128);
 
-    fn incr_col(env: Env, caller: Address, amount: i128);
+    fn incr_col(env: Env, caller: Address, amount: u128);
+    fn incr_debt(env: Env, caller: Address, debt_amount: u128);
 }
 
 pub struct VaultsContract;
@@ -133,7 +138,7 @@ impl VaultsContractTrait for VaultsContract {
         get_protocol_state(&env)
     }
 
-    fn s_p_state(env: Env, caller: Address, mn_col_rte: i128, mn_v_c_amt: i128, op_col_rte: i128) {
+    fn s_p_state(env: Env, caller: Address, mn_col_rte: u128, mn_v_c_amt: u128, op_col_rte: u128) {
         caller.require_auth();
         check_admin(&env, caller);
 
@@ -151,7 +156,7 @@ impl VaultsContractTrait for VaultsContract {
         get_protocol_collateral_price(&env)
     }
 
-    fn s_p_c_prce(env: Env, caller: Address, price: i128) {
+    fn s_p_c_prce(env: Env, caller: Address, price: u128) {
         // TODO: this method should be updated in the future once there are oracles in the network
         caller.require_auth();
         check_admin(&env, caller);
@@ -179,7 +184,7 @@ impl VaultsContractTrait for VaultsContract {
         get_protocol_stats(&env)
     }
 
-    fn new_vault(env: Env, caller: Address, initial_debt: i128, collateral_amount: i128) {
+    fn new_vault(env: Env, caller: Address, initial_debt: u128, collateral_amount: u128) {
         caller.require_auth();
 
         let key = DataKeys::UserVault(caller.clone());
@@ -199,11 +204,11 @@ impl VaultsContractTrait for VaultsContract {
         let protocol_collateral_price: ProtocolCollateralPrice =
             get_protocol_collateral_price(&env);
 
-        let collateral_value: i128 = protocol_collateral_price.current * collateral_amount;
+        let collateral_value: u128 = protocol_collateral_price.current * collateral_amount;
 
-        let deposit_rate: i128 = collateral_value / initial_debt;
+        let deposit_rate: u128 = collateral_value / initial_debt;
 
-        if deposit_rate < protocol_state.op_col_rte {
+        if deposit_rate < protocol_state.mn_col_rte {
             panic_with_error!(&env, SCErrors::InvalidOpeningCollateralRatio);
         }
 
@@ -235,7 +240,7 @@ impl VaultsContractTrait for VaultsContract {
         update_protocol_stats(&env, protocol_stats);
     }
 
-    fn pay_debt(env: Env, caller: Address, deposit_amount: i128) {
+    fn pay_debt(env: Env, caller: Address, deposit_amount: u128) {
         caller.require_auth();
 
         let key = DataKeys::UserVault(caller.clone());
@@ -257,7 +262,7 @@ impl VaultsContractTrait for VaultsContract {
         token::Client::new(&env, &core_state.stble_tokn).xfer(
             &caller,
             &env.current_contract_address(),
-            &deposit_amount,
+            &(deposit_amount as i128),
         );
 
         let mut protocol_stats: ProtStats = get_protocol_stats(&env);
@@ -270,7 +275,7 @@ impl VaultsContractTrait for VaultsContract {
             token::Client::new(&env, &core_state.colla_tokn).xfer(
                 &env.current_contract_address(),
                 &caller,
-                &user_vault.total_col,
+                &(user_vault.total_col as i128),
             );
 
             env.storage().remove(&key);
@@ -285,7 +290,7 @@ impl VaultsContractTrait for VaultsContract {
         update_protocol_stats(&env, protocol_stats);
     }
 
-    fn incr_col(env: Env, caller: Address, collateral_amount: i128) {
+    fn incr_col(env: Env, caller: Address, collateral_amount: u128) {
         caller.require_auth();
 
         let key = DataKeys::UserVault(caller.clone());
@@ -301,7 +306,7 @@ impl VaultsContractTrait for VaultsContract {
         token::Client::new(&env, &core_state.colla_tokn).xfer(
             &caller,
             &env.current_contract_address(),
-            &collateral_amount,
+            &(collateral_amount as i128),
         );
 
         let mut user_vault: UserVault = env.storage().get(&key).unwrap().unwrap();
@@ -310,6 +315,53 @@ impl VaultsContractTrait for VaultsContract {
 
         user_vault.total_col = user_vault.total_col + collateral_amount;
         protocol_stats.tot_col = protocol_stats.tot_col + collateral_amount;
+
+        env.storage().set(&key, &user_vault);
+        update_protocol_stats(&env, protocol_stats);
+    }
+
+    fn incr_debt(env: Env, caller: Address, debt_amount: u128) {
+        caller.require_auth();
+
+        let key = DataKeys::UserVault(caller.clone());
+
+        if !env.storage().has(&key) {
+            panic_with_error!(&env, SCErrors::UserDoesntHaveAVault);
+        }
+
+        // TODO: Add fee logic
+        // TODO: check if we are in panic mode once is implemented
+        // TODO: check if collateral price has been updated lately
+
+        let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
+
+        let protocol_collateral_price: ProtocolCollateralPrice =
+            get_protocol_collateral_price(&env);
+
+        let mut user_vault: UserVault = env.storage().get(&key).unwrap().unwrap();
+
+        let protocol_state: ProtocolState = get_protocol_state(&env);
+
+        let new_debt_amount: u128 = user_vault.total_debt + debt_amount;
+
+        let collateral_value: u128 = protocol_collateral_price.current * user_vault.total_col;
+
+        let deposit_rate: u128 = collateral_value / new_debt_amount;
+
+        if deposit_rate < protocol_state.op_col_rte {
+            panic_with_error!(&env, SCErrors::CollateralRateUnderMinimun);
+        }
+
+        token::Client::new(&env, &core_state.stble_tokn).xfer(
+            &env.current_contract_address(),
+            &caller,
+            &(debt_amount as i128),
+        );
+
+        let mut protocol_stats: ProtStats = get_protocol_stats(&env);
+
+        user_vault.total_debt = new_debt_amount;
+        protocol_stats.tot_debt = protocol_stats.tot_debt + debt_amount;
 
         env.storage().set(&key, &user_vault);
         update_protocol_stats(&env, protocol_stats);
@@ -342,7 +394,7 @@ fn get_protocol_collateral_price(env: &Env) -> ProtocolCollateralPrice {
         .unwrap()
 }
 
-fn valid_initial_debt(env: &Env, state: &ProtocolState, initial_debt: i128) {
+fn valid_initial_debt(env: &Env, state: &ProtocolState, initial_debt: u128) {
     if state.mn_v_c_amt > initial_debt {
         panic_with_error!(env, SCErrors::InvalidInitialDebtAmount);
     }
@@ -353,12 +405,12 @@ fn deposit_collateral(
     env: &Env,
     collateral_token: BytesN<32>,
     depositor: &Address,
-    collateral_amount: i128,
+    collateral_amount: u128,
 ) {
     token::Client::new(&env, &collateral_token).xfer(
         &depositor,
         &env.current_contract_address(),
-        &collateral_amount,
+        &(collateral_amount as i128),
     );
 }
 
@@ -366,12 +418,12 @@ fn withdraw_stablecoin(
     env: &Env,
     contract: BytesN<32>,
     recipient: &Address,
-    stablecoin_amount: i128,
+    stablecoin_amount: u128,
 ) {
     token::Client::new(&env, &contract).xfer(
         &env.current_contract_address(),
         &recipient,
-        &stablecoin_amount,
+        &(stablecoin_amount as i128),
     );
 }
 
