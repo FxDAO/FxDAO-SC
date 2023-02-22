@@ -2,12 +2,13 @@
 
 #![cfg(test)]
 extern crate std;
-use super::*;
+use crate::storage_types::*;
+use crate::token;
+use crate::VaultsContractClient;
 
-use crate::{token, CoreState, SCErrors, VaultsContractClient};
+use crate::storage_types::CoreState;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::testutils::Logger;
-use soroban_sdk::{assert_with_error, log, symbol, Address, BytesN, Env, IntoVal};
+use soroban_sdk::{symbol, Address, Env, IntoVal};
 
 fn create_token_contract(e: &Env, admin: &Address) -> token::Client {
     token::Client::new(&e, &e.register_stellar_asset_contract(admin.clone()))
@@ -23,7 +24,7 @@ struct TestData {
     collateral_token_client: token::Client,
 
     // Collateral token data
-    native_token_admin: Address,
+    // native_token_admin: Address,
     native_token_client: token::Client,
 
     // Collateral token data
@@ -57,15 +58,17 @@ fn create_base_data(env: &Env) -> TestData {
 
     // Create the contract
     let contract_admin = Address::random(&env);
-    let contract_client =
-        VaultsContractClient::new(&env, &env.register_contract(None, crate::VaultsContract));
+    let contract_client = VaultsContractClient::new(
+        &env,
+        &env.register_contract(None, crate::contract::VaultsContract),
+    );
 
     return TestData {
         contract_admin,
         contract_client,
         collateral_token_admin,
         collateral_token_client,
-        native_token_admin,
+        // native_token_admin,
         native_token_client,
         stable_token_admin,
         stable_token_client,
@@ -85,7 +88,7 @@ fn create_base_variables(env: &Env, data: &TestData) -> InitialVariables {
     }
 }
 
-fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVariables) {
+fn set_initial_state(data: &TestData, base_variables: &InitialVariables) {
     data.contract_client.s_c_state(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
@@ -581,7 +584,7 @@ fn test_increase_debt() {
     let env = Env::default();
     let data: TestData = create_base_data(&env);
     let base_variables: InitialVariables = create_base_variables(&env, &data);
-    set_initial_state(&env, &data, &base_variables);
+    set_initial_state(&data, &base_variables);
 
     data.collateral_token_client.mint(
         &data.collateral_token_admin,
