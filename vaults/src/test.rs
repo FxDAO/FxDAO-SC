@@ -97,10 +97,9 @@ fn set_initial_state(data: &TestData, base_variables: &InitialVariables) {
     );
 
     data.contract_client
-        .s_p_c_prce(&data.contract_admin, &base_variables.collateral_price);
+        .s_p_c_prce(&base_variables.collateral_price);
 
     data.contract_client.s_p_state(
-        &data.contract_admin,
         &base_variables.mn_col_rte,
         &base_variables.mn_v_c_amt,
         &base_variables.op_col_rte,
@@ -153,9 +152,10 @@ fn test_get_core_state() {
         &data.stable_token_client.contract_id,
     );
 
+    let saved_admin: Address = data.contract_client.get_admin();
     let core_state: CoreState = data.contract_client.g_c_state();
 
-    assert_eq!(core_state.admin, data.contract_admin);
+    assert_eq!(saved_admin, data.contract_admin);
     assert_eq!(core_state.nativ_tokn, data.native_token_client.contract_id);
     assert_eq!(
         core_state.colla_tokn,
@@ -181,8 +181,9 @@ fn test_set_and_get_protocol_state() {
     let op_col_rte: u128 = 11500000;
 
     data.contract_client
-        .s_p_state(&data.contract_admin, &mn_col_rte, &mn_v_c_amt, &op_col_rte);
+        .s_p_state(&mn_col_rte, &mn_v_c_amt, &op_col_rte);
 
+    // Check the admin is the one who call it
     assert_eq!(
         env.recorded_top_authorizations(),
         std::vec![(
@@ -193,13 +194,7 @@ fn test_set_and_get_protocol_state() {
             // Name of the called function
             symbol!("s_p_state"),
             // Arguments used (converted to the env-managed vector via `into_val`)
-            (
-                data.contract_admin.clone(),
-                mn_col_rte.clone(),
-                mn_v_c_amt.clone(),
-                op_col_rte.clone()
-            )
-                .into_val(&env)
+            (mn_col_rte.clone(), mn_v_c_amt.clone(), op_col_rte.clone()).into_val(&env)
         )]
     );
 
@@ -224,7 +219,7 @@ fn test_set_and_get_rate() {
 
     let rate: u128 = 931953;
 
-    data.contract_client.s_p_c_prce(&data.contract_admin, &rate);
+    data.contract_client.s_p_c_prce(&rate);
 
     // Check the function is requiring the sender approved this operation
     assert_eq!(
@@ -237,7 +232,7 @@ fn test_set_and_get_rate() {
             // Name of the called function
             symbol!("s_p_c_prce"),
             // Arguments used (converted to the env-managed vector via `into_val`)
-            (data.contract_admin.clone(), rate.clone()).into_val(&env)
+            (rate.clone(),).into_val(&env.clone())
         )]
     );
 
@@ -248,8 +243,7 @@ fn test_set_and_get_rate() {
 
     let new_rate: u128 = 941953;
 
-    data.contract_client
-        .s_p_c_prce(&data.contract_admin, &new_rate);
+    data.contract_client.s_p_c_prce(&new_rate);
 
     let new_protocol_rate: ProtocolCollateralPrice = data.contract_client.g_p_c_prce();
 
@@ -299,8 +293,7 @@ fn test_new_vault() {
         .try_new_vault(&depositor, &initial_debt, &collateral_amount)
         .is_err());
 
-    data.contract_client
-        .s_p_c_prce(&data.contract_admin, &collateral_price);
+    data.contract_client.s_p_c_prce(&collateral_price);
 
     data.collateral_token_client.mint(
         &data.collateral_token_admin,
@@ -321,7 +314,7 @@ fn test_new_vault() {
         .is_err());
 
     data.contract_client
-        .s_p_state(&data.contract_admin, &mn_col_rte, &mn_v_c_amt, &op_col_rte);
+        .s_p_state(&mn_col_rte, &mn_v_c_amt, &op_col_rte);
 
     data.contract_client
         .new_vault(&depositor, &initial_debt, &collateral_amount);
@@ -413,8 +406,7 @@ fn test_pay_debt() {
     let mn_v_c_amt: u128 = 50000000000;
     let op_col_rte: u128 = 11500000;
 
-    data.contract_client
-        .s_p_c_prce(&data.contract_admin, &collateral_price);
+    data.contract_client.s_p_c_prce(&collateral_price);
 
     data.collateral_token_client.mint(
         &data.collateral_token_admin,
@@ -429,7 +421,7 @@ fn test_pay_debt() {
     );
 
     data.contract_client
-        .s_p_state(&data.contract_admin, &mn_col_rte, &mn_v_c_amt, &op_col_rte);
+        .s_p_state(&mn_col_rte, &mn_v_c_amt, &op_col_rte);
 
     // It should fail if the user doesn't have a Vault open
     assert!(data
@@ -515,8 +507,7 @@ fn test_increase_collateral() {
     let mn_v_c_amt: u128 = 50000000000;
     let op_col_rte: u128 = 11500000;
 
-    data.contract_client
-        .s_p_c_prce(&data.contract_admin, &collateral_price);
+    data.contract_client.s_p_c_prce(&collateral_price);
 
     data.collateral_token_client.mint(
         &data.collateral_token_admin,
@@ -531,7 +522,7 @@ fn test_increase_collateral() {
     );
 
     data.contract_client
-        .s_p_state(&data.contract_admin, &mn_col_rte, &mn_v_c_amt, &op_col_rte);
+        .s_p_state(&mn_col_rte, &mn_v_c_amt, &op_col_rte);
 
     // It should fail if the user doesn't have a Vault open
     assert!(data

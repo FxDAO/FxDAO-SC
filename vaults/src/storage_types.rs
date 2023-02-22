@@ -2,7 +2,6 @@ use soroban_sdk::{contracterror, contracttype, Address, BytesN};
 
 #[contracttype]
 pub struct CoreState {
-    pub admin: Address,
     pub colla_tokn: BytesN<32>,
     pub nativ_tokn: BytesN<32>,
     pub stble_tokn: BytesN<32>,
@@ -49,6 +48,7 @@ pub enum DataKeys {
     ProtState,
     ProtRate,
     ProtStats,
+    Admin,
     UserVault(Address),
 }
 

@@ -6,6 +6,8 @@ use soroban_sdk::{contractimpl, panic_with_error, Address, BytesN, Env};
 
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
+    fn get_admin(env: Env) -> Address;
+
     fn s_c_state(
         env: Env,
         admin: Address,
@@ -17,10 +19,10 @@ pub trait VaultsContractTrait {
     fn g_c_state(env: Env) -> CoreState;
 
     fn g_p_state(env: Env) -> ProtocolState;
-    fn s_p_state(env: Env, caller: Address, mn_col_rte: u128, mn_v_c_amt: u128, op_col_rte: u128);
+    fn s_p_state(env: Env, mn_col_rte: u128, mn_v_c_amt: u128, op_col_rte: u128);
 
     fn g_p_c_prce(env: Env) -> ProtocolCollateralPrice;
-    fn s_p_c_prce(env: Env, caller: Address, rate: u128);
+    fn s_p_c_prce(env: Env, rate: u128);
 
     fn g_p_stats(env: Env) -> ProtStats;
 
@@ -36,6 +38,10 @@ pub struct VaultsContract;
 
 #[contractimpl]
 impl VaultsContractTrait for VaultsContract {
+    fn get_admin(env: Env) -> Address {
+        env.storage().get(&DataKeys::Admin).unwrap().unwrap()
+    }
+
     fn s_c_state(
         env: Env,
         admin: Address,
@@ -47,14 +53,14 @@ impl VaultsContractTrait for VaultsContract {
             panic_with_error!(&env, SCErrors::AlreadyInit);
         }
 
-        let core_state = CoreState {
-            admin,
+        let core_state: CoreState = CoreState {
             colla_tokn,
             nativ_tokn,
             stble_tokn,
         };
 
         env.storage().set(&DataKeys::CoreState, &core_state);
+        env.storage().set(&DataKeys::Admin, &admin);
     }
 
     fn g_c_state(env: Env) -> CoreState {
@@ -65,9 +71,8 @@ impl VaultsContractTrait for VaultsContract {
         get_protocol_state(&env)
     }
 
-    fn s_p_state(env: Env, caller: Address, mn_col_rte: u128, mn_v_c_amt: u128, op_col_rte: u128) {
-        caller.require_auth();
-        check_admin(&env, caller);
+    fn s_p_state(env: Env, mn_col_rte: u128, mn_v_c_amt: u128, op_col_rte: u128) {
+        check_admin(&env);
 
         env.storage().set(
             &DataKeys::ProtState,
@@ -83,10 +88,9 @@ impl VaultsContractTrait for VaultsContract {
         get_protocol_collateral_price(&env)
     }
 
-    fn s_p_c_prce(env: Env, caller: Address, price: u128) {
+    fn s_p_c_prce(env: Env, price: u128) {
         // TODO: this method should be updated in the future once there are oracles in the network
-        caller.require_auth();
-        check_admin(&env, caller);
+        check_admin(&env);
 
         let mut protocol_collateral_price: ProtocolCollateralPrice = env
             .storage()

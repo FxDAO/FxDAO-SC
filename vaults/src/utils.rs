@@ -2,12 +2,9 @@ use crate::storage_types::*;
 use crate::token;
 use soroban_sdk::{panic_with_error, Address, BytesN, Env};
 
-pub fn check_admin(env: &Env, caller: Address) {
-    let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
-
-    if core_state.admin != caller {
-        panic_with_error!(&env, SCErrors::Unauthorized);
-    }
+pub fn check_admin(env: &Env) {
+    let admin: Address = env.storage().get(&DataKeys::Admin).unwrap().unwrap();
+    admin.require_auth();
 }
 
 pub fn get_core_state(env: &Env) -> CoreState {
