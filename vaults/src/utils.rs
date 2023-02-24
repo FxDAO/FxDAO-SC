@@ -25,7 +25,7 @@ pub fn get_protocol_collateral_price(env: &Env) -> ProtocolCollateralPrice {
         .unwrap()
 }
 
-pub fn valid_initial_debt(env: &Env, state: &ProtocolState, initial_debt: u128) {
+pub fn valid_initial_debt(env: &Env, state: &ProtocolState, initial_debt: i128) {
     if state.mn_v_c_amt > initial_debt {
         panic_with_error!(env, SCErrors::InvalidInitialDebtAmount);
     }
@@ -36,7 +36,7 @@ pub fn deposit_collateral(
     env: &Env,
     collateral_token: BytesN<32>,
     depositor: &Address,
-    collateral_amount: u128,
+    collateral_amount: i128,
 ) {
     token::Client::new(&env, &collateral_token).xfer(
         &depositor,
@@ -49,7 +49,7 @@ pub fn withdraw_stablecoin(
     env: &Env,
     contract: BytesN<32>,
     recipient: &Address,
-    stablecoin_amount: u128,
+    stablecoin_amount: i128,
 ) {
     token::Client::new(&env, &contract).xfer(
         &env.current_contract_address(),
@@ -72,3 +72,19 @@ pub fn get_protocol_stats(env: &Env) -> ProtStats {
 pub fn update_protocol_stats(env: &Env, stats: ProtStats) {
     env.storage().set(&DataKeys::ProtStats, &stats);
 }
+
+pub fn check_positive(env: &Env, value: &i128) {
+    if value < &0 {
+        panic_with_error!(&env, SCErrors::UnsuportedNegativeValue);
+    }
+}
+
+// pub fn parse_number_or_default(number: i128, defaul: i128) -> i128 {
+//     let parsed = Decimal::from_i128_with_scale(number, DEFAULT_DECIMAL).to_i128();
+
+//     if parsed.is_some() {
+//         parsed.unwrap()
+//     } else {
+//         defaul
+//     }
+// }

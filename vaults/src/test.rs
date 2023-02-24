@@ -33,14 +33,14 @@ struct TestData {
 }
 
 struct InitialVariables {
-    collateral_price: u128,
+    collateral_price: i128,
     depositor: Address,
-    initial_debt: u128,
-    collateral_amount: u128,
+    initial_debt: i128,
+    collateral_amount: i128,
     contract_address: Address,
-    mn_col_rte: u128,
-    mn_v_c_amt: u128,
-    op_col_rte: u128,
+    mn_col_rte: i128,
+    mn_v_c_amt: i128,
+    op_col_rte: i128,
 }
 
 fn create_base_data(env: &Env) -> TestData {
@@ -89,7 +89,7 @@ fn create_base_variables(env: &Env, data: &TestData) -> InitialVariables {
 }
 
 fn set_initial_state(data: &TestData, base_variables: &InitialVariables) {
-    data.contract_client.s_c_state(
+    data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
         &data.native_token_client.contract_id,
@@ -111,7 +111,7 @@ fn test_set_core_state() {
     let env = Env::default();
     let data = create_base_data(&env);
 
-    data.contract_client.s_c_state(
+    data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
         &data.native_token_client.contract_id,
@@ -125,14 +125,14 @@ fn test_init_panic() {
     let env = Env::default();
     let data = create_base_data(&env);
 
-    data.contract_client.s_c_state(
+    data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
         &data.native_token_client.contract_id,
         &data.stable_token_client.contract_id,
     );
 
-    data.contract_client.s_c_state(
+    data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
         &data.native_token_client.contract_id,
@@ -145,7 +145,7 @@ fn test_get_core_state() {
     let env = Env::default();
     let data = create_base_data(&env);
 
-    data.contract_client.s_c_state(
+    data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
         &data.native_token_client.contract_id,
@@ -169,16 +169,16 @@ fn test_set_and_get_protocol_state() {
     let env = Env::default();
     let data = create_base_data(&env);
 
-    data.contract_client.s_c_state(
+    data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
         &data.native_token_client.contract_id,
         &data.stable_token_client.contract_id,
     );
 
-    let mn_col_rte: u128 = 11000000;
-    let mn_v_c_amt: u128 = 50000000000;
-    let op_col_rte: u128 = 11500000;
+    let mn_col_rte: i128 = 1_1000000;
+    let mn_v_c_amt: i128 = 5000_0000000;
+    let op_col_rte: i128 = 1_1500000;
 
     data.contract_client
         .s_p_state(&mn_col_rte, &mn_v_c_amt, &op_col_rte);
@@ -198,11 +198,17 @@ fn test_set_and_get_protocol_state() {
         )]
     );
 
+    // Fail if one value is neative
+    assert!(data
+        .contract_client
+        .try_s_p_state(&mn_col_rte, &mn_v_c_amt, &-23)
+        .is_err());
+
     let protocol_state = data.contract_client.g_p_state();
 
-    assert_eq!(protocol_state.mn_col_rte, mn_col_rte);
-    assert_eq!(protocol_state.mn_v_c_amt, mn_v_c_amt);
-    assert_eq!(protocol_state.op_col_rte, op_col_rte);
+    assert_eq!(protocol_state.mn_col_rte, 11000000);
+    assert_eq!(protocol_state.mn_v_c_amt, 50000000000);
+    assert_eq!(protocol_state.op_col_rte, 11500000);
 }
 
 #[test]
@@ -210,14 +216,14 @@ fn test_set_and_get_rate() {
     let env = Env::default();
     let data = create_base_data(&env);
 
-    data.contract_client.s_c_state(
+    data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
         &data.native_token_client.contract_id,
         &data.stable_token_client.contract_id,
     );
 
-    let rate: u128 = 931953;
+    let rate: i128 = 931953;
 
     data.contract_client.s_p_c_prce(&rate);
 
@@ -241,7 +247,7 @@ fn test_set_and_get_rate() {
     // We test that the first update is done correctly
     assert_eq!(&current_protocol_rate.current, &rate);
 
-    let new_rate: u128 = 941953;
+    let new_rate: i128 = 941953;
 
     data.contract_client.s_p_c_prce(&new_rate);
 
@@ -269,23 +275,23 @@ fn test_new_vault() {
     let env = Env::default();
     let data = create_base_data(&env);
 
-    data.contract_client.s_c_state(
+    data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
         &data.native_token_client.contract_id,
         &data.stable_token_client.contract_id,
     );
 
-    let collateral_price: u128 = 20000000;
+    let collateral_price: i128 = 20000000;
     let depositor = Address::random(&env);
-    let initial_debt: u128 = 50000000000;
-    let collateral_amount: u128 = 50000000000;
+    let initial_debt: i128 = 50000000000;
+    let collateral_amount: i128 = 50000000000;
     let contract_address: Address =
         Address::from_contract_id(&env, &data.contract_client.contract_id);
 
-    let mn_col_rte: u128 = 11000000;
-    let mn_v_c_amt: u128 = 50000000000;
-    let op_col_rte: u128 = 11500000;
+    let mn_col_rte: i128 = 11000000;
+    let mn_v_c_amt: i128 = 50000000000;
+    let op_col_rte: i128 = 11500000;
 
     // If the method is called before collateral price is set it should fail
     assert!(data
@@ -298,13 +304,13 @@ fn test_new_vault() {
     data.collateral_token_client.mint(
         &data.collateral_token_admin,
         &depositor,
-        &((collateral_amount * 2) as i128),
+        &(collateral_amount * 2),
     );
 
     data.stable_token_client.mint(
         &data.stable_token_admin,
         &contract_address,
-        &((initial_debt * 10) as i128),
+        &(initial_debt * 10),
     );
 
     // If the method is called before protocol state is set it should fail
@@ -341,12 +347,9 @@ fn test_new_vault() {
 
     assert_eq!(
         data.collateral_token_client.balance(&contract_address),
-        (collateral_amount as i128)
+        (collateral_amount)
     );
-    assert_eq!(
-        data.stable_token_client.balance(&depositor),
-        (initial_debt as i128)
-    );
+    assert_eq!(data.stable_token_client.balance(&depositor), (initial_debt));
 
     let current_protocol_stats: ProtStats = data.contract_client.g_p_stats();
 
@@ -365,7 +368,7 @@ fn test_new_vault() {
     data.collateral_token_client.mint(
         &data.collateral_token_admin,
         &depositor_2,
-        &((collateral_amount * 2) as i128),
+        &(collateral_amount * 2),
     );
 
     data.contract_client
@@ -373,7 +376,7 @@ fn test_new_vault() {
 
     assert_eq!(
         data.stable_token_client.balance(&depositor_2),
-        (initial_debt as i128)
+        (initial_debt)
     );
 
     let updated_protocol_stats: ProtStats = data.contract_client.g_p_stats();
@@ -388,36 +391,36 @@ fn test_pay_debt() {
     let env = Env::default();
     let data = create_base_data(&env);
 
-    data.contract_client.s_c_state(
+    data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
         &data.native_token_client.contract_id,
         &data.stable_token_client.contract_id,
     );
 
-    let collateral_price: u128 = 20000000;
+    let collateral_price: i128 = 20000000;
     let depositor = Address::random(&env);
-    let initial_debt: u128 = 50000000000;
-    let collateral_amount: u128 = 50000000000;
+    let initial_debt: i128 = 50000000000;
+    let collateral_amount: i128 = 50000000000;
     let contract_address: Address =
         Address::from_contract_id(&env, &data.contract_client.contract_id);
 
-    let mn_col_rte: u128 = 11000000;
-    let mn_v_c_amt: u128 = 50000000000;
-    let op_col_rte: u128 = 11500000;
+    let mn_col_rte: i128 = 11000000;
+    let mn_v_c_amt: i128 = 50000000000;
+    let op_col_rte: i128 = 11500000;
 
     data.contract_client.s_p_c_prce(&collateral_price);
 
     data.collateral_token_client.mint(
         &data.collateral_token_admin,
         &depositor,
-        &(collateral_amount as i128),
+        &(collateral_amount),
     );
 
     data.stable_token_client.mint(
         &data.stable_token_admin,
         &contract_address,
-        &((initial_debt * 10) as i128),
+        &(initial_debt * 10),
     );
 
     data.contract_client
@@ -464,11 +467,11 @@ fn test_pay_debt() {
 
     assert_eq!(
         data.stable_token_client.balance(&depositor),
-        (initial_debt / 2) as i128
+        (initial_debt / 2)
     );
     assert_eq!(
         data.collateral_token_client.balance(&contract_address),
-        (collateral_amount) as i128
+        (collateral_amount)
     );
 
     data.contract_client
@@ -489,37 +492,34 @@ fn test_increase_collateral() {
     let env = Env::default();
     let data = create_base_data(&env);
 
-    data.contract_client.s_c_state(
+    data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
         &data.native_token_client.contract_id,
         &data.stable_token_client.contract_id,
     );
 
-    let collateral_price: u128 = 20000000;
+    let collateral_price: i128 = 20000000;
     let depositor = Address::random(&env);
-    let initial_debt: u128 = 50000000000;
-    let collateral_amount: u128 = 50000000000;
+    let initial_debt: i128 = 50000000000;
+    let collateral_amount: i128 = 50000000000;
     let contract_address: Address =
         Address::from_contract_id(&env, &data.contract_client.contract_id);
 
-    let mn_col_rte: u128 = 11000000;
-    let mn_v_c_amt: u128 = 50000000000;
-    let op_col_rte: u128 = 11500000;
+    let mn_col_rte: i128 = 11000000;
+    let mn_v_c_amt: i128 = 50000000000;
+    let op_col_rte: i128 = 11500000;
 
     data.contract_client.s_p_c_prce(&collateral_price);
 
     data.collateral_token_client.mint(
         &data.collateral_token_admin,
         &depositor,
-        &((collateral_amount * 2) as i128),
+        &(collateral_amount * 2),
     );
 
-    data.stable_token_client.mint(
-        &data.stable_token_admin,
-        &contract_address,
-        &(initial_debt as i128),
-    );
+    data.stable_token_client
+        .mint(&data.stable_token_admin, &contract_address, &(initial_debt));
 
     data.contract_client
         .s_p_state(&mn_col_rte, &mn_v_c_amt, &op_col_rte);
@@ -566,7 +566,7 @@ fn test_increase_collateral() {
     assert_eq!(data.collateral_token_client.balance(&depositor), 0);
     assert_eq!(
         data.collateral_token_client.balance(&contract_address),
-        (collateral_amount * 2) as i128
+        (collateral_amount * 2)
     );
 }
 
@@ -580,13 +580,13 @@ fn test_increase_debt() {
     data.collateral_token_client.mint(
         &data.collateral_token_admin,
         &base_variables.depositor,
-        &((base_variables.collateral_amount * 5) as i128),
+        &(base_variables.collateral_amount * 5),
     );
 
     data.stable_token_client.mint(
         &data.stable_token_admin,
         &base_variables.contract_address,
-        &((base_variables.initial_debt * 5) as i128),
+        &(base_variables.initial_debt * 5),
     );
 
     // It should fail if the user doesn't have a Vault open
@@ -612,7 +612,7 @@ fn test_increase_debt() {
 
     assert_eq!(
         data.stable_token_client.balance(&base_variables.depositor),
-        base_variables.initial_debt as i128
+        base_variables.initial_debt
     );
 
     data.contract_client
@@ -651,6 +651,6 @@ fn test_increase_debt() {
 
     assert_eq!(
         data.stable_token_client.balance(&base_variables.depositor),
-        (base_variables.initial_debt * 2) as i128
+        (base_variables.initial_debt * 2)
     );
 }
