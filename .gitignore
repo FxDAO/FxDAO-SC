@@ -12,6 +12,8 @@ $RECYCLE.BIN/
 *.log
 log.txt
 
+/temp
+
 
 /.sourcemaps
 /.versions

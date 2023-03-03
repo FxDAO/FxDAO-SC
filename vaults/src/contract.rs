@@ -6,7 +6,9 @@ use soroban_sdk::{contractimpl, panic_with_error, Address, BytesN, Env};
 
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
-    fn get_admin(env: Env) -> Address;
+    // These two functions are temporal and only to use while the soroban-cli gets updated an allows parsing BytesN<32> -> Address
+    fn inc_prot(env: Env, issuer: Address);
+    fn inc_stab(env: Env, issuer: Address);
 
     fn init(
         env: Env,
@@ -16,10 +18,12 @@ pub trait VaultsContractTrait {
         stble_tokn: BytesN<32>,
     );
 
+    fn get_admin(env: Env) -> Address;
+
     fn g_c_state(env: Env) -> CoreState;
 
-    fn g_p_state(env: Env) -> ProtocolState;
     fn s_p_state(env: Env, mn_col_rte: i128, mn_v_c_amt: i128, op_col_rte: i128);
+    fn g_p_state(env: Env) -> ProtocolState;
 
     fn g_p_c_prce(env: Env) -> ProtocolCollateralPrice;
     fn s_p_c_prce(env: Env, rate: i128);
@@ -27,17 +31,38 @@ pub trait VaultsContractTrait {
     fn g_p_stats(env: Env) -> ProtStats;
 
     fn new_vault(env: Env, caller: Address, initial_debt: i128, collateral_amount: i128);
-
-    fn pay_debt(env: Env, caller: Address, amount: i128);
+    fn get_vault(env: Env, caller: Address) -> UserVault;
 
     fn incr_col(env: Env, caller: Address, amount: i128);
     fn incr_debt(env: Env, caller: Address, debt_amount: i128);
+
+    fn pay_debt(env: Env, caller: Address, amount: i128);
 }
 
 pub struct VaultsContract;
 
 #[contractimpl]
 impl VaultsContractTrait for VaultsContract {
+    fn inc_prot(env: Env, issuer: Address) {
+        issuer.require_auth();
+        let core_state = get_core_state(&env);
+        token::Client::new(&env, &core_state.nativ_tokn).xfer(
+            &issuer,
+            &env.current_contract_address(),
+            &20_000_000_0000000,
+        );
+    }
+
+    fn inc_stab(env: Env, issuer: Address) {
+        issuer.require_auth();
+        let core_state = get_core_state(&env);
+        token::Client::new(&env, &core_state.stble_tokn).xfer(
+            &issuer,
+            &env.current_contract_address(),
+            &50_000_000_0000000,
+        );
+    }
+
     fn init(
         env: Env,
         admin: Address,
@@ -67,10 +92,6 @@ impl VaultsContractTrait for VaultsContract {
         get_core_state(&env)
     }
 
-    fn g_p_state(env: Env) -> ProtocolState {
-        get_protocol_state(&env)
-    }
-
     fn s_p_state(env: Env, mn_col_rte: i128, mn_v_c_amt: i128, op_col_rte: i128) {
         check_admin(&env);
         check_positive(&env, &mn_col_rte);
@@ -85,6 +106,10 @@ impl VaultsContractTrait for VaultsContract {
                 op_col_rte: op_col_rte,
             },
         );
+    }
+
+    fn g_p_state(env: Env) -> ProtocolState {
+        get_protocol_state(&env)
     }
 
     fn g_p_c_prce(env: Env) -> ProtocolCollateralPrice {
@@ -105,6 +130,7 @@ impl VaultsContractTrait for VaultsContract {
             }))
             .unwrap();
 
+        // TODO: Check if the price was updated recently
         if price != protocol_collateral_price.current {
             protocol_collateral_price.current = price;
             protocol_collateral_price.last_updte = env.ledger().timestamp();
@@ -177,55 +203,8 @@ impl VaultsContractTrait for VaultsContract {
         update_protocol_stats(&env, protocol_stats);
     }
 
-    fn pay_debt(env: Env, caller: Address, deposit_amount: i128) {
-        caller.require_auth();
-        check_positive(&env, &deposit_amount);
-
-        let key = DataKeys::UserVault(caller.clone());
-
-        if !env.storage().has(&key) {
-            panic_with_error!(&env, SCErrors::UserDoesntHaveAVault);
-        }
-
-        // TODO: Add fee logic
-
-        let mut user_vault: UserVault = env.storage().get(&key).unwrap().unwrap();
-
-        if deposit_amount > user_vault.total_debt {
-            panic_with_error!(&env, SCErrors::DepositAmountIsMoreThanTotalDebt);
-        }
-
-        let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
-
-        token::Client::new(&env, &core_state.stble_tokn).xfer(
-            &caller,
-            &env.current_contract_address(),
-            &(deposit_amount as i128),
-        );
-
-        let mut protocol_stats: ProtStats = get_protocol_stats(&env);
-
-        if user_vault.total_debt == deposit_amount {
-            // If the amount is equal to the debt it means it is paid in full so we release the collateral and remove the vault
-            protocol_stats.tot_vaults = protocol_stats.tot_vaults - 1;
-            protocol_stats.tot_col = protocol_stats.tot_col - user_vault.total_col;
-
-            token::Client::new(&env, &core_state.colla_tokn).xfer(
-                &env.current_contract_address(),
-                &caller,
-                &(user_vault.total_col as i128),
-            );
-
-            env.storage().remove(&key);
-        } else {
-            // If amount is not enough to pay all the debt, we just updated the stats of the user's vault
-            user_vault.total_debt = user_vault.total_debt - deposit_amount;
-            env.storage().set(&key, &user_vault);
-        }
-
-        protocol_stats.tot_debt = protocol_stats.tot_debt - deposit_amount;
-
-        update_protocol_stats(&env, protocol_stats);
+    fn get_vault(env: Env, caller: Address) -> UserVault {
+        env.storage().get(&DataKeys::UserVault(caller.clone())).unwrap().unwrap()
     }
 
     fn incr_col(env: Env, caller: Address, collateral_amount: i128) {
@@ -245,7 +224,7 @@ impl VaultsContractTrait for VaultsContract {
         token::Client::new(&env, &core_state.colla_tokn).xfer(
             &caller,
             &env.current_contract_address(),
-            &(collateral_amount as i128),
+            &collateral_amount,
         );
 
         let mut user_vault: UserVault = env.storage().get(&key).unwrap().unwrap();
@@ -304,6 +283,57 @@ impl VaultsContractTrait for VaultsContract {
         protocol_stats.tot_debt = protocol_stats.tot_debt + debt_amount;
 
         env.storage().set(&key, &user_vault);
+        update_protocol_stats(&env, protocol_stats);
+    }
+
+    fn pay_debt(env: Env, caller: Address, deposit_amount: i128) {
+        caller.require_auth();
+        check_positive(&env, &deposit_amount);
+
+        let key = DataKeys::UserVault(caller.clone());
+
+        if !env.storage().has(&key) {
+            panic_with_error!(&env, SCErrors::UserDoesntHaveAVault);
+        }
+
+        // TODO: Add fee logic
+
+        let mut user_vault: UserVault = env.storage().get(&key).unwrap().unwrap();
+
+        if deposit_amount > user_vault.total_debt {
+            panic_with_error!(&env, SCErrors::DepositAmountIsMoreThanTotalDebt);
+        }
+
+        let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
+
+        token::Client::new(&env, &core_state.stble_tokn).xfer(
+            &caller,
+            &env.current_contract_address(),
+            &(deposit_amount as i128),
+        );
+
+        let mut protocol_stats: ProtStats = get_protocol_stats(&env);
+
+        if user_vault.total_debt == deposit_amount {
+            // If the amount is equal to the debt it means it is paid in full so we release the collateral and remove the vault
+            protocol_stats.tot_vaults = protocol_stats.tot_vaults - 1;
+            protocol_stats.tot_col = protocol_stats.tot_col - user_vault.total_col;
+
+            token::Client::new(&env, &core_state.colla_tokn).xfer(
+                &env.current_contract_address(),
+                &caller,
+                &(user_vault.total_col as i128),
+            );
+
+            env.storage().remove(&key);
+        } else {
+            // If amount is not enough to pay all the debt, we just updated the stats of the user's vault
+            user_vault.total_debt = user_vault.total_debt - deposit_amount;
+            env.storage().set(&key, &user_vault);
+        }
+
+        protocol_stats.tot_debt = protocol_stats.tot_debt - deposit_amount;
+
         update_protocol_stats(&env, protocol_stats);
     }
 }

@@ -1,17 +1,11 @@
 use soroban_sdk::{contracterror, contracttype, Address, BytesN};
 
-pub const DEFAULT_DECIMAL: u32 = 7;
-
 #[contracttype]
 pub struct CoreState {
     pub colla_tokn: BytesN<32>,
     pub nativ_tokn: BytesN<32>,
     pub stble_tokn: BytesN<32>,
 }
-
-pub const DEFAULT_MIN_COLLATERAL_RATIO: i128 = 11000000;
-pub const DEFAULT_MIN_VAULT_CREATION_AMOUNT: i128 = 50000000000;
-pub const DEFAULT_OPENING_COLLATERAL_RATIO: i128 = 11500000;
 
 #[contracttype]
 pub struct ProtocolState {
