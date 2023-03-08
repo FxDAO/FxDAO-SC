@@ -1,3 +1,4 @@
+use num_integer::div_floor;
 use crate::storage_types::*;
 use crate::token;
 use crate::utils::*;
@@ -169,7 +170,7 @@ impl VaultsContractTrait for VaultsContract {
 
         let collateral_value: i128 = protocol_collateral_price.current * collateral_amount;
 
-        let deposit_rate: i128 = collateral_value / initial_debt;
+        let deposit_rate: i128 = div_floor(collateral_value, initial_debt);
 
         if deposit_rate < protocol_state.mn_col_rte {
             panic_with_error!(&env, SCErrors::InvalidOpeningCollateralRatio);
@@ -266,7 +267,7 @@ impl VaultsContractTrait for VaultsContract {
 
         let collateral_value: i128 = protocol_collateral_price.current * user_vault.total_col;
 
-        let deposit_rate: i128 = collateral_value / new_debt_amount;
+        let deposit_rate: i128 = div_floor(collateral_value, new_debt_amount);
 
         if deposit_rate < protocol_state.op_col_rte {
             panic_with_error!(&env, SCErrors::CollateralRateUnderMinimun);

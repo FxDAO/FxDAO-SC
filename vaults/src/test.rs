@@ -261,16 +261,16 @@ fn test_new_vault() {
         &data.stable_token_client.contract_id,
     );
 
-    let collateral_price: i128 = 20000000;
+    let collateral_price: i128 = 830124; // 0.0830124
     let depositor = Address::random(&env);
-    let initial_debt: i128 = 50000000000;
-    let collateral_amount: i128 = 50000000000;
+    let initial_debt: i128 = 5_000_0000000; // USD 5000
+    let collateral_amount: i128 = 90_347_8867088; // 90,347.8867088 XLM
     let contract_address: Address =
         Address::from_contract_id(&env, &data.contract_client.contract_id);
 
-    let mn_col_rte: i128 = 11000000;
-    let mn_v_c_amt: i128 = 50000000000;
-    let op_col_rte: i128 = 11500000;
+    let mn_col_rte: i128 = 1_1000000;
+    let mn_v_c_amt: i128 = 5000_0000000;
+    let op_col_rte: i128 = 1_1500000;
 
     // If the method is called before collateral price is set it should fail
     assert!(data

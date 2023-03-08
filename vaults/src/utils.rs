@@ -78,13 +78,3 @@ pub fn check_positive(env: &Env, value: &i128) {
         panic_with_error!(&env, SCErrors::UnsuportedNegativeValue);
     }
 }
-
-// pub fn parse_number_or_default(number: i128, defaul: i128) -> i128 {
-//     let parsed = Decimal::from_i128_with_scale(number, DEFAULT_DECIMAL).to_i128();
-
-//     if parsed.is_some() {
-//         parsed.unwrap()
-//     } else {
-//         defaul
-//     }
-// }
