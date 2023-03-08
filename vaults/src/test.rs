@@ -1,4 +1,4 @@
-// TODO: documentate all the steps in the tests
+// TODO: specify all the steps in the tests
 
 #![cfg(test)]
 extern crate std;
@@ -107,7 +107,7 @@ fn set_initial_state(data: &TestData, base_variables: &InitialVariables) {
 }
 
 #[test]
-fn test_set_core_state() {
+fn test_set_and_get_core_state() {
     let env = Env::default();
     let data = create_base_data(&env);
 
@@ -117,6 +117,17 @@ fn test_set_core_state() {
         &data.native_token_client.contract_id,
         &data.stable_token_client.contract_id,
     );
+
+    let saved_admin: Address = data.contract_client.get_admin();
+    let core_state: CoreState = data.contract_client.g_c_state();
+
+    assert_eq!(saved_admin, data.contract_admin);
+    assert_eq!(core_state.nativ_tokn, data.native_token_client.contract_id);
+    assert_eq!(
+        core_state.colla_tokn,
+        data.collateral_token_client.contract_id
+    );
+    assert_eq!(core_state.stble_tokn, data.stable_token_client.contract_id);
 }
 
 #[test]
@@ -141,33 +152,10 @@ fn test_init_panic() {
 }
 
 #[test]
-fn test_get_core_state() {
-    let env = Env::default();
-    let data = create_base_data(&env);
-
-    data.contract_client.init(
-        &data.contract_admin,
-        &data.collateral_token_client.contract_id,
-        &data.native_token_client.contract_id,
-        &data.stable_token_client.contract_id,
-    );
-
-    let saved_admin: Address = data.contract_client.get_admin();
-    let core_state: CoreState = data.contract_client.g_c_state();
-
-    assert_eq!(saved_admin, data.contract_admin);
-    assert_eq!(core_state.nativ_tokn, data.native_token_client.contract_id);
-    assert_eq!(
-        core_state.colla_tokn,
-        data.collateral_token_client.contract_id
-    );
-    assert_eq!(core_state.stble_tokn, data.stable_token_client.contract_id);
-}
-
-#[test]
 fn test_set_and_get_protocol_state() {
     let env = Env::default();
-    let data = create_base_data(&env);
+    let data: TestData = create_base_data(&env);
+    let base_variables: InitialVariables = create_base_variables(&env, &data);
 
     data.contract_client.init(
         &data.contract_admin,
@@ -176,12 +164,8 @@ fn test_set_and_get_protocol_state() {
         &data.stable_token_client.contract_id,
     );
 
-    let mn_col_rte: i128 = 1_1000000;
-    let mn_v_c_amt: i128 = 5000_0000000;
-    let op_col_rte: i128 = 1_1500000;
-
     data.contract_client
-        .s_p_state(&mn_col_rte, &mn_v_c_amt, &op_col_rte);
+        .s_p_state(&base_variables.mn_col_rte, &base_variables.mn_v_c_amt, &base_variables.op_col_rte);
 
     // Check the admin is the one who call it
     assert_eq!(
@@ -194,14 +178,14 @@ fn test_set_and_get_protocol_state() {
             // Name of the called function
             symbol!("s_p_state"),
             // Arguments used (converted to the env-managed vector via `into_val`)
-            (mn_col_rte.clone(), mn_v_c_amt.clone(), op_col_rte.clone()).into_val(&env)
+            (base_variables.mn_col_rte.clone(), base_variables.mn_v_c_amt.clone(), base_variables.op_col_rte.clone()).into_val(&env)
         )]
     );
 
     // Fail if one value is neative
     assert!(data
         .contract_client
-        .try_s_p_state(&mn_col_rte, &mn_v_c_amt, &-23)
+        .try_s_p_state(&base_variables.mn_col_rte, &base_variables.mn_v_c_amt, &-23)
         .is_err());
 
     let protocol_state = data.contract_client.g_p_state();
@@ -214,14 +198,9 @@ fn test_set_and_get_protocol_state() {
 #[test]
 fn test_set_and_get_rate() {
     let env = Env::default();
-    let data = create_base_data(&env);
-
-    data.contract_client.init(
-        &data.contract_admin,
-        &data.collateral_token_client.contract_id,
-        &data.native_token_client.contract_id,
-        &data.stable_token_client.contract_id,
-    );
+    let data: TestData = create_base_data(&env);
+    let base_variables: InitialVariables = create_base_variables(&env, &data);
+    set_initial_state(&data, &base_variables);
 
     let rate: i128 = 931953;
 
@@ -389,14 +368,9 @@ fn test_new_vault() {
 #[test]
 fn test_pay_debt() {
     let env = Env::default();
-    let data = create_base_data(&env);
-
-    data.contract_client.init(
-        &data.contract_admin,
-        &data.collateral_token_client.contract_id,
-        &data.native_token_client.contract_id,
-        &data.stable_token_client.contract_id,
-    );
+    let data: TestData = create_base_data(&env);
+    let base_variables: InitialVariables = create_base_variables(&env, &data);
+    set_initial_state(&data, &base_variables);
 
     let collateral_price: i128 = 20000000;
     let depositor = Address::random(&env);
@@ -490,14 +464,9 @@ fn test_pay_debt() {
 #[test]
 fn test_increase_collateral() {
     let env = Env::default();
-    let data = create_base_data(&env);
-
-    data.contract_client.init(
-        &data.contract_admin,
-        &data.collateral_token_client.contract_id,
-        &data.native_token_client.contract_id,
-        &data.stable_token_client.contract_id,
-    );
+    let data: TestData = create_base_data(&env);
+    let base_variables: InitialVariables = create_base_variables(&env, &data);
+    set_initial_state(&data, &base_variables);
 
     let collateral_price: i128 = 20000000;
     let depositor = Address::random(&env);

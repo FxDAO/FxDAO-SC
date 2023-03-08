@@ -101,9 +101,9 @@ impl VaultsContractTrait for VaultsContract {
         env.storage().set(
             &DataKeys::ProtState,
             &ProtocolState {
-                mn_col_rte: mn_col_rte,
-                mn_v_c_amt: mn_v_c_amt,
-                op_col_rte: op_col_rte,
+                mn_col_rte,
+                mn_v_c_amt,
+                op_col_rte,
             },
         );
     }
@@ -146,6 +146,8 @@ impl VaultsContractTrait for VaultsContract {
     }
 
     fn new_vault(env: Env, caller: Address, initial_debt: i128, collateral_amount: i128) {
+        // TODO: check if we are in panic mode once is implemented
+
         caller.require_auth();
         check_positive(&env, &initial_debt);
         check_positive(&env, &collateral_amount);
@@ -156,9 +158,7 @@ impl VaultsContractTrait for VaultsContract {
             panic_with_error!(&env, SCErrors::UserAlreadyHasVault);
         }
 
-        // TODO: check if we are in panic mode once is implemented
         // TODO: check if collateral price has been updated lately
-        // TODO: Add fee logic
 
         let protocol_state: ProtocolState = get_protocol_state(&env);
 
@@ -175,6 +175,7 @@ impl VaultsContractTrait for VaultsContract {
             panic_with_error!(&env, SCErrors::InvalidOpeningCollateralRatio);
         }
 
+        // TODO: Add fee logic
         let new_vault = UserVault {
             id: caller.clone(),
             total_col: collateral_amount,

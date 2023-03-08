@@ -50,6 +50,7 @@ pub enum DataKeys {
     ProtStats,
     Admin,
     UserVault(Address),
+    PanicMode,
 }
 
 #[contracterror]
