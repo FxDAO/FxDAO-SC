@@ -49,3 +49,17 @@ sandbox_full_set_up:
 	make sandbox_install_contracts
 	make sandbox_deploy_assets
 
+launch_standalone:
+	docker run -d -it \
+      -p 8000:8000 \
+      --name stellar-soroban-network \
+      stellar/quickstart:soroban-dev \
+      --standalone \
+      --enable-soroban-rpc
+
+standalone_fund_accounts:
+	curl 'http://localhost:8000/friendbot?addr=GCQDSTJQKHSZICYDHGI3U73VOYCPGI5QEEOCVUORFWCYN5MH26XHH2LZ' && \
+    curl 'http://localhost:8000/friendbot?addr=GBMHIX37J3IZC4H2TVOQ6RKYGLCNNX543NU3OI3SP4LDBERVCO3DCCOD' && \
+    curl 'http://localhost:8000/friendbot?addr=GAZ5H54I4O7QF64HBLVWWAPDZ7OYRI3EGMJ27YJGSTBE2L7VQNNEIWZF'
+
+

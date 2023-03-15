@@ -28,7 +28,7 @@ struct TestData {
     native_token_client: token::Client,
 
     // Collateral token data
-    stable_token_admin: Address,
+    stable_token_issuer: Address,
     stable_token_client: token::Client,
 }
 
@@ -53,8 +53,8 @@ fn create_base_data(env: &Env) -> TestData {
     let native_token_client = create_token_contract(&env, &native_token_admin);
 
     // Set up the stable token
-    let stable_token_admin = Address::random(&env);
-    let stable_token_client = create_token_contract(&env, &stable_token_admin);
+    let stable_token_issuer = Address::random(&env);
+    let stable_token_client = create_token_contract(&env, &stable_token_issuer);
 
     // Create the contract
     let contract_admin = Address::random(&env);
@@ -70,7 +70,7 @@ fn create_base_data(env: &Env) -> TestData {
         collateral_token_client,
         // native_token_admin,
         native_token_client,
-        stable_token_admin,
+        stable_token_issuer,
         stable_token_client,
     };
 }
@@ -92,8 +92,7 @@ fn set_initial_state(data: &TestData, base_variables: &InitialVariables) {
     data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
-        &data.native_token_client.contract_id,
-        &data.stable_token_client.contract_id,
+        &data.stable_token_issuer,
     );
 
     data.contract_client
@@ -114,20 +113,17 @@ fn test_set_and_get_core_state() {
     data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
-        &data.native_token_client.contract_id,
-        &data.stable_token_client.contract_id,
+        &data.stable_token_issuer,
     );
 
     let saved_admin: Address = data.contract_client.get_admin();
     let core_state: CoreState = data.contract_client.g_c_state();
 
     assert_eq!(saved_admin, data.contract_admin);
-    assert_eq!(core_state.nativ_tokn, data.native_token_client.contract_id);
     assert_eq!(
         core_state.colla_tokn,
         data.collateral_token_client.contract_id
     );
-    assert_eq!(core_state.stble_tokn, data.stable_token_client.contract_id);
 }
 
 #[test]
@@ -139,15 +135,13 @@ fn test_init_panic() {
     data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
-        &data.native_token_client.contract_id,
-        &data.stable_token_client.contract_id,
+        &data.stable_token_issuer,
     );
 
     data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
-        &data.native_token_client.contract_id,
-        &data.stable_token_client.contract_id,
+        &data.stable_token_issuer,
     );
 }
 
@@ -160,8 +154,7 @@ fn test_set_and_get_protocol_state() {
     data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
-        &data.native_token_client.contract_id,
-        &data.stable_token_client.contract_id,
+        &data.stable_token_issuer,
     );
 
     data.contract_client
@@ -257,8 +250,7 @@ fn test_new_vault() {
     data.contract_client.init(
         &data.contract_admin,
         &data.collateral_token_client.contract_id,
-        &data.native_token_client.contract_id,
-        &data.stable_token_client.contract_id,
+        &data.stable_token_issuer,
     );
 
     let collateral_price: i128 = 830124; // 0.0830124
@@ -287,7 +279,7 @@ fn test_new_vault() {
     );
 
     data.stable_token_client.mint(
-        &data.stable_token_admin,
+        &data.stable_token_issuer,
         &contract_address,
         &(initial_debt * 10),
     );
@@ -392,7 +384,7 @@ fn test_pay_debt() {
     );
 
     data.stable_token_client.mint(
-        &data.stable_token_admin,
+        &data.stable_token_issuer,
         &contract_address,
         &(initial_debt * 10),
     );
@@ -488,7 +480,7 @@ fn test_increase_collateral() {
     );
 
     data.stable_token_client
-        .mint(&data.stable_token_admin, &contract_address, &(initial_debt));
+        .mint(&data.stable_token_issuer, &contract_address, &(initial_debt));
 
     data.contract_client
         .s_p_state(&mn_col_rte, &mn_v_c_amt, &op_col_rte);
@@ -553,7 +545,7 @@ fn test_increase_debt() {
     );
 
     data.stable_token_client.mint(
-        &data.stable_token_admin,
+        &data.stable_token_issuer,
         &base_variables.contract_address,
         &(base_variables.initial_debt * 5),
     );

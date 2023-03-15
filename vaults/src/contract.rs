@@ -7,16 +7,11 @@ use soroban_sdk::{contractimpl, panic_with_error, Address, BytesN, Env};
 
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
-    // These two functions are temporal and only to use while the soroban-cli gets updated an allows parsing BytesN<32> -> Address
-    fn inc_prot(env: Env, issuer: Address);
-    fn inc_stab(env: Env, issuer: Address);
-
     fn init(
         env: Env,
         admin: Address,
         colla_tokn: BytesN<32>,
-        nativ_tokn: BytesN<32>,
-        stble_tokn: BytesN<32>,
+        stble_issr: Address,
     );
 
     fn get_admin(env: Env) -> Address;
@@ -44,32 +39,11 @@ pub struct VaultsContract;
 
 #[contractimpl]
 impl VaultsContractTrait for VaultsContract {
-    fn inc_prot(env: Env, issuer: Address) {
-        issuer.require_auth();
-        let core_state = get_core_state(&env);
-        token::Client::new(&env, &core_state.nativ_tokn).xfer(
-            &issuer,
-            &env.current_contract_address(),
-            &20_000_000_0000000,
-        );
-    }
-
-    fn inc_stab(env: Env, issuer: Address) {
-        issuer.require_auth();
-        let core_state = get_core_state(&env);
-        token::Client::new(&env, &core_state.stble_tokn).xfer(
-            &issuer,
-            &env.current_contract_address(),
-            &50_000_000_0000000,
-        );
-    }
-
     fn init(
         env: Env,
         admin: Address,
         colla_tokn: BytesN<32>,
-        nativ_tokn: BytesN<32>,
-        stble_tokn: BytesN<32>,
+        stble_issr: Address,
     ) {
         if env.storage().has(&DataKeys::CoreState) {
             panic_with_error!(&env, SCErrors::AlreadyInit);
@@ -77,8 +51,7 @@ impl VaultsContractTrait for VaultsContract {
 
         let core_state: CoreState = CoreState {
             colla_tokn,
-            nativ_tokn,
-            stble_tokn,
+            stble_issr,
         };
 
         env.storage().set(&DataKeys::CoreState, &core_state);
@@ -194,7 +167,7 @@ impl VaultsContractTrait for VaultsContract {
 
         env.storage().set(&key, &new_vault);
 
-        withdraw_stablecoin(&env, core_state.stble_tokn.clone(), &caller, initial_debt);
+        // withdraw_stablecoin(&env, core_state.stble_tokn.clone(), &caller, initial_debt);
 
         let mut protocol_stats: ProtStats = get_protocol_stats(&env);
 
@@ -273,11 +246,11 @@ impl VaultsContractTrait for VaultsContract {
             panic_with_error!(&env, SCErrors::CollateralRateUnderMinimun);
         }
 
-        token::Client::new(&env, &core_state.stble_tokn).xfer(
-            &env.current_contract_address(),
-            &caller,
-            &(debt_amount as i128),
-        );
+        // token::Client::new(&env, &core_state.stble_tokn).xfer(
+        //     &env.current_contract_address(),
+        //     &caller,
+        //     &(debt_amount as i128),
+        // );
 
         let mut protocol_stats: ProtStats = get_protocol_stats(&env);
 
@@ -308,11 +281,11 @@ impl VaultsContractTrait for VaultsContract {
 
         let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
 
-        token::Client::new(&env, &core_state.stble_tokn).xfer(
-            &caller,
-            &env.current_contract_address(),
-            &(deposit_amount as i128),
-        );
+        // token::Client::new(&env, &core_state.stble_tokn).xfer(
+        //     &caller,
+        //     &env.current_contract_address(),
+        //     &(deposit_amount as i128),
+        // );
 
         let mut protocol_stats: ProtStats = get_protocol_stats(&env);
 
