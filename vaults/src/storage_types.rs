@@ -14,12 +14,6 @@ pub struct ProtocolState {
 }
 
 #[contracttype]
-pub struct ProtocolCollateralPrice {
-    pub last_updte: u64, // This is the last time the price got updated
-    pub current: i128, // This is the current price of the collateral in our protocol
-}
-
-#[contracttype]
 pub struct ProtStats {
     pub tot_vaults: i64,
     pub tot_debt: i128,
@@ -35,6 +29,7 @@ pub struct UserVault {
 
 #[contracttype]
 pub struct Currency {
+    pub symbol: Symbol, // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
     pub active: bool,
     pub contract: BytesN<32>,
     pub last_updte: u64, // This is the last time the price got updated
@@ -64,6 +59,8 @@ pub enum SCErrors {
     InvalidOpeningCollateralRatio = 4,
     UserDoesntHaveAVault = 5,
     DepositAmountIsMoreThanTotalDebt = 6,
-    CollateralRateUnderMinimun = 7,
-    UnsuportedNegativeValue = 8,
+    CollateralRateUnderMinimum = 7,
+    UnsupportedNegativeValue = 8,
+    CurrencyAlreadyAdded = 9000,
+    CurrencyDoesntExist = 90001,
 }

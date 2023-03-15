@@ -1,6 +1,6 @@
 use crate::storage_types::*;
 use crate::token;
-use soroban_sdk::{panic_with_error, Address, BytesN, Env};
+use soroban_sdk::{panic_with_error, Address, BytesN, Env, Symbol};
 
 pub fn check_admin(env: &Env) {
     let admin: Address = env.storage().get(&DataKeys::Admin).unwrap().unwrap();
@@ -13,16 +13,6 @@ pub fn get_core_state(env: &Env) -> CoreState {
 
 pub fn get_protocol_state(env: &Env) -> ProtocolState {
     env.storage().get(&DataKeys::ProtState).unwrap().unwrap()
-}
-
-pub fn get_protocol_collateral_price(env: &Env) -> ProtocolCollateralPrice {
-    env.storage()
-        .get(&DataKeys::ProtRate)
-        .unwrap_or(Ok(ProtocolCollateralPrice {
-            last_updte: env.ledger().timestamp(),
-            current: 0,
-        }))
-        .unwrap()
 }
 
 pub fn valid_initial_debt(env: &Env, state: &ProtocolState, initial_debt: i128) {
@@ -75,6 +65,20 @@ pub fn update_protocol_stats(env: &Env, stats: ProtStats) {
 
 pub fn check_positive(env: &Env, value: &i128) {
     if value < &0 {
-        panic_with_error!(&env, SCErrors::UnsuportedNegativeValue);
+        panic_with_error!(&env, SCErrors::UnsupportedNegativeValue);
     }
+}
+
+pub fn validate_currency(env: &Env, denomination: Symbol) {
+    if !env.storage().has(&DataKeys::Currency(denomination)) {
+        panic_with_error!(&env, SCErrors::CurrencyDoesntExist);
+    }
+}
+
+pub fn save_currency(env: &Env, currency: Currency) {
+    env.storage().set(&DataKeys::Currency(currency.symbol), &currency);
+}
+
+pub fn get_currency(env: &Env, denomination: Symbol) -> Currency {
+    env.storage().get(&DataKeys::Currency(denomination)).unwrap().unwrap()
 }
