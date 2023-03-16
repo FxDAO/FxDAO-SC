@@ -21,33 +21,6 @@ pub fn valid_initial_debt(env: &Env, state: &ProtocolState, initial_debt: i128) 
     }
 }
 
-// TODO: consider remove both deposit_collateral and withdraw_stablecoin
-pub fn deposit_collateral(
-    env: &Env,
-    collateral_token: BytesN<32>,
-    depositor: &Address,
-    collateral_amount: i128,
-) {
-    token::Client::new(&env, &collateral_token).xfer(
-        &depositor,
-        &env.current_contract_address(),
-        &(collateral_amount as i128),
-    );
-}
-
-pub fn withdraw_stablecoin(
-    env: &Env,
-    contract: BytesN<32>,
-    recipient: &Address,
-    stablecoin_amount: i128,
-) {
-    token::Client::new(&env, &contract).xfer(
-        &env.current_contract_address(),
-        &recipient,
-        &(stablecoin_amount as i128),
-    );
-}
-
 pub fn get_protocol_stats(env: &Env) -> ProtStats {
     env.storage()
         .get(&DataKeys::ProtStats)
@@ -69,16 +42,97 @@ pub fn check_positive(env: &Env, value: &i128) {
     }
 }
 
+/// Vaults utils
+pub fn validate_user_vault(env: &Env, user: Address, denomination: Symbol) {
+    if !env.storage().has(&UserVaultDataType {
+        user,
+        symbol: denomination,
+    }) {
+        panic_with_error!(&env, SCErrors::UserVaultDoesntExist);
+    }
+}
+
+pub fn vault_spot_available(env: &Env, user: Address, denomination: Symbol) {
+    if env.storage().has(&UserVaultDataType {
+        user,
+        symbol: denomination,
+    }) {
+        panic_with_error!(&env, SCErrors::UserAlreadyHasDenominationVault);
+    }
+}
+
+pub fn set_user_vault(env: &Env, user: &Address, denomination: &Symbol, user_vault: &UserVault) {
+    env.storage().set(
+        &UserVaultDataType {
+            user: user.clone(),
+            symbol: denomination.clone(),
+        },
+        user_vault,
+    );
+}
+
+pub fn get_user_vault(env: &Env, user: Address, denomination: Symbol) -> UserVault {
+    env.storage()
+        .get(&UserVaultDataType {
+            user,
+            symbol: denomination,
+        })
+        .unwrap()
+        .unwrap()
+}
+
+/// Currency utils
 pub fn validate_currency(env: &Env, denomination: Symbol) {
     if !env.storage().has(&DataKeys::Currency(denomination)) {
         panic_with_error!(&env, SCErrors::CurrencyDoesntExist);
     }
 }
 
+pub fn is_currency_active(env: &Env, denomination: Symbol) {
+    let currency: Currency = env
+        .storage()
+        .get(&DataKeys::Currency(denomination))
+        .unwrap()
+        .unwrap();
+
+    if !currency.active {
+        panic_with_error!(&env, SCErrors::CurrencyIsInactive);
+    }
+}
+
 pub fn save_currency(env: &Env, currency: Currency) {
-    env.storage().set(&DataKeys::Currency(currency.symbol), &currency);
+    env.storage()
+        .set(&DataKeys::Currency(currency.symbol), &currency);
 }
 
 pub fn get_currency(env: &Env, denomination: Symbol) -> Currency {
-    env.storage().get(&DataKeys::Currency(denomination)).unwrap().unwrap()
+    env.storage()
+        .get(&DataKeys::Currency(denomination))
+        .unwrap()
+        .unwrap()
+}
+
+// TODO: consider remove both deposit_collateral and withdraw_stablecoin
+/// Payments Utils
+pub fn deposit_collateral(env: &Env, core_state: &CoreState, depositor: &Address, amount: &i128) {
+    token::Client::new(&env, &core_state.colla_tokn).xfer(
+        &depositor,
+        &env.current_contract_address(),
+        &amount,
+    );
+}
+
+pub fn withdraw_stablecoin(
+    env: &Env,
+    core_state: &CoreState,
+    currency: &Currency,
+    recipient: &Address,
+    amount: i128,
+) {
+    token::Client::new(&env, &currency.contract).xfer_from(
+        &env.current_contract_address(),
+        &core_state.stble_issr,
+        &recipient,
+        &amount,
+    );
 }

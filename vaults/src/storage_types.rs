@@ -21,6 +21,12 @@ pub struct ProtStats {
 }
 
 #[contracttype]
+pub struct UserVaultDataType {
+    pub user: Address,
+    pub symbol: Symbol, // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
+}
+
+#[contracttype]
 pub struct UserVault {
     pub id: Address,
     pub total_debt: i128,
@@ -33,7 +39,7 @@ pub struct Currency {
     pub active: bool,
     pub contract: BytesN<32>,
     pub last_updte: u64, // This is the last time the price got updated
-    pub rate: i128, // This is the current price of the collateral in our protocol
+    pub rate: i128,      // This is the current price of the collateral in our protocol
 }
 
 #[contracttype]
@@ -43,7 +49,7 @@ pub enum DataKeys {
     ProtRate,
     ProtStats,
     Admin,
-    UserVault(Address),
+    UserVault(UserVaultDataType),
     Currency(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
     PanicMode,
 }
@@ -57,10 +63,12 @@ pub enum SCErrors {
     UserAlreadyHasVault = 2,
     InvalidInitialDebtAmount = 3,
     InvalidOpeningCollateralRatio = 4,
-    UserDoesntHaveAVault = 5,
+    UserVaultDoesntExist = 50000,
+    UserAlreadyHasDenominationVault = 50001,
     DepositAmountIsMoreThanTotalDebt = 6,
     CollateralRateUnderMinimum = 7,
     UnsupportedNegativeValue = 8,
     CurrencyAlreadyAdded = 9000,
     CurrencyDoesntExist = 90001,
+    CurrencyIsInactive = 90002,
 }
