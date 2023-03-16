@@ -18,12 +18,13 @@ pub trait VaultsContractTrait {
 
     fn g_p_stats(env: Env) -> ProtStats;
 
-    // Currencies methods
+    /// Currencies methods
     fn new_cy(env: Env, denomination: Symbol, contract: BytesN<32>);
     fn get_cy(env: Env, denomination: Symbol) -> Currency;
     fn s_cy_rate(env: Env, denomination: Symbol, rate: i128);
     fn toggle_cy(env: Env, denomination: Symbol, active: bool);
 
+    /// Vaults methods
     fn new_vault(
         env: Env,
         caller: Address,
@@ -32,8 +33,7 @@ pub trait VaultsContractTrait {
         denomination: Symbol,
     );
     fn get_vault(env: Env, caller: Address, denomination: Symbol) -> UserVault;
-    //
-    // fn incr_col(env: Env, caller: Address, amount: i128);
+    fn incr_col(env: Env, caller: Address, amount: i128, denomination: Symbol);
     // fn incr_debt(env: Env, caller: Address, debt_amount: i128);
     //
     // fn pay_debt(env: Env, caller: Address, amount: i128);
@@ -199,38 +199,32 @@ impl VaultsContractTrait for VaultsContract {
         validate_user_vault(&env, caller.clone(), denomination);
         get_user_vault(&env, caller.clone(), denomination)
     }
-    //
-    // fn incr_col(env: Env, caller: Address, collateral_amount: i128) {
-    //     caller.require_auth();
-    //     check_positive(&env, &collateral_amount);
-    //
-    //     let key = DataKeys::UserVault(caller.clone());
-    //
-    //     if !env.storage().has(&key) {
-    //         panic_with_error!(&env, SCErrors::UserDoesntHaveAVault);
-    //     }
-    //
-    //     // TODO: Add fee logic
-    //
-    //     let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
-    //
-    //     token::Client::new(&env, &core_state.colla_tokn).xfer(
-    //         &caller,
-    //         &env.current_contract_address(),
-    //         &collateral_amount,
-    //     );
-    //
-    //     let mut user_vault: UserVault = env.storage().get(&key).unwrap().unwrap();
-    //
-    //     let mut protocol_stats: ProtStats = get_protocol_stats(&env);
-    //
-    //     user_vault.total_col = user_vault.total_col + collateral_amount;
-    //     protocol_stats.tot_col = protocol_stats.tot_col + collateral_amount;
-    //
-    //     env.storage().set(&key, &user_vault);
-    //     update_protocol_stats(&env, protocol_stats);
-    // }
-    //
+
+    fn incr_col(env: Env, caller: Address, collateral_amount: i128, denomination: Symbol) {
+        caller.require_auth();
+
+        validate_currency(&env, denomination);
+        is_currency_active(&env, denomination);
+        check_positive(&env, &collateral_amount);
+        validate_user_vault(&env, caller.clone(), denomination);
+
+        // TODO: Add fee logic
+
+        let core_state: CoreState = get_core_state(&env);
+
+        deposit_collateral(&env, &core_state, &caller, &collateral_amount);
+
+        let mut user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+
+        let mut protocol_stats: ProtStats = get_protocol_stats(&env);
+
+        user_vault.total_col = user_vault.total_col + collateral_amount;
+        protocol_stats.tot_col = protocol_stats.tot_col + collateral_amount;
+
+        set_user_vault(&env, &caller, &denomination, &user_vault);
+        update_protocol_stats(&env, protocol_stats);
+    }
+
     // fn incr_debt(env: Env, caller: Address, debt_amount: i128) {
     //     caller.require_auth();
     //     check_positive(&env, &debt_amount);

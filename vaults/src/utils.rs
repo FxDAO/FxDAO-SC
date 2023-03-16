@@ -112,7 +112,6 @@ pub fn get_currency(env: &Env, denomination: Symbol) -> Currency {
         .unwrap()
 }
 
-// TODO: consider remove both deposit_collateral and withdraw_stablecoin
 /// Payments Utils
 pub fn deposit_collateral(env: &Env, core_state: &CoreState, depositor: &Address, amount: &i128) {
     token::Client::new(&env, &core_state.colla_tokn).xfer(
