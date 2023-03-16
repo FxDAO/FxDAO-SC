@@ -35,8 +35,7 @@ pub trait VaultsContractTrait {
     fn get_vault(env: Env, caller: Address, denomination: Symbol) -> UserVault;
     fn incr_col(env: Env, caller: Address, amount: i128, denomination: Symbol);
     fn incr_debt(env: Env, caller: Address, debt_amount: i128, denomination: Symbol);
-    //
-    // fn pay_debt(env: Env, caller: Address, amount: i128);
+    fn pay_debt(env: Env, caller: Address, amount: i128, denomination: Symbol);
 }
 
 pub struct VaultsContract;
@@ -265,55 +264,51 @@ impl VaultsContractTrait for VaultsContract {
         set_user_vault(&env, &caller, &denomination, &user_vault);
         update_protocol_stats(&env, protocol_stats);
     }
-    //
-    // fn pay_debt(env: Env, caller: Address, deposit_amount: i128) {
-    //     caller.require_auth();
-    //     check_positive(&env, &deposit_amount);
-    //
-    //     let key = DataKeys::UserVault(caller.clone());
-    //
-    //     if !env.storage().has(&key) {
-    //         panic_with_error!(&env, SCErrors::UserDoesntHaveAVault);
-    //     }
-    //
-    //     // TODO: Add fee logic
-    //
-    //     let mut user_vault: UserVault = env.storage().get(&key).unwrap().unwrap();
-    //
-    //     if deposit_amount > user_vault.total_debt {
-    //         panic_with_error!(&env, SCErrors::DepositAmountIsMoreThanTotalDebt);
-    //     }
-    //
-    //     let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
-    //
-    //     // token::Client::new(&env, &core_state.stble_tokn).xfer(
-    //     //     &caller,
-    //     //     &env.current_contract_address(),
-    //     //     &(deposit_amount as i128),
-    //     // );
-    //
-    //     let mut protocol_stats: ProtStats = get_protocol_stats(&env);
-    //
-    //     if user_vault.total_debt == deposit_amount {
-    //         // If the amount is equal to the debt it means it is paid in full so we release the collateral and remove the vault
-    //         protocol_stats.tot_vaults = protocol_stats.tot_vaults - 1;
-    //         protocol_stats.tot_col = protocol_stats.tot_col - user_vault.total_col;
-    //
-    //         token::Client::new(&env, &core_state.colla_tokn).xfer(
-    //             &env.current_contract_address(),
-    //             &caller,
-    //             &(user_vault.total_col as i128),
-    //         );
-    //
-    //         env.storage().remove(&key);
-    //     } else {
-    //         // If amount is not enough to pay all the debt, we just updated the stats of the user's vault
-    //         user_vault.total_debt = user_vault.total_debt - deposit_amount;
-    //         env.storage().set(&key, &user_vault);
-    //     }
-    //
-    //     protocol_stats.tot_debt = protocol_stats.tot_debt - deposit_amount;
-    //
-    //     update_protocol_stats(&env, protocol_stats);
-    // }
+
+    fn pay_debt(env: Env, caller: Address, deposit_amount: i128, denomination: Symbol) {
+        caller.require_auth();
+
+        validate_currency(&env, denomination);
+        is_currency_active(&env, denomination);
+        check_positive(&env, &deposit_amount);
+        validate_user_vault(&env, caller.clone(), denomination);
+
+        // TODO: Add fee logic
+
+        let currency: Currency = get_currency(&env, denomination);
+
+        let mut user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+
+        if deposit_amount > user_vault.total_debt {
+            panic_with_error!(&env, SCErrors::DepositAmountIsMoreThanTotalDebt);
+        }
+
+        let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
+
+        deposit_stablecoin(&env, &currency, &caller, &deposit_amount);
+
+        let mut protocol_stats: ProtStats = get_protocol_stats(&env);
+
+        if user_vault.total_debt == deposit_amount {
+            // If the amount is equal to the debt it means it is paid in full so we release the collateral and remove the vault
+            protocol_stats.tot_vaults = protocol_stats.tot_vaults - 1;
+            protocol_stats.tot_col = protocol_stats.tot_col - user_vault.total_col;
+
+            token::Client::new(&env, &core_state.colla_tokn).xfer(
+                &env.current_contract_address(),
+                &caller,
+                &user_vault.total_col,
+            );
+
+            remove_user_vault(&env, &caller, &denomination);
+        } else {
+            // If amount is not enough to pay all the debt, we just updated the stats of the user's vault
+            user_vault.total_debt = user_vault.total_debt - deposit_amount;
+            set_user_vault(&env, &caller, &denomination, &user_vault);
+        }
+
+        protocol_stats.tot_debt = protocol_stats.tot_debt - deposit_amount;
+
+        update_protocol_stats(&env, protocol_stats);
+    }
 }

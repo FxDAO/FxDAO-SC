@@ -71,6 +71,13 @@ pub fn set_user_vault(env: &Env, user: &Address, denomination: &Symbol, user_vau
     );
 }
 
+pub fn remove_user_vault(env: &Env, user: &Address, denomination: &Symbol) {
+    env.storage().remove(&UserVaultDataType {
+        user: user.clone(),
+        symbol: denomination.clone(),
+    });
+}
+
 pub fn get_user_vault(env: &Env, user: Address, denomination: Symbol) -> UserVault {
     env.storage()
         .get(&UserVaultDataType {
@@ -132,6 +139,14 @@ pub fn withdraw_stablecoin(
         &env.current_contract_address(),
         &core_state.stble_issr,
         &recipient,
+        &amount,
+    );
+}
+
+pub fn deposit_stablecoin(env: &Env, currency: &Currency, depositor: &Address, amount: &i128) {
+    token::Client::new(&env, &currency.contract).xfer(
+        &depositor,
+        &env.current_contract_address(),
         &amount,
     );
 }
