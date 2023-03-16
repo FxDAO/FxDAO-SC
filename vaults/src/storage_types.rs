@@ -13,14 +13,6 @@ pub struct ProtocolState {
     pub op_col_rte: i128, // Opening collateral ratio - ex: 1.15
 }
 
-// TODO: Protocol stats needs to be updated so it handles multi currencies too
-#[contracttype]
-pub struct ProtStats {
-    pub tot_vaults: i64,
-    pub tot_debt: i128,
-    pub tot_col: i128,
-}
-
 #[contracttype]
 pub struct UserVaultDataType {
     pub user: Address,
@@ -44,14 +36,21 @@ pub struct Currency {
 }
 
 #[contracttype]
+pub struct CurrencyStats {
+    pub tot_vaults: i64,
+    pub tot_debt: i128,
+    pub tot_col: i128,
+}
+
+#[contracttype]
 pub enum DataKeys {
     CoreState,
     ProtState,
     ProtRate,
-    ProtStats,
     Admin,
     UserVault(UserVaultDataType),
     Currency(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
+    CyStats(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
     PanicMode,
 }
 

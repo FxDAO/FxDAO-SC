@@ -16,7 +16,7 @@ pub trait VaultsContractTrait {
     fn s_p_state(env: Env, mn_col_rte: i128, mn_v_c_amt: i128, op_col_rte: i128);
     fn g_p_state(env: Env) -> ProtocolState;
 
-    fn g_p_stats(env: Env) -> ProtStats;
+    fn g_cy_stats(env: Env, denomination: Symbol) -> CurrencyStats;
 
     /// Currencies methods
     fn new_cy(env: Env, denomination: Symbol, contract: BytesN<32>);
@@ -84,8 +84,8 @@ impl VaultsContractTrait for VaultsContract {
         get_protocol_state(&env)
     }
 
-    fn g_p_stats(env: Env) -> ProtStats {
-        get_protocol_stats(&env)
+    fn g_cy_stats(env: Env, denomination: Symbol) -> CurrencyStats {
+        get_currency_stats(&env, &denomination)
     }
 
     fn new_cy(env: Env, denomination: Symbol, contract: BytesN<32>) {
@@ -185,13 +185,13 @@ impl VaultsContractTrait for VaultsContract {
 
         withdraw_stablecoin(&env, &core_state, &currency, &caller, &initial_debt);
 
-        let mut protocol_stats: ProtStats = get_protocol_stats(&env);
+        let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
 
-        protocol_stats.tot_vaults = protocol_stats.tot_vaults + 1;
-        protocol_stats.tot_debt = protocol_stats.tot_debt + initial_debt;
-        protocol_stats.tot_col = protocol_stats.tot_col + collateral_amount;
+        currency_stats.tot_vaults = currency_stats.tot_vaults + 1;
+        currency_stats.tot_debt = currency_stats.tot_debt + initial_debt;
+        currency_stats.tot_col = currency_stats.tot_col + collateral_amount;
 
-        update_protocol_stats(&env, protocol_stats);
+        set_currency_stats(&env, &denomination, &currency_stats);
     }
 
     fn get_vault(env: Env, caller: Address, denomination: Symbol) -> UserVault {
@@ -215,13 +215,13 @@ impl VaultsContractTrait for VaultsContract {
 
         let mut user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
 
-        let mut protocol_stats: ProtStats = get_protocol_stats(&env);
+        let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
 
         user_vault.total_col = user_vault.total_col + collateral_amount;
-        protocol_stats.tot_col = protocol_stats.tot_col + collateral_amount;
+        currency_stats.tot_col = currency_stats.tot_col + collateral_amount;
 
         set_user_vault(&env, &caller, &denomination, &user_vault);
-        update_protocol_stats(&env, protocol_stats);
+        set_currency_stats(&env, &denomination, &currency_stats);
     }
 
     fn incr_debt(env: Env, caller: Address, debt_amount: i128, denomination: Symbol) {
@@ -256,13 +256,13 @@ impl VaultsContractTrait for VaultsContract {
 
         withdraw_stablecoin(&env, &core_state, &currency, &caller, &debt_amount);
 
-        let mut protocol_stats: ProtStats = get_protocol_stats(&env);
+        let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
 
         user_vault.total_debt = new_debt_amount;
-        protocol_stats.tot_debt = protocol_stats.tot_debt + debt_amount;
+        currency_stats.tot_debt = currency_stats.tot_debt + debt_amount;
 
         set_user_vault(&env, &caller, &denomination, &user_vault);
-        update_protocol_stats(&env, protocol_stats);
+        set_currency_stats(&env, &denomination, &currency_stats);
     }
 
     fn pay_debt(env: Env, caller: Address, deposit_amount: i128, denomination: Symbol) {
@@ -287,12 +287,12 @@ impl VaultsContractTrait for VaultsContract {
 
         deposit_stablecoin(&env, &currency, &caller, &deposit_amount);
 
-        let mut protocol_stats: ProtStats = get_protocol_stats(&env);
+        let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
 
         if user_vault.total_debt == deposit_amount {
             // If the amount is equal to the debt it means it is paid in full so we release the collateral and remove the vault
-            protocol_stats.tot_vaults = protocol_stats.tot_vaults - 1;
-            protocol_stats.tot_col = protocol_stats.tot_col - user_vault.total_col;
+            currency_stats.tot_vaults = currency_stats.tot_vaults - 1;
+            currency_stats.tot_col = currency_stats.tot_col - user_vault.total_col;
 
             token::Client::new(&env, &core_state.colla_tokn).xfer(
                 &env.current_contract_address(),
@@ -307,8 +307,8 @@ impl VaultsContractTrait for VaultsContract {
             set_user_vault(&env, &caller, &denomination, &user_vault);
         }
 
-        protocol_stats.tot_debt = protocol_stats.tot_debt - deposit_amount;
+        currency_stats.tot_debt = currency_stats.tot_debt - deposit_amount;
 
-        update_protocol_stats(&env, protocol_stats);
+        set_currency_stats(&env, &denomination, &currency_stats);
     }
 }

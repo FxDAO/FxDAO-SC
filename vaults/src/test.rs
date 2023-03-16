@@ -387,11 +387,13 @@ fn test_new_vault() {
     );
     assert_eq!(data.stable_token_client.balance(&depositor), (initial_debt));
 
-    let current_protocol_stats: ProtStats = data.contract_client.g_p_stats();
+    let currency_stats: CurrencyStats = data
+        .contract_client
+        .g_cy_stats(&data.stable_token_denomination);
 
-    assert_eq!(current_protocol_stats.tot_vaults, 1);
-    assert_eq!(current_protocol_stats.tot_debt, initial_debt);
-    assert_eq!(current_protocol_stats.tot_col, collateral_amount);
+    assert_eq!(currency_stats.tot_vaults, 1);
+    assert_eq!(currency_stats.tot_debt, initial_debt);
+    assert_eq!(currency_stats.tot_col, collateral_amount);
 
     // Should fail if user tries to create a new vault but already have one
     assert!(data
@@ -424,11 +426,13 @@ fn test_new_vault() {
         (initial_debt)
     );
 
-    let updated_protocol_stats: ProtStats = data.contract_client.g_p_stats();
+    let updated_currency_stats: CurrencyStats = data
+        .contract_client
+        .g_cy_stats(&data.stable_token_denomination);
 
-    assert_eq!(updated_protocol_stats.tot_vaults, 2);
-    assert_eq!(updated_protocol_stats.tot_debt, initial_debt * 2);
-    assert_eq!(updated_protocol_stats.tot_col, collateral_amount * 2);
+    assert_eq!(updated_currency_stats.tot_vaults, 2);
+    assert_eq!(updated_currency_stats.tot_debt, initial_debt * 2);
+    assert_eq!(updated_currency_stats.tot_col, collateral_amount * 2);
 }
 
 #[test]
@@ -480,11 +484,13 @@ fn test_increase_collateral() {
         &data.stable_token_denomination,
     );
 
-    let current_protocol_stats: ProtStats = data.contract_client.g_p_stats();
+    let current_currency_stats: CurrencyStats = data
+        .contract_client
+        .g_cy_stats(&data.stable_token_denomination);
 
-    assert_eq!(current_protocol_stats.tot_vaults, 1);
-    assert_eq!(current_protocol_stats.tot_debt, initial_debt);
-    assert_eq!(current_protocol_stats.tot_col, collateral_amount);
+    assert_eq!(current_currency_stats.tot_vaults, 1);
+    assert_eq!(current_currency_stats.tot_debt, initial_debt);
+    assert_eq!(current_currency_stats.tot_col, collateral_amount);
 
     data.contract_client.incr_col(
         &depositor,
@@ -512,11 +518,13 @@ fn test_increase_collateral() {
         )]
     );
 
-    let updated_protocol_stats: ProtStats = data.contract_client.g_p_stats();
+    let updated_currency_stats: CurrencyStats = data
+        .contract_client
+        .g_cy_stats(&data.stable_token_denomination);
 
-    assert_eq!(updated_protocol_stats.tot_vaults, 1);
-    assert_eq!(updated_protocol_stats.tot_debt, initial_debt);
-    assert_eq!(updated_protocol_stats.tot_col, collateral_amount * 2);
+    assert_eq!(updated_currency_stats.tot_vaults, 1);
+    assert_eq!(updated_currency_stats.tot_debt, initial_debt);
+    assert_eq!(updated_currency_stats.tot_col, collateral_amount * 2);
 
     assert_eq!(data.collateral_token_client.balance(&depositor), 0);
     assert_eq!(
@@ -561,12 +569,14 @@ fn test_increase_debt() {
         &data.stable_token_denomination,
     );
 
-    let current_protocol_stats: ProtStats = data.contract_client.g_p_stats();
+    let current_currency_stats: CurrencyStats = data
+        .contract_client
+        .g_cy_stats(&data.stable_token_denomination);
 
-    assert_eq!(current_protocol_stats.tot_vaults, 1);
-    assert_eq!(current_protocol_stats.tot_debt, base_variables.initial_debt);
+    assert_eq!(current_currency_stats.tot_vaults, 1);
+    assert_eq!(current_currency_stats.tot_debt, base_variables.initial_debt);
     assert_eq!(
-        current_protocol_stats.tot_col,
+        current_currency_stats.tot_col,
         base_variables.collateral_amount * 2
     );
 
@@ -601,15 +611,17 @@ fn test_increase_debt() {
         )]
     );
 
-    let updated_protocol_stats: ProtStats = data.contract_client.g_p_stats();
+    let updated_currency_stats: CurrencyStats = data
+        .contract_client
+        .g_cy_stats(&data.stable_token_denomination);
 
-    assert_eq!(updated_protocol_stats.tot_vaults, 1);
+    assert_eq!(updated_currency_stats.tot_vaults, 1);
     assert_eq!(
-        updated_protocol_stats.tot_debt,
+        updated_currency_stats.tot_debt,
         base_variables.initial_debt * 2
     );
     assert_eq!(
-        updated_protocol_stats.tot_col,
+        updated_currency_stats.tot_col,
         base_variables.collateral_amount * 2
     );
 
@@ -672,11 +684,13 @@ fn test_pay_debt() {
         &data.stable_token_denomination,
     );
 
-    let current_protocol_stats: ProtStats = data.contract_client.g_p_stats();
+    let current_currency_stats: CurrencyStats = data
+        .contract_client
+        .g_cy_stats(&data.stable_token_denomination);
 
-    assert_eq!(current_protocol_stats.tot_vaults, 1);
-    assert_eq!(current_protocol_stats.tot_debt, initial_debt);
-    assert_eq!(current_protocol_stats.tot_col, collateral_amount);
+    assert_eq!(current_currency_stats.tot_vaults, 1);
+    assert_eq!(current_currency_stats.tot_debt, initial_debt);
+    assert_eq!(current_currency_stats.tot_col, collateral_amount);
 
     data.contract_client.pay_debt(
         &depositor,
@@ -704,11 +718,13 @@ fn test_pay_debt() {
         )]
     );
 
-    let updated_protocol_stats: ProtStats = data.contract_client.g_p_stats();
+    let updated_currency_stats: CurrencyStats = data
+        .contract_client
+        .g_cy_stats(&data.stable_token_denomination);
 
-    assert_eq!(updated_protocol_stats.tot_vaults, 1);
-    assert_eq!(updated_protocol_stats.tot_debt, initial_debt / 2);
-    assert_eq!(updated_protocol_stats.tot_col, collateral_amount);
+    assert_eq!(updated_currency_stats.tot_vaults, 1);
+    assert_eq!(updated_currency_stats.tot_debt, initial_debt / 2);
+    assert_eq!(updated_currency_stats.tot_col, collateral_amount);
 
     assert_eq!(
         data.stable_token_client.balance(&depositor),
@@ -725,11 +741,13 @@ fn test_pay_debt() {
         &data.stable_token_denomination,
     );
 
-    let final_protocol_stats: ProtStats = data.contract_client.g_p_stats();
+    let final_currency_stats: CurrencyStats = data
+        .contract_client
+        .g_cy_stats(&data.stable_token_denomination);
 
-    assert_eq!(final_protocol_stats.tot_vaults, 0);
-    assert_eq!(final_protocol_stats.tot_debt, 0);
-    assert_eq!(final_protocol_stats.tot_col, 0);
+    assert_eq!(final_currency_stats.tot_vaults, 0);
+    assert_eq!(final_currency_stats.tot_debt, 0);
+    assert_eq!(final_currency_stats.tot_col, 0);
 
     assert_eq!(data.stable_token_client.balance(&depositor), 0);
     assert_eq!(data.collateral_token_client.balance(&contract_address), 0);

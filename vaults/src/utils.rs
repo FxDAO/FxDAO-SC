@@ -21,21 +21,6 @@ pub fn valid_initial_debt(env: &Env, state: &ProtocolState, initial_debt: i128) 
     }
 }
 
-pub fn get_protocol_stats(env: &Env) -> ProtStats {
-    env.storage()
-        .get(&DataKeys::ProtStats)
-        .unwrap_or(Ok(ProtStats {
-            tot_vaults: 0,
-            tot_debt: 0,
-            tot_col: 0,
-        }))
-        .unwrap()
-}
-
-pub fn update_protocol_stats(env: &Env, stats: ProtStats) {
-    env.storage().set(&DataKeys::ProtStats, &stats);
-}
-
 pub fn check_positive(env: &Env, value: &i128) {
     if value < &0 {
         panic_with_error!(&env, SCErrors::UnsupportedNegativeValue);
@@ -117,6 +102,23 @@ pub fn get_currency(env: &Env, denomination: Symbol) -> Currency {
         .get(&DataKeys::Currency(denomination))
         .unwrap()
         .unwrap()
+}
+
+/// Currency Stats Utils
+pub fn get_currency_stats(env: &Env, denomination: &Symbol) -> CurrencyStats {
+    env.storage()
+        .get(&DataKeys::CyStats(denomination.clone()))
+        .unwrap_or(Ok(CurrencyStats {
+            tot_vaults: 0,
+            tot_debt: 0,
+            tot_col: 0,
+        }))
+        .unwrap()
+}
+
+pub fn set_currency_stats(env: &Env, denomination: &Symbol, currency_stats: &CurrencyStats) {
+    env.storage()
+        .set(&DataKeys::CyStats(denomination.clone()), currency_stats);
 }
 
 /// Payments Utils
