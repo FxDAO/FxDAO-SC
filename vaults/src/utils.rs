@@ -126,7 +126,7 @@ pub fn withdraw_stablecoin(
     core_state: &CoreState,
     currency: &Currency,
     recipient: &Address,
-    amount: i128,
+    amount: &i128,
 ) {
     token::Client::new(&env, &currency.contract).xfer_from(
         &env.current_contract_address(),

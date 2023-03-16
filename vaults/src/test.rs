@@ -525,6 +525,100 @@ fn test_increase_collateral() {
     );
 }
 
+#[test]
+fn test_increase_debt() {
+    let env = Env::default();
+    let data: TestData = create_base_data(&env);
+    let base_variables: InitialVariables = create_base_variables(&env, &data);
+    set_initial_state(&env, &data, &base_variables);
+
+    data.collateral_token_client.mint(
+        &data.collateral_token_admin,
+        &base_variables.depositor,
+        &(base_variables.collateral_amount * 5),
+    );
+
+    data.stable_token_client.mint(
+        &data.stable_token_issuer,
+        &base_variables.contract_address,
+        &(base_variables.initial_debt * 5),
+    );
+
+    // It should fail if the user doesn't have a Vault open
+    assert!(data
+        .contract_client
+        .try_incr_debt(
+            &base_variables.depositor,
+            &base_variables.collateral_amount,
+            &data.stable_token_denomination
+        )
+        .is_err());
+
+    data.contract_client.new_vault(
+        &base_variables.depositor,
+        &base_variables.initial_debt,
+        &(base_variables.collateral_amount * 2),
+        &data.stable_token_denomination,
+    );
+
+    let current_protocol_stats: ProtStats = data.contract_client.g_p_stats();
+
+    assert_eq!(current_protocol_stats.tot_vaults, 1);
+    assert_eq!(current_protocol_stats.tot_debt, base_variables.initial_debt);
+    assert_eq!(
+        current_protocol_stats.tot_col,
+        base_variables.collateral_amount * 2
+    );
+
+    assert_eq!(
+        data.stable_token_client.balance(&base_variables.depositor),
+        base_variables.initial_debt
+    );
+
+    data.contract_client.incr_debt(
+        &base_variables.depositor,
+        &base_variables.initial_debt,
+        &data.stable_token_denomination,
+    );
+
+    // Check the function is requiring the sender approved this operation
+    assert_eq!(
+        env.recorded_top_authorizations(),
+        std::vec![(
+            // Address for which auth is performed
+            base_variables.depositor.clone(),
+            // Identifier of the called contract
+            data.contract_client.contract_id.clone(),
+            // Name of the called function
+            symbol!("incr_debt"),
+            // Arguments used (converted to the env-managed vector via `into_val`)
+            (
+                base_variables.depositor.clone(),
+                base_variables.initial_debt.clone(),
+                data.stable_token_denomination.clone(),
+            )
+                .into_val(&env),
+        )]
+    );
+
+    let updated_protocol_stats: ProtStats = data.contract_client.g_p_stats();
+
+    assert_eq!(updated_protocol_stats.tot_vaults, 1);
+    assert_eq!(
+        updated_protocol_stats.tot_debt,
+        base_variables.initial_debt * 2
+    );
+    assert_eq!(
+        updated_protocol_stats.tot_col,
+        base_variables.collateral_amount * 2
+    );
+
+    assert_eq!(
+        data.stable_token_client.balance(&base_variables.depositor),
+        (base_variables.initial_debt * 2)
+    );
+}
+
 //
 // #[test]
 // fn test_pay_debt() {
@@ -622,87 +716,3 @@ fn test_increase_collateral() {
 //     assert_eq!(data.collateral_token_client.balance(&contract_address), 0);
 // }
 //
-// #[test]
-// fn test_increase_debt() {
-//     let env = Env::default();
-//     let data: TestData = create_base_data(&env);
-//     let base_variables: InitialVariables = create_base_variables(&env, &data);
-//     set_initial_state(&data, &base_variables);
-//
-//     data.collateral_token_client.mint(
-//         &data.collateral_token_admin,
-//         &base_variables.depositor,
-//         &(base_variables.collateral_amount * 5),
-//     );
-//
-//     data.stable_token_client.mint(
-//         &data.stable_token_issuer,
-//         &base_variables.contract_address,
-//         &(base_variables.initial_debt * 5),
-//     );
-//
-//     // It should fail if the user doesn't have a Vault open
-//     assert!(data
-//         .contract_client
-//         .try_incr_debt(&base_variables.depositor, &base_variables.collateral_amount)
-//         .is_err());
-//
-//     data.contract_client.new_vault(
-//         &base_variables.depositor,
-//         &base_variables.initial_debt,
-//         &(base_variables.collateral_amount * 2),
-//     );
-//
-//     let current_protocol_stats: ProtStats = data.contract_client.g_p_stats();
-//
-//     assert_eq!(current_protocol_stats.tot_vaults, 1);
-//     assert_eq!(current_protocol_stats.tot_debt, base_variables.initial_debt);
-//     assert_eq!(
-//         current_protocol_stats.tot_col,
-//         base_variables.collateral_amount * 2
-//     );
-//
-//     assert_eq!(
-//         data.stable_token_client.balance(&base_variables.depositor),
-//         base_variables.initial_debt
-//     );
-//
-//     data.contract_client
-//         .incr_debt(&base_variables.depositor, &base_variables.initial_debt);
-//
-//     // Check the function is requiring the sender approved this operation
-//     assert_eq!(
-//         env.recorded_top_authorizations(),
-//         std::vec![(
-//             // Address for which auth is performed
-//             base_variables.depositor.clone(),
-//             // Identifier of the called contract
-//             data.contract_client.contract_id.clone(),
-//             // Name of the called function
-//             symbol!("incr_debt"),
-//             // Arguments used (converted to the env-managed vector via `into_val`)
-//             (
-//                 base_variables.depositor.clone(),
-//                 base_variables.initial_debt.clone()
-//             )
-//                 .into_val(&env),
-//         )]
-//     );
-//
-//     let updated_protocol_stats: ProtStats = data.contract_client.g_p_stats();
-//
-//     assert_eq!(updated_protocol_stats.tot_vaults, 1);
-//     assert_eq!(
-//         updated_protocol_stats.tot_debt,
-//         base_variables.initial_debt * 2
-//     );
-//     assert_eq!(
-//         updated_protocol_stats.tot_col,
-//         base_variables.collateral_amount * 2
-//     );
-//
-//     assert_eq!(
-//         data.stable_token_client.balance(&base_variables.depositor),
-//         (base_variables.initial_debt * 2)
-//     );
-// }

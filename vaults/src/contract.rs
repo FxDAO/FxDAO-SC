@@ -34,7 +34,7 @@ pub trait VaultsContractTrait {
     );
     fn get_vault(env: Env, caller: Address, denomination: Symbol) -> UserVault;
     fn incr_col(env: Env, caller: Address, amount: i128, denomination: Symbol);
-    // fn incr_debt(env: Env, caller: Address, debt_amount: i128);
+    fn incr_debt(env: Env, caller: Address, debt_amount: i128, denomination: Symbol);
     //
     // fn pay_debt(env: Env, caller: Address, amount: i128);
 }
@@ -184,7 +184,7 @@ impl VaultsContractTrait for VaultsContract {
 
         set_user_vault(&env, &caller, &denomination, &new_vault);
 
-        withdraw_stablecoin(&env, &core_state, &currency, &caller, initial_debt);
+        withdraw_stablecoin(&env, &core_state, &currency, &caller, &initial_debt);
 
         let mut protocol_stats: ProtStats = get_protocol_stats(&env);
 
@@ -225,53 +225,46 @@ impl VaultsContractTrait for VaultsContract {
         update_protocol_stats(&env, protocol_stats);
     }
 
-    // fn incr_debt(env: Env, caller: Address, debt_amount: i128) {
-    //     caller.require_auth();
-    //     check_positive(&env, &debt_amount);
-    //
-    //     let key = DataKeys::UserVault(caller.clone());
-    //
-    //     if !env.storage().has(&key) {
-    //         panic_with_error!(&env, SCErrors::UserDoesntHaveAVault);
-    //     }
-    //
-    //     // TODO: Add fee logic
-    //     // TODO: check if we are in panic mode once is implemented
-    //     // TODO: check if collateral price has been updated lately
-    //
-    //     let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
-    //
-    //     let protocol_collateral_price: ProtocolCollateralPrice =
-    //         get_protocol_collateral_price(&env);
-    //
-    //     let mut user_vault: UserVault = env.storage().get(&key).unwrap().unwrap();
-    //
-    //     let protocol_state: ProtocolState = get_protocol_state(&env);
-    //
-    //     let new_debt_amount: i128 = user_vault.total_debt + debt_amount;
-    //
-    //     let collateral_value: i128 = protocol_collateral_price.current * user_vault.total_col;
-    //
-    //     let deposit_rate: i128 = div_floor(collateral_value, new_debt_amount);
-    //
-    //     if deposit_rate < protocol_state.op_col_rte {
-    //         panic_with_error!(&env, SCErrors::CollateralRateUnderMinimum);
-    //     }
-    //
-    //     // token::Client::new(&env, &core_state.stble_tokn).xfer(
-    //     //     &env.current_contract_address(),
-    //     //     &caller,
-    //     //     &(debt_amount as i128),
-    //     // );
-    //
-    //     let mut protocol_stats: ProtStats = get_protocol_stats(&env);
-    //
-    //     user_vault.total_debt = new_debt_amount;
-    //     protocol_stats.tot_debt = protocol_stats.tot_debt + debt_amount;
-    //
-    //     env.storage().set(&key, &user_vault);
-    //     update_protocol_stats(&env, protocol_stats);
-    // }
+    fn incr_debt(env: Env, caller: Address, debt_amount: i128, denomination: Symbol) {
+        caller.require_auth();
+
+        validate_currency(&env, denomination);
+        is_currency_active(&env, denomination);
+        check_positive(&env, &debt_amount);
+        validate_user_vault(&env, caller.clone(), denomination);
+
+        // TODO: Add fee logic
+        // TODO: check if we are in panic mode once is implemented
+        // TODO: check if collateral price has been updated lately
+
+        let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
+
+        let currency: Currency = get_currency(&env, denomination);
+
+        let mut user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+
+        let protocol_state: ProtocolState = get_protocol_state(&env);
+
+        let new_debt_amount: i128 = user_vault.total_debt + debt_amount;
+
+        let collateral_value: i128 = currency.rate * user_vault.total_col;
+
+        let deposit_rate: i128 = div_floor(collateral_value, new_debt_amount);
+
+        if deposit_rate < protocol_state.op_col_rte {
+            panic_with_error!(&env, SCErrors::CollateralRateUnderMinimum);
+        }
+
+        withdraw_stablecoin(&env, &core_state, &currency, &caller, &debt_amount);
+
+        let mut protocol_stats: ProtStats = get_protocol_stats(&env);
+
+        user_vault.total_debt = new_debt_amount;
+        protocol_stats.tot_debt = protocol_stats.tot_debt + debt_amount;
+
+        set_user_vault(&env, &caller, &denomination, &user_vault);
+        update_protocol_stats(&env, protocol_stats);
+    }
     //
     // fn pay_debt(env: Env, caller: Address, deposit_amount: i128) {
     //     caller.require_auth();
