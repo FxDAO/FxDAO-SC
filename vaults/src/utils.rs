@@ -11,12 +11,36 @@ pub fn get_core_state(env: &Env) -> CoreState {
     env.storage().get(&DataKeys::CoreState).unwrap().unwrap()
 }
 
-pub fn get_protocol_state(env: &Env) -> ProtocolState {
-    env.storage().get(&DataKeys::ProtState).unwrap().unwrap()
+pub fn get_currency_vault_conditions(env: &Env, denomination: &Symbol) -> CurrencyVaultsConditions {
+    env.storage()
+        .get(&DataKeys::CyVltCond(denomination.clone()))
+        .unwrap()
+        .unwrap()
 }
 
-pub fn valid_initial_debt(env: &Env, state: &ProtocolState, initial_debt: i128) {
-    if state.mn_v_c_amt > initial_debt {
+pub fn set_currency_vault_conditions(
+    env: &Env,
+    mn_col_rte: &i128,
+    mn_v_c_amt: &i128,
+    op_col_rte: &i128,
+    denomination: &Symbol,
+) {
+    env.storage().set(
+        &DataKeys::CyVltCond(denomination.clone()),
+        &CurrencyVaultsConditions {
+            mn_col_rte: mn_col_rte.clone(),
+            mn_v_c_amt: mn_v_c_amt.clone(),
+            op_col_rte: op_col_rte.clone(),
+        },
+    );
+}
+
+pub fn valid_initial_debt(
+    env: &Env,
+    currency_vault_conditions: &CurrencyVaultsConditions,
+    initial_debt: i128,
+) {
+    if currency_vault_conditions.mn_v_c_amt > initial_debt {
         panic_with_error!(env, SCErrors::InvalidInitialDebtAmount);
     }
 }

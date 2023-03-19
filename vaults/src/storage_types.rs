@@ -7,13 +7,6 @@ pub struct CoreState {
 }
 
 #[contracttype]
-pub struct ProtocolState {
-    pub mn_col_rte: i128, // Min collateral ratio - ex: 1.10
-    pub mn_v_c_amt: i128, // Min vault creation amount - ex: 5000
-    pub op_col_rte: i128, // Opening collateral ratio - ex: 1.15
-}
-
-#[contracttype]
 pub struct UserVaultDataType {
     pub user: Address,
     pub symbol: Symbol, // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
@@ -28,7 +21,7 @@ pub struct UserVault {
 
 #[contracttype]
 pub struct Currency {
-    pub symbol: Symbol, // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
+    pub symbol: Symbol, // symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
     pub active: bool,
     pub contract: BytesN<32>,
     pub last_updte: u64, // This is the last time the price got updated
@@ -43,14 +36,20 @@ pub struct CurrencyStats {
 }
 
 #[contracttype]
+pub struct CurrencyVaultsConditions {
+    pub mn_col_rte: i128, // Min collateral ratio - ex: 1.10
+    pub mn_v_c_amt: i128, // Min vault creation amount - ex: 5000
+    pub op_col_rte: i128, // Opening collateral ratio - ex: 1.15
+}
+
+#[contracttype]
 pub enum DataKeys {
     CoreState,
-    ProtState,
-    ProtRate,
     Admin,
     UserVault(UserVaultDataType),
     Currency(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
     CyStats(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
+    CyVltCond(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
     PanicMode,
 }
 
@@ -68,7 +67,7 @@ pub enum SCErrors {
     DepositAmountIsMoreThanTotalDebt = 6,
     CollateralRateUnderMinimum = 7,
     UnsupportedNegativeValue = 8,
-    CurrencyAlreadyAdded = 9000,
+    CurrencyAlreadyAdded = 90000,
     CurrencyDoesntExist = 90001,
     CurrencyIsInactive = 90002,
 }

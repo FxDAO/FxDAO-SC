@@ -111,10 +111,11 @@ fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVariabl
     data.contract_client
         .toggle_cy(&data.stable_token_denomination, &true);
 
-    data.contract_client.s_p_state(
+    data.contract_client.s_c_v_c(
         &base_variables.mn_col_rte,
         &base_variables.mn_v_c_amt,
         &base_variables.op_col_rte,
+        &data.stable_token_denomination,
     );
 
     token::Client::new(&env, &data.stable_token_client.contract_id).incr_allow(
@@ -171,7 +172,7 @@ fn test_init_panic() {
 }
 
 #[test]
-fn test_set_and_get_protocol_state() {
+fn test_set_and_get_currency_vault_conditions() {
     let env = Env::default();
     let data: TestData = create_base_data(&env);
     let base_variables: InitialVariables = create_base_variables(&env, &data);
@@ -182,10 +183,11 @@ fn test_set_and_get_protocol_state() {
         &data.stable_token_issuer,
     );
 
-    data.contract_client.s_p_state(
+    data.contract_client.s_c_v_c(
         &base_variables.mn_col_rte,
         &base_variables.mn_v_c_amt,
         &base_variables.op_col_rte,
+        &data.stable_token_denomination,
     );
 
     // Check the admin is the one who call it
@@ -197,12 +199,13 @@ fn test_set_and_get_protocol_state() {
             // Identifier of the called contract
             data.contract_client.contract_id.clone(),
             // Name of the called function
-            symbol!("s_p_state"),
-            // Arguments used (converted to the env-managed vector via `into_val`)
+            symbol!("s_c_v_c"),
+            // Arguments used (converted to the, &data.stable_token_denomination env-managed vector via `into_val`)
             (
                 base_variables.mn_col_rte.clone(),
                 base_variables.mn_v_c_amt.clone(),
-                base_variables.op_col_rte.clone()
+                base_variables.op_col_rte.clone(),
+                data.stable_token_denomination.clone()
             )
                 .into_val(&env)
         )]
@@ -211,14 +214,21 @@ fn test_set_and_get_protocol_state() {
     // Fail if one value is neative
     assert!(data
         .contract_client
-        .try_s_p_state(&base_variables.mn_col_rte, &base_variables.mn_v_c_amt, &-23)
+        .try_s_c_v_c(
+            &base_variables.mn_col_rte,
+            &base_variables.mn_v_c_amt,
+            &-23,
+            &data.stable_token_denomination,
+        )
         .is_err());
 
-    let protocol_state = data.contract_client.g_p_state();
+    let currency_vault_conditions = data
+        .contract_client
+        .g_c_v_c(&data.stable_token_denomination);
 
-    assert_eq!(protocol_state.mn_col_rte, 11000000);
-    assert_eq!(protocol_state.mn_v_c_amt, 50000000000);
-    assert_eq!(protocol_state.op_col_rte, 11500000);
+    assert_eq!(currency_vault_conditions.mn_col_rte, 11000000);
+    assert_eq!(currency_vault_conditions.mn_v_c_amt, 50000000000);
+    assert_eq!(currency_vault_conditions.op_col_rte, 11500000);
 }
 
 #[test]
@@ -350,8 +360,12 @@ fn test_new_vault() {
         )
         .is_err());
 
-    data.contract_client
-        .s_p_state(&mn_col_rte, &mn_v_c_amt, &op_col_rte);
+    data.contract_client.s_c_v_c(
+        &mn_col_rte,
+        &mn_v_c_amt,
+        &op_col_rte,
+        &data.stable_token_denomination,
+    );
 
     data.contract_client.new_vault(
         &depositor,
@@ -464,8 +478,12 @@ fn test_increase_collateral() {
         &(initial_debt),
     );
 
-    data.contract_client
-        .s_p_state(&mn_col_rte, &mn_v_c_amt, &op_col_rte);
+    data.contract_client.s_c_v_c(
+        &mn_col_rte,
+        &mn_v_c_amt,
+        &op_col_rte,
+        &data.stable_token_denomination,
+    );
 
     // It should fail if the user doesn't have a Vault open
     assert!(data
@@ -664,8 +682,12 @@ fn test_pay_debt() {
         &(initial_debt * 10),
     );
 
-    data.contract_client
-        .s_p_state(&mn_col_rte, &mn_v_c_amt, &op_col_rte);
+    data.contract_client.s_c_v_c(
+        &mn_col_rte,
+        &mn_v_c_amt,
+        &op_col_rte,
+        &data.stable_token_denomination,
+    );
 
     // It should fail if the user doesn't have a Vault open
     assert!(data

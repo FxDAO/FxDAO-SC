@@ -13,14 +13,20 @@ pub trait VaultsContractTrait {
 
     fn g_c_state(env: Env) -> CoreState;
 
-    fn s_p_state(env: Env, mn_col_rte: i128, mn_v_c_amt: i128, op_col_rte: i128);
-    fn g_p_state(env: Env) -> ProtocolState;
-
-    fn g_cy_stats(env: Env, denomination: Symbol) -> CurrencyStats;
+    /// Currency vaults conditions
+    fn s_c_v_c(
+        env: Env,
+        mn_col_rte: i128,
+        mn_v_c_amt: i128,
+        op_col_rte: i128,
+        denomination: Symbol,
+    );
+    fn g_c_v_c(env: Env, denomination: Symbol) -> CurrencyVaultsConditions;
 
     /// Currencies methods
     fn new_cy(env: Env, denomination: Symbol, contract: BytesN<32>);
     fn get_cy(env: Env, denomination: Symbol) -> Currency;
+    fn g_cy_stats(env: Env, denomination: Symbol) -> CurrencyStats;
     fn s_cy_rate(env: Env, denomination: Symbol, rate: i128);
     fn toggle_cy(env: Env, denomination: Symbol, active: bool);
 
@@ -47,12 +53,13 @@ impl VaultsContractTrait for VaultsContract {
             panic_with_error!(&env, SCErrors::AlreadyInit);
         }
 
-        let core_state: CoreState = CoreState {
-            colla_tokn,
-            stble_issr,
-        };
-
-        env.storage().set(&DataKeys::CoreState, &core_state);
+        env.storage().set(
+            &DataKeys::CoreState,
+            &CoreState {
+                colla_tokn,
+                stble_issr,
+            },
+        );
         env.storage().set(&DataKeys::Admin, &admin);
     }
 
@@ -64,28 +71,22 @@ impl VaultsContractTrait for VaultsContract {
         get_core_state(&env)
     }
 
-    fn s_p_state(env: Env, mn_col_rte: i128, mn_v_c_amt: i128, op_col_rte: i128) {
+    fn s_c_v_c(
+        env: Env,
+        mn_col_rte: i128,
+        mn_v_c_amt: i128,
+        op_col_rte: i128,
+        denomination: Symbol,
+    ) {
         check_admin(&env);
         check_positive(&env, &mn_col_rte);
         check_positive(&env, &mn_v_c_amt);
         check_positive(&env, &op_col_rte);
-
-        env.storage().set(
-            &DataKeys::ProtState,
-            &ProtocolState {
-                mn_col_rte,
-                mn_v_c_amt,
-                op_col_rte,
-            },
-        );
+        set_currency_vault_conditions(&env, &mn_col_rte, &mn_v_c_amt, &op_col_rte, &denomination);
     }
 
-    fn g_p_state(env: Env) -> ProtocolState {
-        get_protocol_state(&env)
-    }
-
-    fn g_cy_stats(env: Env, denomination: Symbol) -> CurrencyStats {
-        get_currency_stats(&env, &denomination)
+    fn g_c_v_c(env: Env, denomination: Symbol) -> CurrencyVaultsConditions {
+        get_currency_vault_conditions(&env, &denomination)
     }
 
     fn new_cy(env: Env, denomination: Symbol, contract: BytesN<32>) {
@@ -110,6 +111,10 @@ impl VaultsContractTrait for VaultsContract {
     fn get_cy(env: Env, denomination: Symbol) -> Currency {
         validate_currency(&env, denomination);
         get_currency(&env, denomination)
+    }
+
+    fn g_cy_stats(env: Env, denomination: Symbol) -> CurrencyStats {
+        get_currency_stats(&env, &denomination)
     }
 
     fn s_cy_rate(env: Env, denomination: Symbol, rate: i128) {
@@ -156,9 +161,10 @@ impl VaultsContractTrait for VaultsContract {
 
         // TODO: check if collateral price has been updated lately
 
-        let protocol_state: ProtocolState = get_protocol_state(&env);
+        let currency_vault_conditions: CurrencyVaultsConditions =
+            get_currency_vault_conditions(&env, &denomination);
 
-        valid_initial_debt(&env, &protocol_state, initial_debt);
+        valid_initial_debt(&env, &currency_vault_conditions, initial_debt);
 
         let currency: Currency = get_currency(&env, denomination);
 
@@ -166,7 +172,7 @@ impl VaultsContractTrait for VaultsContract {
 
         let deposit_rate: i128 = div_floor(collateral_value, initial_debt);
 
-        if deposit_rate < protocol_state.mn_col_rte {
+        if deposit_rate < currency_vault_conditions.mn_col_rte {
             panic_with_error!(&env, SCErrors::InvalidOpeningCollateralRatio);
         }
 
@@ -242,7 +248,8 @@ impl VaultsContractTrait for VaultsContract {
 
         let mut user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
 
-        let protocol_state: ProtocolState = get_protocol_state(&env);
+        let currency_vault_conditions: CurrencyVaultsConditions =
+            get_currency_vault_conditions(&env, &denomination);
 
         let new_debt_amount: i128 = user_vault.total_debt + debt_amount;
 
@@ -250,7 +257,7 @@ impl VaultsContractTrait for VaultsContract {
 
         let deposit_rate: i128 = div_floor(collateral_value, new_debt_amount);
 
-        if deposit_rate < protocol_state.op_col_rte {
+        if deposit_rate < currency_vault_conditions.op_col_rte {
             panic_with_error!(&env, SCErrors::CollateralRateUnderMinimum);
         }
 
