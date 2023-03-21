@@ -11,30 +11,6 @@ pub fn get_core_state(env: &Env) -> CoreState {
     env.storage().get(&DataKeys::CoreState).unwrap().unwrap()
 }
 
-pub fn get_currency_vault_conditions(env: &Env, denomination: &Symbol) -> CurrencyVaultsConditions {
-    env.storage()
-        .get(&DataKeys::CyVltCond(denomination.clone()))
-        .unwrap()
-        .unwrap()
-}
-
-pub fn set_currency_vault_conditions(
-    env: &Env,
-    mn_col_rte: &i128,
-    mn_v_c_amt: &i128,
-    op_col_rte: &i128,
-    denomination: &Symbol,
-) {
-    env.storage().set(
-        &DataKeys::CyVltCond(denomination.clone()),
-        &CurrencyVaultsConditions {
-            mn_col_rte: mn_col_rte.clone(),
-            mn_v_c_amt: mn_v_c_amt.clone(),
-            op_col_rte: op_col_rte.clone(),
-        },
-    );
-}
-
 pub fn valid_initial_debt(
     env: &Env,
     currency_vault_conditions: &CurrencyVaultsConditions,
@@ -53,46 +29,47 @@ pub fn check_positive(env: &Env, value: &i128) {
 
 /// Vaults utils
 pub fn validate_user_vault(env: &Env, user: Address, denomination: Symbol) {
-    if !env.storage().has(&UserVaultDataType {
+    if !env.storage().has(&DataKeys::UserVault(UserVaultDataType {
         user,
         symbol: denomination,
-    }) {
+    })) {
         panic_with_error!(&env, SCErrors::UserVaultDoesntExist);
     }
 }
 
 pub fn vault_spot_available(env: &Env, user: Address, denomination: Symbol) {
-    if env.storage().has(&UserVaultDataType {
+    if env.storage().has(&DataKeys::UserVault(UserVaultDataType {
         user,
         symbol: denomination,
-    }) {
+    })) {
         panic_with_error!(&env, SCErrors::UserAlreadyHasDenominationVault);
     }
 }
 
 pub fn set_user_vault(env: &Env, user: &Address, denomination: &Symbol, user_vault: &UserVault) {
     env.storage().set(
-        &UserVaultDataType {
+        &DataKeys::UserVault(UserVaultDataType {
             user: user.clone(),
             symbol: denomination.clone(),
-        },
+        }),
         user_vault,
     );
 }
 
 pub fn remove_user_vault(env: &Env, user: &Address, denomination: &Symbol) {
-    env.storage().remove(&UserVaultDataType {
-        user: user.clone(),
-        symbol: denomination.clone(),
-    });
+    env.storage()
+        .remove(&DataKeys::UserVault(UserVaultDataType {
+            user: user.clone(),
+            symbol: denomination.clone(),
+        }));
 }
 
 pub fn get_user_vault(env: &Env, user: Address, denomination: Symbol) -> UserVault {
     env.storage()
-        .get(&UserVaultDataType {
+        .get(&DataKeys::UserVault(UserVaultDataType {
             user,
             symbol: denomination,
-        })
+        }))
         .unwrap()
         .unwrap()
 }
@@ -126,6 +103,31 @@ pub fn get_currency(env: &Env, denomination: Symbol) -> Currency {
         .get(&DataKeys::Currency(denomination))
         .unwrap()
         .unwrap()
+}
+
+/// Currency Vault conditions
+pub fn get_currency_vault_conditions(env: &Env, denomination: &Symbol) -> CurrencyVaultsConditions {
+    env.storage()
+        .get(&DataKeys::CyVltCond(denomination.clone()))
+        .unwrap()
+        .unwrap()
+}
+
+pub fn set_currency_vault_conditions(
+    env: &Env,
+    mn_col_rte: &i128,
+    mn_v_c_amt: &i128,
+    op_col_rte: &i128,
+    denomination: &Symbol,
+) {
+    env.storage().set(
+        &DataKeys::CyVltCond(denomination.clone()),
+        &CurrencyVaultsConditions {
+            mn_col_rte: mn_col_rte.clone(),
+            mn_v_c_amt: mn_v_c_amt.clone(),
+            op_col_rte: op_col_rte.clone(),
+        },
+    );
 }
 
 /// Currency Stats Utils
