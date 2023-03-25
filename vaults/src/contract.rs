@@ -42,6 +42,9 @@ pub trait VaultsContractTrait {
     fn incr_col(env: Env, caller: Address, amount: i128, denomination: Symbol);
     fn incr_debt(env: Env, caller: Address, debt_amount: i128, denomination: Symbol);
     fn pay_debt(env: Env, caller: Address, amount: i128, denomination: Symbol);
+
+    /// Redeeming
+    fn redeem(env: Env, amount: i128, denomination: Symbol);
 }
 
 pub struct VaultsContract;
@@ -317,5 +320,9 @@ impl VaultsContractTrait for VaultsContract {
         currency_stats.tot_debt = currency_stats.tot_debt - deposit_amount;
 
         set_currency_stats(&env, &denomination, &currency_stats);
+    }
+
+    fn redeem(env: Env, amount: i128, denomination: Symbol) {
+        todo!()
     }
 }
