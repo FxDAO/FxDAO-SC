@@ -1,4 +1,3 @@
-// TODO: Handle decimals
 #![no_std]
 
 mod token {

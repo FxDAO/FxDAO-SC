@@ -1,9 +1,10 @@
 use crate::storage_types::*;
 use crate::token;
+use crate::utils::vaults::*;
 use crate::utils::*;
 use num_integer::div_floor;
 
-use soroban_sdk::{contractimpl, panic_with_error, Address, BytesN, Env, Symbol};
+use soroban_sdk::{contractimpl, panic_with_error, Address, BytesN, Env, Symbol, Vec};
 
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
@@ -42,6 +43,7 @@ pub trait VaultsContractTrait {
     fn incr_col(env: Env, caller: Address, amount: i128, denomination: Symbol);
     fn incr_debt(env: Env, caller: Address, debt_amount: i128, denomination: Symbol);
     fn pay_debt(env: Env, caller: Address, amount: i128, denomination: Symbol);
+    fn g_indexes(env: Env, denomination: Symbol) -> Vec<i128>;
 
     /// Redeeming
     fn redeem(env: Env, amount: i128, denomination: Symbol);
@@ -117,6 +119,7 @@ impl VaultsContractTrait for VaultsContract {
     }
 
     fn g_cy_stats(env: Env, denomination: Symbol) -> CurrencyStats {
+        validate_currency(&env, denomination);
         get_currency_stats(&env, &denomination)
     }
 
@@ -173,24 +176,25 @@ impl VaultsContractTrait for VaultsContract {
 
         let collateral_value: i128 = currency.rate * collateral_amount;
 
-        let deposit_rate: i128 = div_floor(collateral_value, initial_debt);
+        let deposit_collateral_rate: i128 = div_floor(collateral_value, initial_debt);
 
-        if deposit_rate < currency_vault_conditions.mn_col_rte {
+        if deposit_collateral_rate < currency_vault_conditions.mn_col_rte {
             panic_with_error!(&env, SCErrors::InvalidOpeningCollateralRatio);
         }
 
         // TODO: Add fee logic
         let new_vault = UserVault {
             id: caller.clone(),
-            total_col: collateral_amount,
             total_debt: initial_debt,
+            total_col: collateral_amount,
+            index: calculate_user_vault_index(initial_debt, collateral_amount),
         };
 
         let core_state: CoreState = get_core_state(&env);
 
         deposit_collateral(&env, &core_state, &caller, &collateral_amount);
 
-        set_user_vault(&env, &caller, &denomination, &new_vault);
+        save_new_user_vault(&env, &caller, &denomination, &new_vault);
 
         withdraw_stablecoin(&env, &core_state, &currency, &caller, &initial_debt);
 
@@ -320,6 +324,10 @@ impl VaultsContractTrait for VaultsContract {
         currency_stats.tot_debt = currency_stats.tot_debt - deposit_amount;
 
         set_currency_stats(&env, &denomination, &currency_stats);
+    }
+
+    fn g_indexes(env: Env, denomination: Symbol) -> Vec<i128> {
+        get_sorted_indexes_list(&env, denomination)
     }
 
     fn redeem(env: Env, amount: i128, denomination: Symbol) {

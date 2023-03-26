@@ -1,13 +1,16 @@
 #![cfg(test)]
 
 extern crate std;
+
 use crate::storage_types::CurrencyStats;
 use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
 };
 use crate::token;
+use crate::utils::vaults::calculate_user_vault_index;
+use num_integer::div_floor;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{symbol, Address, Env, IntoVal};
+use soroban_sdk::{symbol, Address, Env, IntoVal, Vec};
 
 #[test]
 fn test_new_vault() {
@@ -127,9 +130,27 @@ fn test_new_vault() {
         .contract_client
         .g_cy_stats(&data.stable_token_denomination);
 
+    let user_vault = data
+        .contract_client
+        .get_vault(&depositor, &data.stable_token_denomination);
+
+    let indexes_list: Vec<i128> = data
+        .contract_client
+        .g_indexes(&data.stable_token_denomination);
+
     assert_eq!(currency_stats.tot_vaults, 1);
     assert_eq!(currency_stats.tot_debt, initial_debt);
     assert_eq!(currency_stats.tot_col, collateral_amount);
+
+    assert_eq!(user_vault.index, (initial_debt - collateral_amount).abs());
+    assert_eq!(user_vault.total_col, collateral_amount);
+    assert_eq!(user_vault.total_debt, initial_debt);
+
+    assert_eq!(
+        indexes_list.first().unwrap().unwrap(),
+        (initial_debt - collateral_amount).abs()
+    );
+    assert_eq!(indexes_list.iter().len(), 1 as usize);
 
     // Should fail if user tries to create a new vault but already have one
     assert!(data
@@ -166,9 +187,30 @@ fn test_new_vault() {
         .contract_client
         .g_cy_stats(&data.stable_token_denomination);
 
+    let second_user_vault = data
+        .contract_client
+        .get_vault(&depositor, &data.stable_token_denomination);
+
+    let new_indexes_list: Vec<i128> = data
+        .contract_client
+        .g_indexes(&data.stable_token_denomination);
+
     assert_eq!(updated_currency_stats.tot_vaults, 2);
     assert_eq!(updated_currency_stats.tot_debt, initial_debt * 2);
     assert_eq!(updated_currency_stats.tot_col, collateral_amount * 2);
+
+    assert_eq!(
+        second_user_vault.index,
+        (initial_debt - collateral_amount).abs()
+    );
+    assert_eq!(second_user_vault.total_col, collateral_amount);
+    assert_eq!(second_user_vault.total_debt, initial_debt);
+
+    assert_eq!(
+        new_indexes_list.first().unwrap().unwrap(),
+        (initial_debt - collateral_amount).abs()
+    );
+    assert_eq!(new_indexes_list.iter().len(), 1 as usize);
 }
 
 #[test]
