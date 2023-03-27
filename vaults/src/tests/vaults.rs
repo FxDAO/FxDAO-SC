@@ -7,7 +7,6 @@ use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
 };
 use crate::token;
-use crate::utils::vaults::calculate_user_vault_index;
 use num_integer::div_floor;
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{symbol, Address, Env, IntoVal, Vec};

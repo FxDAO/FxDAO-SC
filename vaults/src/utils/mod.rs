@@ -2,7 +2,7 @@ pub mod vaults;
 
 use crate::storage_types::*;
 use crate::token;
-use soroban_sdk::{panic_with_error, Address, BytesN, Env, Symbol};
+use soroban_sdk::{panic_with_error, Address, Env, Symbol};
 
 pub fn check_admin(env: &Env) {
     let admin: Address = env.storage().get(&DataKeys::Admin).unwrap().unwrap();
@@ -52,14 +52,6 @@ pub fn vault_spot_available(env: &Env, user: Address, denomination: Symbol) {
     {
         panic_with_error!(&env, SCErrors::UserAlreadyHasDenominationVault);
     }
-}
-
-pub fn remove_user_vault(env: &Env, user: &Address, denomination: &Symbol) {
-    env.storage()
-        .remove(&VaultsDataKeys::UserVault(UserVaultDataType {
-            user: user.clone(),
-            symbol: denomination.clone(),
-        }));
 }
 
 pub fn get_user_vault(env: &Env, user: Address, denomination: Symbol) -> UserVault {

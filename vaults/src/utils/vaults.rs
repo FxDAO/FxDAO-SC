@@ -1,6 +1,5 @@
 use crate::storage_types::{SCErrors, UserVault, UserVaultDataType, VaultsDataKeys};
 use num_integer::div_floor;
-use soroban_sdk::xdr::ScSpecType::Result;
 use soroban_sdk::{panic_with_error, vec, Address, Env, Symbol, Vec};
 
 pub fn save_new_user_vault(
@@ -100,6 +99,48 @@ pub fn update_user_vault(
     );
 }
 
+/// 1 - This method removes the UserVault from the UserVault(UserVaultDataType) key
+///
+/// 2 - It gets the saved Vaults with the current index and remove the vault data type from the record
+///
+/// 3 - If the record of the Vector is now blank (length == 0):
+///
+/// 3.1 - it removes it instead of saving it
+///
+/// 3.2 - It gets the indexes list and remove the index from it
+pub fn remove_user_vault(env: &Env, user: &Address, denomination: &Symbol, user_vault: &UserVault) {
+    env.storage()
+        .remove(&VaultsDataKeys::UserVault(UserVaultDataType {
+            user: user.clone(),
+            symbol: denomination.clone(),
+        }));
+
+    let mut vaults_with_index_record: Vec<UserVaultDataType> =
+        get_vaults_with_index(env, &user_vault.index);
+
+    vaults_with_index_record =
+        remove_vault_from_vaults_with_index(&vaults_with_index_record, &user, &denomination);
+
+    if vaults_with_index_record.len() == 0 {
+        env.storage()
+            .remove(&VaultsDataKeys::VltsWtIndx(user_vault.index));
+    } else {
+        env.storage().set(
+            &VaultsDataKeys::VltsWtIndx(user_vault.index),
+            &vaults_with_index_record,
+        );
+    }
+
+    if vaults_with_index_record.len() == 0 {
+        let mut indexes_list = get_sorted_indexes_list(env, denomination);
+        indexes_list = remove_index_from_indexes_list(&indexes_list, user_vault.index);
+        env.storage().set(
+            &VaultsDataKeys::Indexes(denomination.clone()),
+            &indexes_list,
+        );
+    }
+}
+
 pub fn set_user_vault(env: &Env, user: &Address, denomination: &Symbol, user_vault: &UserVault) {
     env.storage().set(
         &VaultsDataKeys::UserVault(UserVaultDataType {
@@ -116,6 +157,15 @@ pub fn get_vaults_with_index(env: &Env, index: &i128) -> Vec<UserVaultDataType> 
         .unwrap_or(Ok(vec![env] as Vec<UserVaultDataType>))
         .unwrap()
 }
+
+pub fn get_sorted_indexes_list(env: &Env, denomination: &Symbol) -> Vec<i128> {
+    env.storage()
+        .get(&VaultsDataKeys::Indexes(denomination.clone()))
+        .unwrap_or(Ok(vec![env] as Vec<i128>))
+        .unwrap()
+}
+
+// Functional utils
 
 pub fn add_vault_to_vaults_with_index(
     record: &Vec<UserVaultDataType>,
@@ -168,13 +218,6 @@ pub fn calculate_user_vault_index(total_debt: i128, total_col: i128) -> i128 {
     div_floor(1000000000 * total_col, total_debt)
 }
 
-pub fn get_sorted_indexes_list(env: &Env, denomination: &Symbol) -> Vec<i128> {
-    env.storage()
-        .get(&VaultsDataKeys::Indexes(denomination.clone()))
-        .unwrap_or(Ok(vec![env] as Vec<i128>))
-        .unwrap()
-}
-
 pub fn add_new_index_into_indexes_list(indexes_list: &Vec<i128>, index: i128) -> Vec<i128> {
     let mut updated_indexes_list: Vec<i128> = indexes_list.clone();
     let first_value: i128 = updated_indexes_list.first().unwrap_or(Ok(0)).unwrap();
@@ -217,7 +260,12 @@ pub fn remove_index_from_indexes_list(indexes_list: &Vec<i128>, index: i128) -> 
 
 #[cfg(test)]
 mod test {
-    use crate::utils::vaults::calculate_user_vault_index;
+    use crate::utils::vaults::{
+        add_new_index_into_indexes_list, calculate_user_vault_index, remove_index_from_indexes_list,
+    };
+    use soroban_sdk::{vec, Env, Vec};
+
+    // TODO: test add_vault_to_vaults_with_index and remove_vault_from_vaults_with_index
 
     #[test]
     fn test_calculate_user_vault_index() {
@@ -255,5 +303,122 @@ mod test {
         let result_5 = calculate_user_vault_index(total_debt_5, total_col_5);
 
         assert_eq!(result_5, 29999999999);
+    }
+
+    #[test]
+    fn test_add_new_index_into_indexes_list() {
+        let env = Env::default();
+        let first_index = 1000000000 as i128;
+        let mut original_vector: Vec<i128> = vec![&env] as Vec<i128>;
+
+        original_vector = add_new_index_into_indexes_list(&original_vector, first_index);
+
+        assert_eq!(original_vector, vec![&env, first_index]);
+
+        let second_index: i128 = 30000000000;
+
+        original_vector = add_new_index_into_indexes_list(&original_vector, second_index);
+
+        assert_eq!(original_vector, vec![&env, first_index, second_index]);
+
+        let third_index: i128 = 33333333;
+
+        original_vector = add_new_index_into_indexes_list(&original_vector, third_index);
+
+        assert_eq!(
+            original_vector,
+            vec![&env, third_index, first_index, second_index]
+        );
+
+        let fourth_index: i128 = 33333333;
+
+        original_vector = add_new_index_into_indexes_list(&original_vector, fourth_index);
+
+        assert_eq!(
+            original_vector,
+            vec![&env, third_index, first_index, second_index]
+        );
+
+        let fifth_index: i128 = 29999999999;
+
+        original_vector = add_new_index_into_indexes_list(&original_vector, fifth_index);
+
+        assert_eq!(
+            original_vector,
+            vec![&env, third_index, first_index, fifth_index, second_index]
+        );
+
+        let sixth_index: i128 = 900000000;
+
+        original_vector = add_new_index_into_indexes_list(&original_vector, sixth_index);
+
+        assert_eq!(
+            original_vector,
+            vec![
+                &env,
+                third_index,
+                sixth_index,
+                first_index,
+                fifth_index,
+                second_index
+            ]
+        );
+    }
+
+    #[test]
+    fn test_remove_index_from_indexes_list() {
+        let env = Env::default();
+
+        let first_index: i128 = 1000000000;
+        let second_index: i128 = 30000000000;
+        let third_index: i128 = 33333333;
+        let fourth_index: i128 = 33333333;
+        let fifth_index: i128 = 29999999999;
+        let sixth_index: i128 = 900000000;
+
+        let mut original_vector: Vec<i128> = vec![
+            &env,
+            third_index,
+            sixth_index,
+            first_index,
+            fifth_index,
+            second_index,
+        ] as Vec<i128>;
+
+        original_vector = remove_index_from_indexes_list(&original_vector, third_index);
+
+        assert_eq!(
+            original_vector,
+            vec![&env, sixth_index, first_index, fifth_index, second_index,] as Vec<i128>
+        );
+
+        original_vector = remove_index_from_indexes_list(&original_vector, second_index);
+
+        assert_eq!(
+            original_vector,
+            vec![&env, sixth_index, first_index, fifth_index,] as Vec<i128>
+        );
+
+        original_vector = remove_index_from_indexes_list(&original_vector, first_index);
+
+        assert_eq!(
+            original_vector,
+            vec![&env, sixth_index, fifth_index,] as Vec<i128>
+        );
+
+        original_vector = remove_index_from_indexes_list(&original_vector, fourth_index);
+
+        assert_eq!(
+            original_vector,
+            vec![&env, sixth_index, fifth_index,] as Vec<i128>
+        );
+
+        original_vector = remove_index_from_indexes_list(&original_vector, fifth_index);
+
+        assert_eq!(original_vector, vec![&env, sixth_index,] as Vec<i128>);
+
+        original_vector = remove_index_from_indexes_list(&original_vector, sixth_index);
+
+        assert_eq!(original_vector, vec![&env] as Vec<i128>);
     }
 }

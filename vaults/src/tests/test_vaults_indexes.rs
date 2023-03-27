@@ -31,7 +31,10 @@ fn test_vault_indexes_logic_around() {
     data.contract_client
         .s_cy_rate(&data.stable_token_denomination, &currency_price);
 
-    // First depositor
+    // 1st Set of tests
+    // This section includes and checks that every time we create a new vault the values are updated
+
+    // First deposit
     let depositor_1 = Address::random(&env);
     let depositor_1_debt: i128 = 1500000000;
     let depositor_1_collateral_amount: i128 = 30000000000;
@@ -186,4 +189,10 @@ fn test_vault_indexes_logic_around() {
         current_indexes.last().unwrap().unwrap(),
         calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount)
     );
+
+    // 2nd Section
+    // This section checks that when we update a vault, values get updated correctly
+    // We also include changes in the currency rates and new vaults creations in order to emulate a real scenario
+    // 3rd Section
+    // TODO
 }

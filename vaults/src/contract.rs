@@ -260,14 +260,15 @@ impl VaultsContractTrait for VaultsContract {
 
         let currency: Currency = get_currency(&env, denomination);
 
-        let mut user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let current_user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let mut new_user_vault: UserVault = current_user_vault.clone();
 
         let currency_vault_conditions: CurrencyVaultsConditions =
             get_currency_vault_conditions(&env, &denomination);
 
-        let new_debt_amount: i128 = user_vault.total_debt + debt_amount;
+        let new_debt_amount: i128 = current_user_vault.total_debt + debt_amount;
 
-        let collateral_value: i128 = currency.rate * user_vault.total_col;
+        let collateral_value: i128 = currency.rate * current_user_vault.total_col;
 
         let deposit_rate: i128 = div_floor(collateral_value, new_debt_amount);
 
@@ -277,12 +278,19 @@ impl VaultsContractTrait for VaultsContract {
 
         withdraw_stablecoin(&env, &core_state, &currency, &caller, &debt_amount);
 
+        new_user_vault.total_debt = new_debt_amount;
+        new_user_vault.index =
+            calculate_user_vault_index(new_user_vault.total_debt, new_user_vault.total_col);
+        update_user_vault(
+            &env,
+            &caller,
+            &denomination,
+            &current_user_vault,
+            &new_user_vault,
+        );
+
         let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
-
-        user_vault.total_debt = new_debt_amount;
         currency_stats.tot_debt = currency_stats.tot_debt + debt_amount;
-
-        set_user_vault(&env, &caller, &denomination, &user_vault);
         set_currency_stats(&env, &denomination, &currency_stats);
     }
 
@@ -298,9 +306,10 @@ impl VaultsContractTrait for VaultsContract {
 
         let currency: Currency = get_currency(&env, denomination);
 
-        let mut user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let current_user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let mut updated_user_vault: UserVault = current_user_vault.clone();
 
-        if deposit_amount > user_vault.total_debt {
+        if deposit_amount > current_user_vault.total_debt {
             panic_with_error!(&env, SCErrors::DepositAmountIsMoreThanTotalDebt);
         }
 
@@ -310,26 +319,31 @@ impl VaultsContractTrait for VaultsContract {
 
         let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
 
-        if user_vault.total_debt == deposit_amount {
+        if current_user_vault.total_debt == deposit_amount {
             // If the amount is equal to the debt it means it is paid in full so we release the collateral and remove the vault
             currency_stats.tot_vaults = currency_stats.tot_vaults - 1;
-            currency_stats.tot_col = currency_stats.tot_col - user_vault.total_col;
+            currency_stats.tot_col = currency_stats.tot_col - current_user_vault.total_col;
 
             token::Client::new(&env, &core_state.colla_tokn).xfer(
                 &env.current_contract_address(),
                 &caller,
-                &user_vault.total_col,
+                &current_user_vault.total_col,
             );
 
-            remove_user_vault(&env, &caller, &denomination);
+            remove_user_vault(&env, &caller, &denomination, &current_user_vault);
         } else {
             // If amount is not enough to pay all the debt, we just updated the stats of the user's vault
-            user_vault.total_debt = user_vault.total_debt - deposit_amount;
-            set_user_vault(&env, &caller, &denomination, &user_vault);
+            updated_user_vault.total_debt = updated_user_vault.total_debt - deposit_amount;
+            update_user_vault(
+                &env,
+                &caller,
+                &denomination,
+                &current_user_vault,
+                &updated_user_vault,
+            );
         }
 
         currency_stats.tot_debt = currency_stats.tot_debt - deposit_amount;
-
         set_currency_stats(&env, &denomination, &currency_stats);
     }
 

@@ -3,11 +3,9 @@
 #![cfg(test)]
 extern crate std;
 use crate::storage_types::*;
-use crate::token;
 
 use crate::storage_types::CoreState;
-use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{symbol, Address, Env, IntoVal, Symbol};
+use soroban_sdk::{symbol, Address, Env, IntoVal};
 
 use crate::tests::test_utils::*;
 

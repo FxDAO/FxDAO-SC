@@ -3,7 +3,7 @@ use crate::contract::VaultsContract;
 use crate::token;
 use crate::VaultsContractClient;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{symbol, Address, Env, IntoVal, Symbol};
+use soroban_sdk::{symbol, Address, Env, Symbol};
 
 pub fn create_token_contract(e: &Env, admin: &Address) -> token::Client {
     token::Client::new(&e, &e.register_stellar_asset_contract(admin.clone()))
