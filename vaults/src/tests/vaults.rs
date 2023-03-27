@@ -142,13 +142,16 @@ fn test_new_vault() {
     assert_eq!(currency_stats.tot_debt, initial_debt);
     assert_eq!(currency_stats.tot_col, collateral_amount);
 
-    assert_eq!(user_vault.index, (initial_debt - collateral_amount).abs());
+    assert_eq!(
+        user_vault.index,
+        div_floor(1000000000 * collateral_amount, initial_debt)
+    );
     assert_eq!(user_vault.total_col, collateral_amount);
     assert_eq!(user_vault.total_debt, initial_debt);
 
     assert_eq!(
         indexes_list.first().unwrap().unwrap(),
-        (initial_debt - collateral_amount).abs()
+        div_floor(1000000000 * collateral_amount, initial_debt)
     );
     assert_eq!(indexes_list.iter().len(), 1 as usize);
 
@@ -201,14 +204,14 @@ fn test_new_vault() {
 
     assert_eq!(
         second_user_vault.index,
-        (initial_debt - collateral_amount).abs()
+        div_floor(1000000000 * collateral_amount, initial_debt)
     );
     assert_eq!(second_user_vault.total_col, collateral_amount);
     assert_eq!(second_user_vault.total_debt, initial_debt);
 
     assert_eq!(
         new_indexes_list.first().unwrap().unwrap(),
-        (initial_debt - collateral_amount).abs()
+        div_floor(1000000000 * collateral_amount, initial_debt)
     );
     assert_eq!(new_indexes_list.iter().len(), 1 as usize);
 }

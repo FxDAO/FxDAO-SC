@@ -46,6 +46,7 @@ pub struct UserVaultDataType {
     pub symbol: Symbol, // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
 }
 
+#[derive(Clone)]
 #[contracttype]
 pub struct UserVault {
     pub id: Address,
@@ -64,12 +65,13 @@ pub enum VaultsDataKeys {
     /// Everytime this key is updated we need to update both "SortedVlts" and "RatioKey"
     UserVault(UserVaultDataType),
     /// This key host a Vec of i128 which is the index of the vaults, this Vec must be updated every time a Vault is updated
-    /// The nearest to zero go first
+    /// The Vec is sorted by the collateral ratio of the deposit IE the lower go first
     /// The Symbol value is the denomination of the currency
     Indexes(Symbol),
     /// The UsersRatio(i128) is a map to index the UserVaultDataType that are currently at an specific Vault Ratio
-    /// The "i128" is the Vault ratio and this key hosts a Vec<UserVaultDataType>
-    UsersRatio(i128),
+    /// The "i128" is the Vault ratio
+    /// The result is a Vec<UserVaultDataType>
+    VltsWtIndx(i128),
 }
 
 #[contracterror]
@@ -83,7 +85,7 @@ pub enum SCErrors {
     InvalidOpeningCollateralRatio = 4,
     UserVaultDoesntExist = 50000,
     UserAlreadyHasDenominationVault = 50001,
-    UserVaultRatioIsInvalid = 50002,
+    UserVaultIndexIsInvalid = 50002,
     DepositAmountIsMoreThanTotalDebt = 6,
     CollateralRateUnderMinimum = 7,
     UnsupportedNegativeValue = 8,

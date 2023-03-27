@@ -16,7 +16,7 @@ fn test_vault_indexes_logic_around() {
     let base_variables: InitialVariables = create_base_variables(&env, &data);
     set_initial_state(&env, &data, &base_variables);
 
-    let currency_price: i128 = 924480;
+    let currency_price: i128 = 920330;
     let mn_col_rte: i128 = 11000000;
     let mn_v_c_amt: i128 = 1000000000;
     let op_col_rte: i128 = 11500000;

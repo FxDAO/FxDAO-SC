@@ -8,10 +8,9 @@ use soroban_sdk::{contractimpl, panic_with_error, Address, BytesN, Env, Symbol, 
 
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
+    /// Set up and management
     fn init(env: Env, admin: Address, colla_tokn: BytesN<32>, stble_issr: Address);
-
     fn get_admin(env: Env) -> Address;
-
     fn g_c_state(env: Env) -> CoreState;
 
     /// Currency vaults conditions
@@ -226,14 +225,22 @@ impl VaultsContractTrait for VaultsContract {
 
         deposit_collateral(&env, &core_state, &caller, &collateral_amount);
 
-        let mut user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let current_user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let mut new_user_vault: UserVault = current_user_vault.clone();
+        new_user_vault.total_col = new_user_vault.total_col + collateral_amount;
+        new_user_vault.index =
+            calculate_user_vault_index(new_user_vault.total_debt, new_user_vault.total_col);
+
+        update_user_vault(
+            &env,
+            &caller,
+            &denomination,
+            &current_user_vault,
+            &new_user_vault,
+        );
 
         let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
-
-        user_vault.total_col = user_vault.total_col + collateral_amount;
         currency_stats.tot_col = currency_stats.tot_col + collateral_amount;
-
-        set_user_vault(&env, &caller, &denomination, &user_vault);
         set_currency_stats(&env, &denomination, &currency_stats);
     }
 
@@ -327,7 +334,7 @@ impl VaultsContractTrait for VaultsContract {
     }
 
     fn g_indexes(env: Env, denomination: Symbol) -> Vec<i128> {
-        get_sorted_indexes_list(&env, denomination)
+        get_sorted_indexes_list(&env, &denomination)
     }
 
     fn redeem(env: Env, amount: i128, denomination: Symbol) {
