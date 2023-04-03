@@ -1,16 +1,16 @@
 use crate::storage_types::*;
 use crate::token;
+use crate::utils::vaults::*;
 use crate::utils::*;
 use num_integer::div_floor;
 
-use soroban_sdk::{contractimpl, panic_with_error, Address, BytesN, Env, Symbol};
+use soroban_sdk::{contractimpl, panic_with_error, Address, BytesN, Env, Symbol, Vec};
 
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
+    /// Set up and management
     fn init(env: Env, admin: Address, colla_tokn: BytesN<32>, stble_issr: Address);
-
     fn get_admin(env: Env) -> Address;
-
     fn g_c_state(env: Env) -> CoreState;
 
     /// Currency vaults conditions
@@ -42,6 +42,10 @@ pub trait VaultsContractTrait {
     fn incr_col(env: Env, caller: Address, amount: i128, denomination: Symbol);
     fn incr_debt(env: Env, caller: Address, debt_amount: i128, denomination: Symbol);
     fn pay_debt(env: Env, caller: Address, amount: i128, denomination: Symbol);
+    fn g_indexes(env: Env, denomination: Symbol) -> Vec<i128>;
+
+    /// Redeeming
+    fn redeem(env: Env, caller: Address, amount: i128, denomination: Symbol);
 }
 
 pub struct VaultsContract;
@@ -114,6 +118,7 @@ impl VaultsContractTrait for VaultsContract {
     }
 
     fn g_cy_stats(env: Env, denomination: Symbol) -> CurrencyStats {
+        validate_currency(&env, denomination);
         get_currency_stats(&env, &denomination)
     }
 
@@ -170,24 +175,25 @@ impl VaultsContractTrait for VaultsContract {
 
         let collateral_value: i128 = currency.rate * collateral_amount;
 
-        let deposit_rate: i128 = div_floor(collateral_value, initial_debt);
+        let deposit_collateral_rate: i128 = div_floor(collateral_value, initial_debt);
 
-        if deposit_rate < currency_vault_conditions.mn_col_rte {
+        if deposit_collateral_rate < currency_vault_conditions.mn_col_rte {
             panic_with_error!(&env, SCErrors::InvalidOpeningCollateralRatio);
         }
 
         // TODO: Add fee logic
         let new_vault = UserVault {
             id: caller.clone(),
-            total_col: collateral_amount,
             total_debt: initial_debt,
+            total_col: collateral_amount,
+            index: calculate_user_vault_index(initial_debt, collateral_amount),
         };
 
         let core_state: CoreState = get_core_state(&env);
 
         deposit_collateral(&env, &core_state, &caller, &collateral_amount);
 
-        set_user_vault(&env, &caller, &denomination, &new_vault);
+        save_new_user_vault(&env, &caller, &denomination, &new_vault);
 
         withdraw_stablecoin(&env, &core_state, &currency, &caller, &initial_debt);
 
@@ -200,9 +206,9 @@ impl VaultsContractTrait for VaultsContract {
         set_currency_stats(&env, &denomination, &currency_stats);
     }
 
-    fn get_vault(env: Env, caller: Address, denomination: Symbol) -> UserVault {
-        validate_user_vault(&env, caller.clone(), denomination);
-        get_user_vault(&env, caller.clone(), denomination)
+    fn get_vault(env: Env, user: Address, denomination: Symbol) -> UserVault {
+        validate_user_vault(&env, user.clone(), denomination);
+        get_user_vault(&env, user.clone(), denomination)
     }
 
     fn incr_col(env: Env, caller: Address, collateral_amount: i128, denomination: Symbol) {
@@ -219,14 +225,22 @@ impl VaultsContractTrait for VaultsContract {
 
         deposit_collateral(&env, &core_state, &caller, &collateral_amount);
 
-        let mut user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let current_user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let mut new_user_vault: UserVault = current_user_vault.clone();
+        new_user_vault.total_col = new_user_vault.total_col + collateral_amount;
+        new_user_vault.index =
+            calculate_user_vault_index(new_user_vault.total_debt, new_user_vault.total_col);
+
+        update_user_vault(
+            &env,
+            &caller,
+            &denomination,
+            &current_user_vault,
+            &new_user_vault,
+        );
 
         let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
-
-        user_vault.total_col = user_vault.total_col + collateral_amount;
         currency_stats.tot_col = currency_stats.tot_col + collateral_amount;
-
-        set_user_vault(&env, &caller, &denomination, &user_vault);
         set_currency_stats(&env, &denomination, &currency_stats);
     }
 
@@ -246,14 +260,15 @@ impl VaultsContractTrait for VaultsContract {
 
         let currency: Currency = get_currency(&env, denomination);
 
-        let mut user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let current_user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let mut new_user_vault: UserVault = current_user_vault.clone();
 
         let currency_vault_conditions: CurrencyVaultsConditions =
             get_currency_vault_conditions(&env, &denomination);
 
-        let new_debt_amount: i128 = user_vault.total_debt + debt_amount;
+        let new_debt_amount: i128 = current_user_vault.total_debt + debt_amount;
 
-        let collateral_value: i128 = currency.rate * user_vault.total_col;
+        let collateral_value: i128 = currency.rate * current_user_vault.total_col;
 
         let deposit_rate: i128 = div_floor(collateral_value, new_debt_amount);
 
@@ -263,12 +278,19 @@ impl VaultsContractTrait for VaultsContract {
 
         withdraw_stablecoin(&env, &core_state, &currency, &caller, &debt_amount);
 
+        new_user_vault.total_debt = new_debt_amount;
+        new_user_vault.index =
+            calculate_user_vault_index(new_user_vault.total_debt, new_user_vault.total_col);
+        update_user_vault(
+            &env,
+            &caller,
+            &denomination,
+            &current_user_vault,
+            &new_user_vault,
+        );
+
         let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
-
-        user_vault.total_debt = new_debt_amount;
         currency_stats.tot_debt = currency_stats.tot_debt + debt_amount;
-
-        set_user_vault(&env, &caller, &denomination, &user_vault);
         set_currency_stats(&env, &denomination, &currency_stats);
     }
 
@@ -284,38 +306,126 @@ impl VaultsContractTrait for VaultsContract {
 
         let currency: Currency = get_currency(&env, denomination);
 
-        let mut user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let current_user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let mut updated_user_vault: UserVault = current_user_vault.clone();
 
-        if deposit_amount > user_vault.total_debt {
+        if deposit_amount > current_user_vault.total_debt {
             panic_with_error!(&env, SCErrors::DepositAmountIsMoreThanTotalDebt);
         }
 
         let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
 
-        deposit_stablecoin(&env, &currency, &caller, &deposit_amount);
+        deposit_stablecoin(&env, &core_state, &currency, &caller, &deposit_amount);
 
         let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
 
-        if user_vault.total_debt == deposit_amount {
+        if current_user_vault.total_debt == deposit_amount {
             // If the amount is equal to the debt it means it is paid in full so we release the collateral and remove the vault
             currency_stats.tot_vaults = currency_stats.tot_vaults - 1;
-            currency_stats.tot_col = currency_stats.tot_col - user_vault.total_col;
+            currency_stats.tot_col = currency_stats.tot_col - current_user_vault.total_col;
 
             token::Client::new(&env, &core_state.colla_tokn).xfer(
                 &env.current_contract_address(),
                 &caller,
-                &user_vault.total_col,
+                &current_user_vault.total_col,
             );
 
-            remove_user_vault(&env, &caller, &denomination);
+            remove_user_vault(&env, &caller, &denomination, &current_user_vault);
         } else {
             // If amount is not enough to pay all the debt, we just updated the stats of the user's vault
-            user_vault.total_debt = user_vault.total_debt - deposit_amount;
-            set_user_vault(&env, &caller, &denomination, &user_vault);
+            updated_user_vault.total_debt = updated_user_vault.total_debt - deposit_amount;
+            updated_user_vault.index = calculate_user_vault_index(
+                updated_user_vault.total_debt,
+                updated_user_vault.total_col,
+            );
+            update_user_vault(
+                &env,
+                &caller,
+                &denomination,
+                &current_user_vault,
+                &updated_user_vault,
+            );
         }
 
         currency_stats.tot_debt = currency_stats.tot_debt - deposit_amount;
+        set_currency_stats(&env, &denomination, &currency_stats);
+    }
 
+    fn g_indexes(env: Env, denomination: Symbol) -> Vec<i128> {
+        get_sorted_indexes_list(&env, &denomination)
+    }
+
+    fn redeem(env: Env, caller: Address, amount_to_redeem: i128, denomination: Symbol) {
+        caller.require_auth();
+
+        validate_currency(&env, denomination);
+        is_currency_active(&env, denomination);
+        check_positive(&env, &amount_to_redeem);
+
+        // TODO: Add fee logic
+
+        let core_state: CoreState = get_core_state(&env);
+        let currency: Currency = get_currency(&env, denomination);
+
+        let redeemable_vaults: Vec<UserVault> =
+            get_redeemable_vaults(&env, &amount_to_redeem, &currency);
+
+        deposit_stablecoin(&env, &core_state, &currency, &caller, &amount_to_redeem);
+
+        let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
+
+        // Update the redeemable vaults information
+        let mut amount_redeemed: i128 = 0;
+        let mut collateral_to_withdraw: i128 = 0;
+
+        for redeemable_vault in redeemable_vaults.iter() {
+            let user_vault: UserVault = redeemable_vault.unwrap();
+
+            if (amount_redeemed + user_vault.total_debt) > amount_to_redeem {
+                let mut updated_vault: UserVault = user_vault.clone();
+                let missing_amount: i128 = amount_to_redeem - amount_redeemed;
+                let missing_collateral: i128 = div_floor(missing_amount * 10000000, currency.rate);
+
+                updated_vault.total_col = updated_vault.total_col - missing_collateral;
+                updated_vault.total_debt = updated_vault.total_debt - missing_amount;
+                updated_vault.index =
+                    calculate_user_vault_index(updated_vault.total_debt, updated_vault.total_col);
+
+                currency_stats.tot_col = currency_stats.tot_col - missing_collateral;
+                currency_stats.tot_debt = currency_stats.tot_debt - missing_amount;
+
+                collateral_to_withdraw = collateral_to_withdraw + missing_collateral;
+                amount_redeemed = amount_redeemed + missing_amount;
+
+                update_user_vault(
+                    &env,
+                    &user_vault.id,
+                    &denomination,
+                    &user_vault,
+                    &updated_vault,
+                );
+            } else {
+                let collateral_amount = div_floor(user_vault.total_debt * 10000000, currency.rate);
+
+                collateral_to_withdraw = collateral_to_withdraw + collateral_amount;
+                amount_redeemed = amount_redeemed + user_vault.total_debt;
+
+                currency_stats.tot_vaults = currency_stats.tot_vaults - 1;
+                currency_stats.tot_col = currency_stats.tot_col - user_vault.total_col;
+                currency_stats.tot_debt = currency_stats.tot_debt - user_vault.total_debt;
+
+                withdraw_collateral(
+                    &env,
+                    &core_state,
+                    &user_vault.id,
+                    &(user_vault.total_col - collateral_amount),
+                );
+
+                remove_user_vault(&env, &user_vault.id, &denomination, &user_vault);
+            }
+        }
+
+        withdraw_collateral(&env, &core_state, &caller, &collateral_to_withdraw);
         set_currency_stats(&env, &denomination, &currency_stats);
     }
 }
