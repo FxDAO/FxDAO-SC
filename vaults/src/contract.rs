@@ -45,7 +45,7 @@ pub trait VaultsContractTrait {
     fn g_indexes(env: Env, denomination: Symbol) -> Vec<i128>;
 
     /// Redeeming
-    fn redeem(env: Env, amount: i128, denomination: Symbol);
+    fn redeem(env: Env, caller: Address, amount: i128, denomination: Symbol);
 }
 
 pub struct VaultsContract;
@@ -206,9 +206,9 @@ impl VaultsContractTrait for VaultsContract {
         set_currency_stats(&env, &denomination, &currency_stats);
     }
 
-    fn get_vault(env: Env, caller: Address, denomination: Symbol) -> UserVault {
-        validate_user_vault(&env, caller.clone(), denomination);
-        get_user_vault(&env, caller.clone(), denomination)
+    fn get_vault(env: Env, user: Address, denomination: Symbol) -> UserVault {
+        validate_user_vault(&env, user.clone(), denomination);
+        get_user_vault(&env, user.clone(), denomination)
     }
 
     fn incr_col(env: Env, caller: Address, collateral_amount: i128, denomination: Symbol) {
@@ -315,7 +315,7 @@ impl VaultsContractTrait for VaultsContract {
 
         let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
 
-        deposit_stablecoin(&env, &currency, &caller, &deposit_amount);
+        deposit_stablecoin(&env, &core_state, &currency, &caller, &deposit_amount);
 
         let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
 
@@ -334,6 +334,10 @@ impl VaultsContractTrait for VaultsContract {
         } else {
             // If amount is not enough to pay all the debt, we just updated the stats of the user's vault
             updated_user_vault.total_debt = updated_user_vault.total_debt - deposit_amount;
+            updated_user_vault.index = calculate_user_vault_index(
+                updated_user_vault.total_debt,
+                updated_user_vault.total_col,
+            );
             update_user_vault(
                 &env,
                 &caller,
@@ -351,7 +355,77 @@ impl VaultsContractTrait for VaultsContract {
         get_sorted_indexes_list(&env, &denomination)
     }
 
-    fn redeem(env: Env, amount: i128, denomination: Symbol) {
-        todo!()
+    fn redeem(env: Env, caller: Address, amount_to_redeem: i128, denomination: Symbol) {
+        caller.require_auth();
+
+        validate_currency(&env, denomination);
+        is_currency_active(&env, denomination);
+        check_positive(&env, &amount_to_redeem);
+
+        // TODO: Add fee logic
+
+        let core_state: CoreState = get_core_state(&env);
+        let currency: Currency = get_currency(&env, denomination);
+
+        let redeemable_vaults: Vec<UserVault> =
+            get_redeemable_vaults(&env, &amount_to_redeem, &currency);
+
+        deposit_stablecoin(&env, &core_state, &currency, &caller, &amount_to_redeem);
+
+        let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
+
+        // Update the redeemable vaults information
+        let mut amount_redeemed: i128 = 0;
+        let mut collateral_to_withdraw: i128 = 0;
+
+        for redeemable_vault in redeemable_vaults.iter() {
+            let user_vault: UserVault = redeemable_vault.unwrap();
+
+            if (amount_redeemed + user_vault.total_debt) > amount_to_redeem {
+                let mut updated_vault: UserVault = user_vault.clone();
+                let missing_amount: i128 = amount_to_redeem - amount_redeemed;
+                let missing_collateral: i128 = div_floor(missing_amount * 10000000, currency.rate);
+
+                updated_vault.total_col = updated_vault.total_col - missing_collateral;
+                updated_vault.total_debt = updated_vault.total_debt - missing_amount;
+                updated_vault.index =
+                    calculate_user_vault_index(updated_vault.total_debt, updated_vault.total_col);
+
+                currency_stats.tot_col = currency_stats.tot_col - missing_collateral;
+                currency_stats.tot_debt = currency_stats.tot_debt - missing_amount;
+
+                collateral_to_withdraw = collateral_to_withdraw + missing_collateral;
+                amount_redeemed = amount_redeemed + missing_amount;
+
+                update_user_vault(
+                    &env,
+                    &user_vault.id,
+                    &denomination,
+                    &user_vault,
+                    &updated_vault,
+                );
+            } else {
+                let collateral_amount = div_floor(user_vault.total_debt * 10000000, currency.rate);
+
+                collateral_to_withdraw = collateral_to_withdraw + collateral_amount;
+                amount_redeemed = amount_redeemed + user_vault.total_debt;
+
+                currency_stats.tot_vaults = currency_stats.tot_vaults - 1;
+                currency_stats.tot_col = currency_stats.tot_col - user_vault.total_col;
+                currency_stats.tot_debt = currency_stats.tot_debt - user_vault.total_debt;
+
+                withdraw_collateral(
+                    &env,
+                    &core_state,
+                    &user_vault.id,
+                    &(user_vault.total_col - collateral_amount),
+                );
+
+                remove_user_vault(&env, &user_vault.id, &denomination, &user_vault);
+            }
+        }
+
+        withdraw_collateral(&env, &core_state, &caller, &collateral_to_withdraw);
+        set_currency_stats(&env, &denomination, &currency_stats);
     }
 }

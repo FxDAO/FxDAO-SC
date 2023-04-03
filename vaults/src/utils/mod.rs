@@ -54,16 +54,6 @@ pub fn vault_spot_available(env: &Env, user: Address, denomination: Symbol) {
     }
 }
 
-pub fn get_user_vault(env: &Env, user: Address, denomination: Symbol) -> UserVault {
-    env.storage()
-        .get(&VaultsDataKeys::UserVault(UserVaultDataType {
-            user,
-            symbol: denomination,
-        }))
-        .unwrap()
-        .unwrap()
-}
-
 /// Currency utils
 pub fn validate_currency(env: &Env, denomination: Symbol) {
     if !env.storage().has(&DataKeys::Currency(denomination)) {
@@ -138,6 +128,14 @@ pub fn set_currency_stats(env: &Env, denomination: &Symbol, currency_stats: &Cur
 }
 
 /// Payments Utils
+pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Address, amount: &i128) {
+    token::Client::new(&env, &core_state.colla_tokn).xfer(
+        &env.current_contract_address(),
+        &requester,
+        &amount,
+    );
+}
+
 pub fn deposit_collateral(env: &Env, core_state: &CoreState, depositor: &Address, amount: &i128) {
     token::Client::new(&env, &core_state.colla_tokn).xfer(
         &depositor,
@@ -161,10 +159,12 @@ pub fn withdraw_stablecoin(
     );
 }
 
-pub fn deposit_stablecoin(env: &Env, currency: &Currency, depositor: &Address, amount: &i128) {
-    token::Client::new(&env, &currency.contract).xfer(
-        &depositor,
-        &env.current_contract_address(),
-        &amount,
-    );
+pub fn deposit_stablecoin(
+    env: &Env,
+    core_state: &CoreState,
+    currency: &Currency,
+    depositor: &Address,
+    amount: &i128,
+) {
+    token::Client::new(&env, &currency.contract).xfer(&depositor, &core_state.stble_issr, &amount);
 }

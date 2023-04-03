@@ -1,6 +1,16 @@
-use crate::storage_types::{SCErrors, UserVault, UserVaultDataType, VaultsDataKeys};
+use crate::storage_types::{Currency, SCErrors, UserVault, UserVaultDataType, VaultsDataKeys};
 use num_integer::div_floor;
 use soroban_sdk::{panic_with_error, vec, Address, Env, Symbol, Vec};
+
+pub fn get_user_vault(env: &Env, user: Address, denomination: Symbol) -> UserVault {
+    env.storage()
+        .get(&VaultsDataKeys::UserVault(UserVaultDataType {
+            user,
+            symbol: denomination,
+        }))
+        .unwrap()
+        .unwrap()
+}
 
 pub fn save_new_user_vault(
     env: &Env,
@@ -163,6 +173,33 @@ pub fn get_sorted_indexes_list(env: &Env, denomination: &Symbol) -> Vec<i128> {
         .get(&VaultsDataKeys::Indexes(denomination.clone()))
         .unwrap_or(Ok(vec![env] as Vec<i128>))
         .unwrap()
+}
+
+pub fn get_redeemable_vaults(env: &Env, amount: &i128, currency: &Currency) -> Vec<UserVault> {
+    let sorted_indexes_list: Vec<i128> = get_sorted_indexes_list(env, &currency.symbol);
+    let mut users_vaults: Vec<UserVault> = vec![env] as Vec<UserVault>;
+    let mut covered_amount: i128 = 0;
+
+    for item in sorted_indexes_list.iter() {
+        let vaults_with_index: Vec<UserVaultDataType> = get_vaults_with_index(env, &item.unwrap());
+
+        for data_type in vaults_with_index.iter() {
+            let user_vault: UserVault = env
+                .storage()
+                .get(&VaultsDataKeys::UserVault(data_type.unwrap()))
+                .unwrap()
+                .unwrap();
+
+            covered_amount = covered_amount + user_vault.total_debt;
+            users_vaults.push_back(user_vault);
+        }
+
+        if &covered_amount >= amount {
+            break;
+        }
+    }
+
+    users_vaults
 }
 
 // Functional utils

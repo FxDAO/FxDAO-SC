@@ -539,4 +539,12 @@ fn test_pay_debt() {
 
     assert_eq!(data.stable_token_client.balance(&depositor), 0);
     assert_eq!(data.collateral_token_client.balance(&contract_address), 0);
+
+    // We confirm the vault was removed from the storage
+    assert!(data
+        .contract_client
+        .try_get_vault(&depositor, &data.stable_token_denomination)
+        .is_err());
 }
+
+// TODO: Test the vault index is always updated after each update

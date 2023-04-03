@@ -52,7 +52,6 @@ pub struct UserVault {
     pub id: Address,
     pub total_debt: i128,
     pub total_col: i128,
-    /// the index is the absolute of total_debt - total_col
     pub index: i128,
 }
 
