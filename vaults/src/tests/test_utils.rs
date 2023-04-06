@@ -78,9 +78,9 @@ pub fn create_base_variables(env: &Env, data: &TestData) -> InitialVariables {
         initial_debt: 50000000000,
         collateral_amount: 50000000000,
         contract_address: Address::from_contract_id(&env, &data.contract_client.contract_id),
-        mn_col_rte: 11000000,
-        mn_v_c_amt: 50000000000,
-        op_col_rte: 11500000,
+        mn_col_rte: 1_1000000,
+        mn_v_c_amt: 5000_0000000,
+        op_col_rte: 1_1500000,
     }
 }
 
