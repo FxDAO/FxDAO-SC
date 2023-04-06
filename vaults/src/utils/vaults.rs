@@ -1,4 +1,6 @@
-use crate::storage_types::{Currency, SCErrors, UserVault, UserVaultDataType, VaultsDataKeys};
+use crate::storage_types::{
+    Currency, CurrencyVaultsConditions, SCErrors, UserVault, UserVaultDataType, VaultsDataKeys,
+};
 use num_integer::div_floor;
 use soroban_sdk::{panic_with_error, vec, Address, Env, Symbol, Vec};
 
@@ -293,6 +295,17 @@ pub fn remove_index_from_indexes_list(indexes_list: &Vec<i128>, index: i128) -> 
     }
 
     updated_indexes_list
+}
+
+// Validations
+pub fn can_be_liquidated(
+    user_vault: &UserVault,
+    currency: &Currency,
+    currency_vault_conditions: &CurrencyVaultsConditions,
+) -> bool {
+    let collateral_value: i128 = currency.rate * user_vault.total_col;
+    let deposit_rate: i128 = div_floor(collateral_value, user_vault.total_debt);
+    deposit_rate < currency_vault_conditions.mn_col_rte
 }
 
 #[cfg(test)]

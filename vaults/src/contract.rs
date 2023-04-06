@@ -46,10 +46,14 @@ pub trait VaultsContractTrait {
 
     /// Redeeming
     fn redeem(env: Env, caller: Address, amount: i128, denomination: Symbol);
+
+    /// Liquidation
+    fn liquidate(env: Env, caller: Address, denomination: Symbol, owners: Vec<Address>);
 }
 
 pub struct VaultsContract;
 
+// TODO: Add events for each function
 #[contractimpl]
 impl VaultsContractTrait for VaultsContract {
     fn init(env: Env, admin: Address, colla_tokn: BytesN<32>, stble_issr: Address) {
@@ -426,6 +430,49 @@ impl VaultsContractTrait for VaultsContract {
         }
 
         withdraw_collateral(&env, &core_state, &caller, &collateral_to_withdraw);
+        set_currency_stats(&env, &denomination, &currency_stats);
+    }
+
+    fn liquidate(env: Env, liquidator: Address, denomination: Symbol, owners: Vec<Address>) {
+        liquidator.require_auth();
+
+        // TODO: Add fee logic
+
+        let core_state: CoreState = get_core_state(&env);
+        let currency: Currency = get_currency(&env, denomination);
+        let currency_vault_conditions: CurrencyVaultsConditions =
+            get_currency_vault_conditions(&env, &denomination);
+
+        let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
+        let mut collateral_to_withdraw: i128 = 0;
+        let mut amount_to_deposit: i128 = 0;
+
+        for item in owners.iter() {
+            let owner: Address = item.unwrap();
+            let user_vault: UserVault = get_user_vault(&env, owner.clone(), denomination);
+
+            if !can_be_liquidated(&user_vault, &currency, &currency_vault_conditions) {
+                panic_with_error!(&env, &SCErrors::UserVaultCantBeLiquidated);
+            }
+
+            collateral_to_withdraw = collateral_to_withdraw + user_vault.total_col;
+            amount_to_deposit = amount_to_deposit + user_vault.total_debt;
+
+            currency_stats.tot_vaults = currency_stats.tot_vaults - 1;
+            currency_stats.tot_col = currency_stats.tot_col - user_vault.total_col;
+            currency_stats.tot_debt = currency_stats.tot_debt - user_vault.total_debt;
+
+            remove_user_vault(&env, &owner, &denomination, &user_vault);
+        }
+
+        withdraw_collateral(&env, &core_state, &liquidator, &collateral_to_withdraw);
+        deposit_stablecoin(
+            &env,
+            &core_state,
+            &currency,
+            &liquidator,
+            &amount_to_deposit,
+        );
         set_currency_stats(&env, &denomination, &currency_stats);
     }
 }

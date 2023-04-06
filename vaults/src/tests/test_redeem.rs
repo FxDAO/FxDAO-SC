@@ -9,7 +9,7 @@ use crate::token;
 use crate::utils::vaults::calculate_user_vault_index;
 use num_integer::div_floor;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{symbol, Address, Env, IntoVal};
 
 /// It tests the redeem method, this must comply with the next behaviour:
 ///
@@ -181,6 +181,26 @@ fn test_redeem() {
         &redeem_user,
         &amount_to_redeem,
         &data.stable_token_denomination,
+    );
+
+    // Check the function is requiring the sender approved this operation
+    assert_eq!(
+        env.recorded_top_authorizations(),
+        std::vec![(
+            // Address for which auth is performed
+            redeem_user.clone(),
+            // Identifier of the called contract
+            data.contract_client.contract_id.clone(),
+            // Name of the called function
+            symbol!("redeem"),
+            // Arguments used (converted to the env-managed vector via `into_val`)
+            (
+                redeem_user.clone(),
+                amount_to_redeem.clone(),
+                data.stable_token_denomination.clone()
+            )
+                .into_val(&env),
+        )]
     );
 
     // We check the results after redeeming

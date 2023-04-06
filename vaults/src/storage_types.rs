@@ -46,7 +46,7 @@ pub struct UserVaultDataType {
     pub symbol: Symbol, // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[contracttype]
 pub struct UserVault {
     pub id: Address,
@@ -85,6 +85,7 @@ pub enum SCErrors {
     UserVaultDoesntExist = 50000,
     UserAlreadyHasDenominationVault = 50001,
     UserVaultIndexIsInvalid = 50002,
+    UserVaultCantBeLiquidated = 50003,
     DepositAmountIsMoreThanTotalDebt = 6,
     CollateralRateUnderMinimum = 7,
     UnsupportedNegativeValue = 8,
