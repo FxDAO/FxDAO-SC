@@ -4,11 +4,11 @@ use crate::storage_types::{
 use num_integer::div_floor;
 use soroban_sdk::{panic_with_error, vec, Address, Env, Symbol, Vec};
 
-pub fn get_user_vault(env: &Env, user: Address, denomination: Symbol) -> UserVault {
+pub fn get_user_vault(env: &Env, user: &Address, denomination: &Symbol) -> UserVault {
     env.storage()
         .get(&VaultsDataKeys::UserVault(UserVaultDataType {
-            user,
-            symbol: denomination,
+            user: user.clone(),
+            symbol: denomination.clone(),
         }))
         .unwrap()
         .unwrap()

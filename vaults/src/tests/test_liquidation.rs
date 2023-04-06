@@ -8,7 +8,7 @@ use crate::tests::test_utils::{
 use crate::token;
 use crate::utils::vaults::calculate_user_vault_index;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{symbol, vec, Address, Env, IntoVal, Status, Vec};
+use soroban_sdk::{vec, Address, Env, IntoVal, Status, Symbol, Vec};
 
 /// It test a simple liquidation
 /// The vault must be removed and the collateral sent to the liquidator
@@ -28,21 +28,15 @@ fn test_liquidation() {
     let depositor_debt: i128 = 5_000_0000000;
     let depositor_collateral: i128 = 100_000_0000000;
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
-        &data.collateral_token_admin,
-        &depositor,
-        &depositor_collateral,
-    );
+    token::Client::new(&env, &data.collateral_token_client.contract_id)
+        .mint(&depositor, &depositor_collateral);
 
     let liquidator: Address = Address::random(&env);
     let liquidator_debt: i128 = 5_000_0000000;
     let liquidator_collateral: i128 = 500_000_0000000;
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
-        &data.collateral_token_admin,
-        &liquidator,
-        &liquidator_collateral,
-    );
+    token::Client::new(&env, &data.collateral_token_client.contract_id)
+        .mint(&liquidator, &liquidator_collateral);
 
     // Create both vaults
     data.contract_client.new_vault(
@@ -94,7 +88,7 @@ fn test_liquidation() {
             // Identifier of the called contract
             data.contract_client.contract_id.clone(),
             // Name of the called function
-            symbol!("liquidate"),
+            Symbol::short("liquidate"),
             // Arguments used (converted to the env-managed vector via `into_val`)
             (
                 liquidator.clone(),

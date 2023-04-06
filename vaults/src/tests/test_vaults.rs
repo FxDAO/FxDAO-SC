@@ -9,7 +9,7 @@ use crate::tests::test_utils::{
 use crate::token;
 use num_integer::div_floor;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{symbol, Address, Env, IntoVal, Vec};
+use soroban_sdk::{Address, Env, IntoVal, Symbol, Vec};
 
 #[test]
 fn test_new_vault() {
@@ -33,17 +33,14 @@ fn test_new_vault() {
     let mn_v_c_amt: i128 = 5000_0000000;
     let op_col_rte: i128 = 1_1500000;
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).incr_allow(
+    token::Client::new(&env, &data.stable_token_client.contract_id).increase_allowance(
         &data.stable_token_issuer,
         &contract_address,
         &90000000000000000000,
     );
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).mint(
-        &data.stable_token_issuer,
-        &data.stable_token_issuer,
-        &90000000000000000000,
-    );
+    token::Client::new(&env, &data.stable_token_client.contract_id)
+        .mint(&data.stable_token_issuer, &90000000000000000000);
 
     // If the method is called before before the currency is active it should fail
     assert!(data
@@ -67,11 +64,8 @@ fn test_new_vault() {
     data.contract_client
         .toggle_cy(&data.stable_token_denomination, &true);
 
-    data.collateral_token_client.mint(
-        &data.collateral_token_admin,
-        &depositor,
-        &(collateral_amount * 2),
-    );
+    data.collateral_token_client
+        .mint(&depositor, &(collateral_amount * 2));
 
     // If the method is called before protocol state is set it should fail
     assert!(data
@@ -107,7 +101,7 @@ fn test_new_vault() {
             // Identifier of the called contract
             data.contract_client.contract_id.clone(),
             // Name of the called function
-            symbol!("new_vault"),
+            Symbol::short("new_vault"),
             // Arguments used (converted to the env-managed vector via `into_val`)
             (
                 depositor.clone(),
@@ -167,11 +161,8 @@ fn test_new_vault() {
 
     let depositor_2 = Address::random(&env);
 
-    data.collateral_token_client.mint(
-        &data.collateral_token_admin,
-        &depositor_2,
-        &(collateral_amount * 2),
-    );
+    data.collateral_token_client
+        .mint(&depositor_2, &(collateral_amount * 2));
 
     data.contract_client.new_vault(
         &depositor_2,
@@ -232,17 +223,11 @@ fn test_increase_collateral() {
     let mn_v_c_amt: i128 = 50000000000;
     let op_col_rte: i128 = 11500000;
 
-    data.collateral_token_client.mint(
-        &data.collateral_token_admin,
-        &depositor,
-        &(collateral_amount * 2),
-    );
+    data.collateral_token_client
+        .mint(&depositor, &(collateral_amount * 2));
 
-    data.stable_token_client.mint(
-        &data.stable_token_issuer,
-        &contract_address,
-        &(initial_debt),
-    );
+    data.stable_token_client
+        .mint(&contract_address, &(initial_debt));
 
     data.contract_client.s_c_v_c(
         &mn_col_rte,
@@ -291,7 +276,7 @@ fn test_increase_collateral() {
             // Identifier of the called contract
             data.contract_client.contract_id.clone(),
             // Name of the called function
-            symbol!("incr_col"),
+            Symbol::short("incr_col"),
             // Arguments used (converted to the env-managed vector via `into_val`)
             (
                 depositor.clone(),
@@ -325,13 +310,11 @@ fn test_increase_debt() {
     set_initial_state(&env, &data, &base_variables);
 
     data.collateral_token_client.mint(
-        &data.collateral_token_admin,
         &base_variables.depositor,
         &(base_variables.collateral_amount * 5),
     );
 
     data.stable_token_client.mint(
-        &data.stable_token_issuer,
         &base_variables.contract_address,
         &(base_variables.initial_debt * 5),
     );
@@ -384,7 +367,7 @@ fn test_increase_debt() {
             // Identifier of the called contract
             data.contract_client.contract_id.clone(),
             // Name of the called function
-            symbol!("incr_debt"),
+            Symbol::short("incr_debt"),
             // Arguments used (converted to the env-managed vector via `into_val`)
             (
                 base_variables.depositor.clone(),
@@ -436,17 +419,11 @@ fn test_pay_debt() {
     data.contract_client
         .s_cy_rate(&data.stable_token_denomination, &currency_price);
 
-    data.collateral_token_client.mint(
-        &data.collateral_token_admin,
-        &depositor,
-        &(collateral_amount),
-    );
+    data.collateral_token_client
+        .mint(&depositor, &(collateral_amount));
 
-    data.stable_token_client.mint(
-        &data.stable_token_issuer,
-        &contract_address,
-        &(initial_debt * 10),
-    );
+    data.stable_token_client
+        .mint(&contract_address, &(initial_debt * 10));
 
     data.contract_client.s_c_v_c(
         &mn_col_rte,
@@ -495,7 +472,7 @@ fn test_pay_debt() {
             // Identifier of the called contract
             data.contract_client.contract_id.clone(),
             // Name of the called function
-            symbol!("pay_debt"),
+            Symbol::short("pay_debt"),
             // Arguments used (converted to the env-managed vector via `into_val`)
             (
                 depositor.clone(),

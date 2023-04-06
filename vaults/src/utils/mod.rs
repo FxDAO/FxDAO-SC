@@ -30,24 +30,24 @@ pub fn check_positive(env: &Env, value: &i128) {
 }
 
 /// Vaults utils
-pub fn validate_user_vault(env: &Env, user: Address, denomination: Symbol) {
+pub fn validate_user_vault(env: &Env, user: &Address, denomination: &Symbol) {
     if !env
         .storage()
         .has(&VaultsDataKeys::UserVault(UserVaultDataType {
-            user,
-            symbol: denomination,
+            user: user.clone(),
+            symbol: denomination.clone(),
         }))
     {
         panic_with_error!(&env, SCErrors::UserVaultDoesntExist);
     }
 }
 
-pub fn vault_spot_available(env: &Env, user: Address, denomination: Symbol) {
+pub fn vault_spot_available(env: &Env, user: Address, denomination: &Symbol) {
     if env
         .storage()
         .has(&VaultsDataKeys::UserVault(UserVaultDataType {
             user,
-            symbol: denomination,
+            symbol: denomination.clone(),
         }))
     {
         panic_with_error!(&env, SCErrors::UserAlreadyHasDenominationVault);
@@ -55,16 +55,16 @@ pub fn vault_spot_available(env: &Env, user: Address, denomination: Symbol) {
 }
 
 /// Currency utils
-pub fn validate_currency(env: &Env, denomination: Symbol) {
-    if !env.storage().has(&DataKeys::Currency(denomination)) {
+pub fn validate_currency(env: &Env, denomination: &Symbol) {
+    if !env.storage().has(&DataKeys::Currency(denomination.clone())) {
         panic_with_error!(&env, SCErrors::CurrencyDoesntExist);
     }
 }
 
-pub fn is_currency_active(env: &Env, denomination: Symbol) {
+pub fn is_currency_active(env: &Env, denomination: &Symbol) {
     let currency: Currency = env
         .storage()
-        .get(&DataKeys::Currency(denomination))
+        .get(&DataKeys::Currency(denomination.clone()))
         .unwrap()
         .unwrap();
 
@@ -73,14 +73,14 @@ pub fn is_currency_active(env: &Env, denomination: Symbol) {
     }
 }
 
-pub fn save_currency(env: &Env, currency: Currency) {
+pub fn save_currency(env: &Env, currency: &Currency) {
     env.storage()
-        .set(&DataKeys::Currency(currency.symbol), &currency);
+        .set(&DataKeys::Currency(currency.symbol.clone()), currency);
 }
 
-pub fn get_currency(env: &Env, denomination: Symbol) -> Currency {
+pub fn get_currency(env: &Env, denomination: &Symbol) -> Currency {
     env.storage()
-        .get(&DataKeys::Currency(denomination))
+        .get(&DataKeys::Currency(denomination.clone()))
         .unwrap()
         .unwrap()
 }
@@ -129,7 +129,7 @@ pub fn set_currency_stats(env: &Env, denomination: &Symbol, currency_stats: &Cur
 
 /// Payments Utils
 pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Address, amount: &i128) {
-    token::Client::new(&env, &core_state.colla_tokn).xfer(
+    token::Client::new(&env, &core_state.colla_tokn).transfer(
         &env.current_contract_address(),
         &requester,
         &amount,
@@ -137,7 +137,7 @@ pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Addres
 }
 
 pub fn deposit_collateral(env: &Env, core_state: &CoreState, depositor: &Address, amount: &i128) {
-    token::Client::new(&env, &core_state.colla_tokn).xfer(
+    token::Client::new(&env, &core_state.colla_tokn).transfer(
         &depositor,
         &env.current_contract_address(),
         &amount,
@@ -151,7 +151,7 @@ pub fn withdraw_stablecoin(
     recipient: &Address,
     amount: &i128,
 ) {
-    token::Client::new(&env, &currency.contract).xfer_from(
+    token::Client::new(&env, &currency.contract).transfer_from(
         &env.current_contract_address(),
         &core_state.stble_issr,
         &recipient,
@@ -166,5 +166,9 @@ pub fn deposit_stablecoin(
     depositor: &Address,
     amount: &i128,
 ) {
-    token::Client::new(&env, &currency.contract).xfer(&depositor, &core_state.stble_issr, &amount);
+    token::Client::new(&env, &currency.contract).transfer(
+        &depositor,
+        &core_state.stble_issr,
+        &amount,
+    );
 }
