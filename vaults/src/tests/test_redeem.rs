@@ -59,8 +59,11 @@ fn test_redeem() {
     let depositor_4_debt: i128 = 1200000000;
     let depositor_4_index: i128 = 25000000000;
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id)
-        .mint(&depositor_1, &depositor_1_collateral);
+    token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
+        &data.collateral_token_admin,
+        &depositor_1,
+        &depositor_1_collateral,
+    );
 
     data.contract_client.new_vault(
         &depositor_1,
@@ -75,8 +78,11 @@ fn test_redeem() {
 
     assert_eq!(depositor_1_vault.index, depositor_1_index);
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id)
-        .mint(&depositor_2, &depositor_2_collateral);
+    token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
+        &data.collateral_token_admin,
+        &depositor_2,
+        &depositor_2_collateral,
+    );
 
     data.contract_client.new_vault(
         &depositor_2,
@@ -91,8 +97,11 @@ fn test_redeem() {
 
     assert_eq!(depositor_2_vault.index, depositor_2_index);
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id)
-        .mint(&depositor_3, &depositor_3_collateral);
+    token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
+        &data.collateral_token_admin,
+        &depositor_3,
+        &depositor_3_collateral,
+    );
 
     data.contract_client.new_vault(
         &depositor_3,
@@ -107,8 +116,11 @@ fn test_redeem() {
 
     assert_eq!(depositor_3_vault.index, depositor_3_index);
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id)
-        .mint(&depositor_4, &depositor_4_collateral);
+    token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
+        &data.collateral_token_admin,
+        &depositor_4,
+        &depositor_4_collateral,
+    );
 
     data.contract_client.new_vault(
         &depositor_4,
@@ -127,25 +139,25 @@ fn test_redeem() {
 
     let redeem_user: Address = Address::random(&env);
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).transfer(
+    token::Client::new(&env, &data.stable_token_client.contract_id).xfer(
         &depositor_1,
         &redeem_user,
         &500000000,
     );
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).transfer(
+    token::Client::new(&env, &data.stable_token_client.contract_id).xfer(
         &depositor_2,
         &redeem_user,
         &500000000,
     );
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).transfer(
+    token::Client::new(&env, &data.stable_token_client.contract_id).xfer(
         &depositor_3,
         &redeem_user,
         &500000000,
     );
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).transfer(
+    token::Client::new(&env, &data.stable_token_client.contract_id).xfer(
         &depositor_4,
         &redeem_user,
         &500000000,

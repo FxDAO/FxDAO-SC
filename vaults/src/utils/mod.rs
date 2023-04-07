@@ -129,7 +129,7 @@ pub fn set_currency_stats(env: &Env, denomination: &Symbol, currency_stats: &Cur
 
 /// Payments Utils
 pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Address, amount: &i128) {
-    token::Client::new(&env, &core_state.colla_tokn).transfer(
+    token::Client::new(&env, &core_state.colla_tokn).xfer(
         &env.current_contract_address(),
         &requester,
         &amount,
@@ -137,7 +137,7 @@ pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Addres
 }
 
 pub fn deposit_collateral(env: &Env, core_state: &CoreState, depositor: &Address, amount: &i128) {
-    token::Client::new(&env, &core_state.colla_tokn).transfer(
+    token::Client::new(&env, &core_state.colla_tokn).xfer(
         &depositor,
         &env.current_contract_address(),
         &amount,
@@ -151,7 +151,7 @@ pub fn withdraw_stablecoin(
     recipient: &Address,
     amount: &i128,
 ) {
-    token::Client::new(&env, &currency.contract).transfer_from(
+    token::Client::new(&env, &currency.contract).xfer_from(
         &env.current_contract_address(),
         &core_state.stble_issr,
         &recipient,
@@ -166,9 +166,5 @@ pub fn deposit_stablecoin(
     depositor: &Address,
     amount: &i128,
 ) {
-    token::Client::new(&env, &currency.contract).transfer(
-        &depositor,
-        &core_state.stble_issr,
-        &amount,
-    );
+    token::Client::new(&env, &currency.contract).xfer(&depositor, &core_state.stble_issr, &amount);
 }

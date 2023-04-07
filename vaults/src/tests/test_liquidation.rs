@@ -28,15 +28,21 @@ fn test_liquidation() {
     let depositor_debt: i128 = 5_000_0000000;
     let depositor_collateral: i128 = 100_000_0000000;
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id)
-        .mint(&depositor, &depositor_collateral);
+    token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
+        &data.collateral_token_admin,
+        &depositor,
+        &depositor_collateral,
+    );
 
     let liquidator: Address = Address::random(&env);
     let liquidator_debt: i128 = 5_000_0000000;
     let liquidator_collateral: i128 = 500_000_0000000;
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id)
-        .mint(&liquidator, &liquidator_collateral);
+    token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
+        &data.collateral_token_admin,
+        &liquidator,
+        &liquidator_collateral,
+    );
 
     // Create both vaults
     data.contract_client.new_vault(

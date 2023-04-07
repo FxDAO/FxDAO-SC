@@ -111,12 +111,15 @@ pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVar
         &data.stable_token_denomination,
     );
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).increase_allowance(
+    token::Client::new(&env, &data.stable_token_client.contract_id).incr_allow(
         &data.stable_token_issuer,
         &Address::from_contract_id(&env, &data.contract_client.contract_id),
         &9000000000000000,
     );
 
-    token::Client::new(&env, &data.stable_token_client.contract_id)
-        .mint(&data.stable_token_issuer, &90000000000000000000);
+    token::Client::new(&env, &data.stable_token_client.contract_id).mint(
+        &data.stable_token_issuer,
+        &data.stable_token_issuer,
+        &90000000000000000000,
+    );
 }

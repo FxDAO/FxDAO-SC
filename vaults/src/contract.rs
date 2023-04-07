@@ -328,7 +328,7 @@ impl VaultsContractTrait for VaultsContract {
             currency_stats.tot_vaults = currency_stats.tot_vaults - 1;
             currency_stats.tot_col = currency_stats.tot_col - current_user_vault.total_col;
 
-            token::Client::new(&env, &core_state.colla_tokn).transfer(
+            token::Client::new(&env, &core_state.colla_tokn).xfer(
                 &env.current_contract_address(),
                 &caller,
                 &current_user_vault.total_col,
