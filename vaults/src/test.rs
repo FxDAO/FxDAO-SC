@@ -5,7 +5,7 @@ extern crate std;
 use crate::storage_types::*;
 
 use crate::storage_types::CoreState;
-use soroban_sdk::{symbol, Address, Env, IntoVal};
+use soroban_sdk::{Address, Env, IntoVal, Symbol};
 
 use crate::tests::test_utils::*;
 
@@ -77,7 +77,7 @@ fn test_set_and_get_currency_vault_conditions() {
             // Identifier of the called contract
             data.contract_client.contract_id.clone(),
             // Name of the called function
-            symbol!("s_c_v_c"),
+            Symbol::short("s_c_v_c"),
             // Arguments used (converted to the, &data.stable_token_denomination env-managed vector via `into_val`)
             (
                 base_variables.mn_col_rte.clone(),
@@ -129,7 +129,7 @@ fn test_set_and_get_rate() {
             // Identifier of the called contract
             data.contract_client.contract_id.clone(),
             // Name of the called function
-            symbol!("s_cy_rate"),
+            Symbol::short("s_cy_rate"),
             // Arguments used (converted to the env-managed vector via `into_val`)
             (data.stable_token_denomination.clone(), rate.clone()).into_val(&env.clone())
         )]

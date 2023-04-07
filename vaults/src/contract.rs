@@ -100,13 +100,13 @@ impl VaultsContractTrait for VaultsContract {
     fn new_cy(env: Env, denomination: Symbol, contract: BytesN<32>) {
         check_admin(&env);
 
-        if env.storage().has(&DataKeys::Currency(denomination)) {
+        if env.storage().has(&DataKeys::Currency(denomination.clone())) {
             panic_with_error!(&env, &SCErrors::CurrencyAlreadyAdded);
         }
 
         save_currency(
             &env,
-            Currency {
+            &Currency {
                 symbol: denomination,
                 active: false,
                 contract,
@@ -117,28 +117,28 @@ impl VaultsContractTrait for VaultsContract {
     }
 
     fn get_cy(env: Env, denomination: Symbol) -> Currency {
-        validate_currency(&env, denomination);
-        get_currency(&env, denomination)
+        validate_currency(&env, &denomination);
+        get_currency(&env, &denomination)
     }
 
     fn g_cy_stats(env: Env, denomination: Symbol) -> CurrencyStats {
-        validate_currency(&env, denomination);
+        validate_currency(&env, &denomination);
         get_currency_stats(&env, &denomination)
     }
 
     fn s_cy_rate(env: Env, denomination: Symbol, rate: i128) {
         // TODO: this method should be updated in the future once there are oracles in the network
         check_admin(&env);
-        validate_currency(&env, denomination);
+        validate_currency(&env, &denomination);
         check_positive(&env, &rate);
 
-        let mut currency = get_currency(&env, denomination);
+        let mut currency = get_currency(&env, &denomination);
 
         // TODO: Check if the price was updated recently
         if currency.rate != rate {
             currency.rate = rate;
             currency.last_updte = env.ledger().timestamp();
-            save_currency(&env, currency);
+            save_currency(&env, &currency);
         } else {
             // TODO: if the last time the rate was changed was more than 15 minutes ago shut down the issuance of new debt
         }
@@ -146,10 +146,10 @@ impl VaultsContractTrait for VaultsContract {
 
     fn toggle_cy(env: Env, denomination: Symbol, active: bool) {
         check_admin(&env);
-        validate_currency(&env, denomination);
-        let mut currency = get_currency(&env, denomination);
+        validate_currency(&env, &denomination);
+        let mut currency = get_currency(&env, &denomination);
         currency.active = active;
-        save_currency(&env, currency);
+        save_currency(&env, &currency);
     }
 
     fn new_vault(
@@ -162,9 +162,9 @@ impl VaultsContractTrait for VaultsContract {
         // TODO: check if we are in panic mode once is implemented
 
         caller.require_auth();
-        validate_currency(&env, denomination);
-        is_currency_active(&env, denomination);
-        vault_spot_available(&env, caller.clone(), denomination);
+        validate_currency(&env, &denomination);
+        is_currency_active(&env, &denomination);
+        vault_spot_available(&env, caller.clone(), &denomination);
         check_positive(&env, &initial_debt);
         check_positive(&env, &collateral_amount);
 
@@ -175,7 +175,7 @@ impl VaultsContractTrait for VaultsContract {
 
         valid_initial_debt(&env, &currency_vault_conditions, initial_debt);
 
-        let currency: Currency = get_currency(&env, denomination);
+        let currency: Currency = get_currency(&env, &denomination);
 
         let collateral_value: i128 = currency.rate * collateral_amount;
 
@@ -211,17 +211,17 @@ impl VaultsContractTrait for VaultsContract {
     }
 
     fn get_vault(env: Env, user: Address, denomination: Symbol) -> UserVault {
-        validate_user_vault(&env, user.clone(), denomination);
-        get_user_vault(&env, user.clone(), denomination)
+        validate_user_vault(&env, &user, &denomination);
+        get_user_vault(&env, &user, &denomination)
     }
 
     fn incr_col(env: Env, caller: Address, collateral_amount: i128, denomination: Symbol) {
         caller.require_auth();
 
-        validate_currency(&env, denomination);
-        is_currency_active(&env, denomination);
+        validate_currency(&env, &denomination);
+        is_currency_active(&env, &denomination);
         check_positive(&env, &collateral_amount);
-        validate_user_vault(&env, caller.clone(), denomination);
+        validate_user_vault(&env, &caller, &denomination);
 
         // TODO: Add fee logic
 
@@ -229,7 +229,7 @@ impl VaultsContractTrait for VaultsContract {
 
         deposit_collateral(&env, &core_state, &caller, &collateral_amount);
 
-        let current_user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let current_user_vault: UserVault = get_user_vault(&env, &caller, &denomination);
         let mut new_user_vault: UserVault = current_user_vault.clone();
         new_user_vault.total_col = new_user_vault.total_col + collateral_amount;
         new_user_vault.index =
@@ -251,10 +251,10 @@ impl VaultsContractTrait for VaultsContract {
     fn incr_debt(env: Env, caller: Address, debt_amount: i128, denomination: Symbol) {
         caller.require_auth();
 
-        validate_currency(&env, denomination);
-        is_currency_active(&env, denomination);
+        validate_currency(&env, &denomination);
+        is_currency_active(&env, &denomination);
         check_positive(&env, &debt_amount);
-        validate_user_vault(&env, caller.clone(), denomination);
+        validate_user_vault(&env, &caller, &denomination);
 
         // TODO: Add fee logic
         // TODO: check if we are in panic mode once is implemented
@@ -262,9 +262,9 @@ impl VaultsContractTrait for VaultsContract {
 
         let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
 
-        let currency: Currency = get_currency(&env, denomination);
+        let currency: Currency = get_currency(&env, &denomination);
 
-        let current_user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let current_user_vault: UserVault = get_user_vault(&env, &caller, &denomination);
         let mut new_user_vault: UserVault = current_user_vault.clone();
 
         let currency_vault_conditions: CurrencyVaultsConditions =
@@ -301,16 +301,16 @@ impl VaultsContractTrait for VaultsContract {
     fn pay_debt(env: Env, caller: Address, deposit_amount: i128, denomination: Symbol) {
         caller.require_auth();
 
-        validate_currency(&env, denomination);
-        is_currency_active(&env, denomination);
+        validate_currency(&env, &denomination);
+        is_currency_active(&env, &denomination);
         check_positive(&env, &deposit_amount);
-        validate_user_vault(&env, caller.clone(), denomination);
+        validate_user_vault(&env, &caller, &denomination);
 
         // TODO: Add fee logic
 
-        let currency: Currency = get_currency(&env, denomination);
+        let currency: Currency = get_currency(&env, &denomination);
 
-        let current_user_vault: UserVault = get_user_vault(&env, caller.clone(), denomination);
+        let current_user_vault: UserVault = get_user_vault(&env, &caller, &denomination);
         let mut updated_user_vault: UserVault = current_user_vault.clone();
 
         if deposit_amount > current_user_vault.total_debt {
@@ -328,7 +328,7 @@ impl VaultsContractTrait for VaultsContract {
             currency_stats.tot_vaults = currency_stats.tot_vaults - 1;
             currency_stats.tot_col = currency_stats.tot_col - current_user_vault.total_col;
 
-            token::Client::new(&env, &core_state.colla_tokn).xfer(
+            token::Client::new(&env, &core_state.colla_tokn).transfer(
                 &env.current_contract_address(),
                 &caller,
                 &current_user_vault.total_col,
@@ -362,14 +362,14 @@ impl VaultsContractTrait for VaultsContract {
     fn redeem(env: Env, caller: Address, amount_to_redeem: i128, denomination: Symbol) {
         caller.require_auth();
 
-        validate_currency(&env, denomination);
-        is_currency_active(&env, denomination);
+        validate_currency(&env, &denomination);
+        is_currency_active(&env, &denomination);
         check_positive(&env, &amount_to_redeem);
 
         // TODO: Add fee logic
 
         let core_state: CoreState = get_core_state(&env);
-        let currency: Currency = get_currency(&env, denomination);
+        let currency: Currency = get_currency(&env, &denomination);
 
         let redeemable_vaults: Vec<UserVault> =
             get_redeemable_vaults(&env, &amount_to_redeem, &currency);
@@ -439,7 +439,7 @@ impl VaultsContractTrait for VaultsContract {
         // TODO: Add fee logic
 
         let core_state: CoreState = get_core_state(&env);
-        let currency: Currency = get_currency(&env, denomination);
+        let currency: Currency = get_currency(&env, &denomination);
         let currency_vault_conditions: CurrencyVaultsConditions =
             get_currency_vault_conditions(&env, &denomination);
 
@@ -449,7 +449,7 @@ impl VaultsContractTrait for VaultsContract {
 
         for item in owners.iter() {
             let owner: Address = item.unwrap();
-            let user_vault: UserVault = get_user_vault(&env, owner.clone(), denomination);
+            let user_vault: UserVault = get_user_vault(&env, &owner, &denomination);
 
             if !can_be_liquidated(&user_vault, &currency, &currency_vault_conditions) {
                 panic_with_error!(&env, &SCErrors::UserVaultCantBeLiquidated);

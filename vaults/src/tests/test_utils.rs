@@ -3,7 +3,7 @@ use crate::contract::VaultsContract;
 use crate::token;
 use crate::VaultsContractClient;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{symbol, Address, Env, Symbol};
+use soroban_sdk::{Address, Env, Symbol};
 
 pub fn create_token_contract(e: &Env, admin: &Address) -> token::Client {
     token::Client::new(&e, &e.register_stellar_asset_contract(admin.clone()))
@@ -49,7 +49,7 @@ pub fn create_base_data(env: &Env) -> TestData {
     let native_token_client = create_token_contract(&env, &native_token_admin);
 
     // Set up the stable token
-    let stable_token_denomination: Symbol = symbol!("usd");
+    let stable_token_denomination: Symbol = Symbol::short("usd");
     let stable_token_issuer = Address::random(&env);
     let stable_token_client = create_token_contract(&env, &stable_token_issuer);
 
@@ -111,15 +111,12 @@ pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVar
         &data.stable_token_denomination,
     );
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).incr_allow(
+    token::Client::new(&env, &data.stable_token_client.contract_id).increase_allowance(
         &data.stable_token_issuer,
         &Address::from_contract_id(&env, &data.contract_client.contract_id),
         &9000000000000000,
     );
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).mint(
-        &data.stable_token_issuer,
-        &data.stable_token_issuer,
-        &90000000000000000000,
-    );
+    token::Client::new(&env, &data.stable_token_client.contract_id)
+        .mint(&data.stable_token_issuer, &90000000000000000000);
 }
