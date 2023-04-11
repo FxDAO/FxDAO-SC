@@ -1,4 +1,3 @@
-// TODO: Handle decimals
 #![no_std]
 
 mod token {
@@ -7,7 +6,9 @@ mod token {
 
 mod contract;
 mod storage_types;
-mod test;
 mod utils;
+
+mod test;
+mod tests;
 
 pub use crate::contract::VaultsContractClient;
