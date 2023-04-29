@@ -4,7 +4,7 @@ extern crate std;
 use crate::storage::deposits::Deposit;
 use crate::tests::utils::{create_test_data, init_contract, TestData};
 use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo};
-use soroban_sdk::{Address, Env, Status, Vec};
+use soroban_sdk::{Address, Env, IntoVal, Status, Symbol, Vec};
 
 // TODO: TEST authentication
 #[test]
@@ -49,6 +49,21 @@ fn test_deposit_funds() {
         test_data
             .contract_client
             .deposit(&depositor, &(mint_amount as u128 / 2));
+
+        // Check the function is requiring the sender approved this operation
+        assert_eq!(
+            env.recorded_top_authorizations(),
+            std::vec![(
+                // Address for which auth is performed
+                depositor.clone(),
+                // Identifier of the called contract
+                test_data.contract_client.contract_id.clone(),
+                // Name of the called function
+                Symbol::short("deposit"),
+                // Arguments used (converted to the env-managed vector via `into_val`)
+                (depositor.clone(), (mint_amount as u128 / 2)).into_val(&env),
+            )]
+        );
 
         let deposit: Deposit = test_data.contract_client.get_deposit(&depositor);
 
@@ -107,6 +122,21 @@ fn test_deposit_funds() {
         let address = result.unwrap();
         test_data.contract_client.withdraw(&address);
 
+        // Check the function is requiring the sender approved this operation
+        assert_eq!(
+            env.recorded_top_authorizations(),
+            std::vec![(
+                // Address for which auth is performed
+                address.clone(),
+                // Identifier of the called contract
+                test_data.contract_client.contract_id.clone(),
+                // Name of the called function
+                Symbol::short("withdraw"),
+                // Arguments used (converted to the env-managed vector via `into_val`)
+                (address.clone(),).into_val(&env),
+            )]
+        );
+
         // Check that the "depositors" Vec gets updated
         depositors.pop_front();
         let updated_depositors = test_data.contract_client.get_depositors();
@@ -117,7 +147,18 @@ fn test_deposit_funds() {
         assert_eq!(updated_deposit.amount, 0);
 
         // We check the depositor got all its funds
-        assert_eq!(test_data.deposit_asset.balance(&address), 10000000000);
+        assert_eq!(test_data.deposit_asset.balance(&address), mint_amount);
+
+        // Test that if the user already withdrew its fund it should fail if try again
+        let already_withdrew_error_result = test_data
+            .contract_client
+            .try_withdraw(&depositor_1)
+            .unwrap_err();
+
+        assert_eq!(
+            already_withdrew_error_result,
+            Ok(Status::from_contract_error(10002))
+        );
     }
 
     // we confirm the contract balance gets drained
