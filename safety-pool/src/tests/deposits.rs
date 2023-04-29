@@ -6,11 +6,14 @@ use crate::tests::utils::{create_test_data, init_contract, TestData};
 use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo};
 use soroban_sdk::{Address, Env, Status, Vec};
 
+// TODO: TEST authentication
 #[test]
 fn test_deposit_funds() {
     let env: Env = Env::default();
     let test_data: TestData = create_test_data(&env);
     init_contract(&test_data);
+
+    let mint_amount: i128 = 10000000000;
 
     let depositor_1: Address = Address::random(&env);
     let depositor_2: Address = Address::random(&env);
@@ -19,7 +22,7 @@ fn test_deposit_funds() {
     for depositor in [&depositor_1, &depositor_2, &depositor_3] {
         test_data
             .deposit_asset
-            .mint(&test_data.deposit_asset_admin, &depositor, &100000000000);
+            .mint(&test_data.deposit_asset_admin, &depositor, &mint_amount);
     }
 
     let invalid_amount_error_result = test_data
@@ -43,13 +46,22 @@ fn test_deposit_funds() {
             base_reserve: 10,
         });
 
-        test_data.contract_client.deposit(&depositor, &5000000000);
+        test_data
+            .contract_client
+            .deposit(&depositor, &(mint_amount as u128 / 2));
 
         let deposit: Deposit = test_data.contract_client.get_deposit(&depositor);
 
         assert_eq!(deposit.deposit_time, counter);
-        assert_eq!(deposit.amount, 5000000000u128);
+        assert_eq!(deposit.amount, mint_amount as u128 / 2);
         assert_eq!(deposit.id, depositor.clone());
+
+        // Check the balance in the contract and depositor gets updated
+        assert_eq!(test_data.deposit_asset.balance(&depositor), mint_amount / 2);
+        assert_eq!(
+            test_data.deposit_asset.balance(&test_data.contract_address),
+            (mint_amount / 2) * counter as i128
+        );
     }
 
     // Confirm you can deposit twice and the funds will be updated but the timestamp will be the same
@@ -68,11 +80,49 @@ fn test_deposit_funds() {
         let deposit: Deposit = test_data.contract_client.get_deposit(&depositor);
 
         assert_eq!(deposit.deposit_time, counter - 3);
-        assert_eq!(deposit.amount, 10000000000u128);
+        assert_eq!(deposit.amount, mint_amount as u128);
         assert_eq!(deposit.id, depositor.clone());
+
+        // Check the balance in the contract and depositor gets updated
+        assert_eq!(test_data.deposit_asset.balance(&depositor), 0);
+        assert_eq!(
+            test_data.deposit_asset.balance(&test_data.contract_address),
+            (mint_amount / 2) * counter as i128
+        );
     }
 
-    let depositors: Vec<Address> = test_data.contract_client.get_depositors();
-    let target_depositors_value = Vec::from_array(&env, [depositor_1, depositor_2, depositor_3]);
+    let mut depositors: Vec<Address> = test_data.contract_client.get_depositors();
+    let target_depositors_value = Vec::from_array(
+        &env,
+        [
+            depositor_1.clone(),
+            depositor_2.clone(),
+            depositor_3.clone(),
+        ],
+    );
     assert_eq!(depositors, target_depositors_value);
+
+    // Check that withdrawing deposits works ok
+    for result in depositors.clone().iter() {
+        let address = result.unwrap();
+        test_data.contract_client.withdraw(&address);
+
+        // Check that the "depositors" Vec gets updated
+        depositors.pop_front();
+        let updated_depositors = test_data.contract_client.get_depositors();
+        assert_eq!(depositors, updated_depositors);
+
+        // Check that the deposit gets updated (value is zero)
+        let updated_deposit: Deposit = test_data.contract_client.get_deposit(&address);
+        assert_eq!(updated_deposit.amount, 0);
+
+        // We check the depositor got all its funds
+        assert_eq!(test_data.deposit_asset.balance(&address), 10000000000);
+    }
+
+    // we confirm the contract balance gets drained
+    assert_eq!(
+        test_data.deposit_asset.balance(&test_data.contract_address),
+        0
+    );
 }

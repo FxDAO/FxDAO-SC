@@ -14,6 +14,7 @@ pub struct TestData {
     pub deposit_asset_admin: Address,
     pub deposit_asset: token::Client,
     pub min_deposit: u128,
+    pub contract_address: Address,
     pub contract_client: SafetyPoolContractClient,
 }
 
@@ -35,6 +36,7 @@ pub fn create_test_data(env: &Env) -> TestData {
         deposit_asset_admin,
         deposit_asset,
         min_deposit,
+        contract_address: Address::from_contract_id(&env, &contract_client.contract_id),
         contract_client,
     }
 }

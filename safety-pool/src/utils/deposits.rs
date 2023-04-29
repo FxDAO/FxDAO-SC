@@ -10,6 +10,14 @@ pub fn make_deposit(env: &Env, asset: &BytesN<32>, depositor: &Address, amount: 
     );
 }
 
+pub fn make_withdrawal(env: &Env, asset: &BytesN<32>, deposit: &Deposit) {
+    token::Client::new(env, asset).xfer(
+        &env.current_contract_address(),
+        &deposit.id,
+        &(deposit.amount as i128),
+    );
+}
+
 pub fn save_deposit(env: &Env, deposit: &Deposit) {
     env.storage()
         .set(&DepositsDataKeys::Deposit(deposit.id.clone()), deposit);
@@ -24,6 +32,11 @@ pub fn get_deposit(env: &Env, depositor: &Address) -> Deposit {
             deposit_time: env.ledger().timestamp(),
         }))
         .unwrap()
+}
+
+pub fn remove_deposit(env: &Env, depositor: &Address) {
+    env.storage()
+        .remove(&DepositsDataKeys::Deposit(depositor.clone()));
 }
 
 pub fn save_depositors(env: &Env, depositors: &Vec<Address>) {
@@ -51,4 +64,19 @@ pub fn is_depositor_listed(records: &Vec<Address>, depositor: &Address) -> bool 
         }
     }
     saved
+}
+
+pub fn remove_depositor_from_depositors(
+    depositors: &Vec<Address>,
+    depositor: &Address,
+) -> Vec<Address> {
+    let mut updated_record = depositors.clone();
+
+    for (i, el) in updated_record.iter().enumerate() {
+        if depositor == &el.unwrap() {
+            updated_record.remove(i as u32);
+        }
+    }
+
+    updated_record
 }

@@ -8,4 +8,5 @@ pub enum SCErrors {
 
     // Deposits
     BelowMinDeposit = 10001,
+    NothingToWithdraw = 10002,
 }
