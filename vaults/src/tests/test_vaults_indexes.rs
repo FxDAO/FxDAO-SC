@@ -2,12 +2,13 @@
 
 extern crate std;
 
+use crate::storage_types::UserVault;
 use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
 };
 use crate::utils::vaults::calculate_user_vault_index;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{Address, Env, Vec};
+use soroban_sdk::{vec, Address, Env, Vec};
 
 #[test]
 fn test_vault_indexes_logic_around() {
@@ -191,8 +192,59 @@ fn test_vault_indexes_logic_around() {
     );
 
     // 2nd Section
+    // We test the function get_vaults_with_index and confirm it returns correct vaults in their order
+
+    // We test the index from depositor 5 and confirm we receive a single UserVault
+    let mut vaults_with_index: Vec<UserVault> =
+        data.contract_client
+            .get_vaults_with_index(&calculate_user_vault_index(
+                depositor_5_debt,
+                depositor_5_collateral_amount,
+            ));
+
+    assert_eq!(
+        vaults_with_index,
+        vec![
+            &env,
+            UserVault {
+                index: calculate_user_vault_index(depositor_5_debt, depositor_5_collateral_amount,),
+                id: depositor_5,
+                total_debt: depositor_5_debt,
+                total_col: depositor_5_collateral_amount,
+            }
+        ]
+    );
+
+    // We now test the index from depositor 3 and confirm we receive two UserVaults (3 and 4)
+    vaults_with_index = data
+        .contract_client
+        .get_vaults_with_index(&calculate_user_vault_index(
+            depositor_3_debt,
+            depositor_3_collateral_amount,
+        ));
+
+    assert_eq!(
+        vaults_with_index,
+        vec![
+            &env,
+            UserVault {
+                index: calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount,),
+                id: depositor_3,
+                total_debt: depositor_3_debt,
+                total_col: depositor_3_collateral_amount,
+            },
+            UserVault {
+                index: calculate_user_vault_index(depositor_4_debt, depositor_4_collateral_amount,),
+                id: depositor_4,
+                total_debt: depositor_4_debt,
+                total_col: depositor_4_collateral_amount,
+            },
+        ]
+    );
+
+    // 3rd Section
     // This section checks that when we update a vault, values get updated correctly
     // We also include changes in the currency rates and new vaults creations in order to emulate a real scenario
-    // 3rd Section
+    // 4th Section
     // TODO
 }

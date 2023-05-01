@@ -4,7 +4,7 @@ use crate::utils::vaults::*;
 use crate::utils::*;
 use num_integer::div_floor;
 
-use soroban_sdk::{contractimpl, panic_with_error, Address, BytesN, Env, Symbol, Vec};
+use soroban_sdk::{contractimpl, panic_with_error, vec, Address, BytesN, Env, Symbol, Vec};
 
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
@@ -43,12 +43,14 @@ pub trait VaultsContractTrait {
     fn incr_debt(env: Env, caller: Address, debt_amount: i128, denomination: Symbol);
     fn pay_debt(env: Env, caller: Address, amount: i128, denomination: Symbol);
     fn g_indexes(env: Env, denomination: Symbol) -> Vec<i128>;
+    fn get_vaults_with_index(env: Env, index: i128) -> Vec<UserVault>;
 
     /// Redeeming
     fn redeem(env: Env, caller: Address, amount: i128, denomination: Symbol);
 
     /// Liquidation
     fn liquidate(env: Env, caller: Address, denomination: Symbol, owners: Vec<Address>);
+    fn vaults_to_liquidate(env: Env, denomination: Symbol) -> Vec<UserVault>;
 }
 
 pub struct VaultsContract;
@@ -359,6 +361,19 @@ impl VaultsContractTrait for VaultsContract {
         get_sorted_indexes_list(&env, &denomination)
     }
 
+    fn get_vaults_with_index(env: Env, index: i128) -> Vec<UserVault> {
+        let data_keys: Vec<UserVaultDataType> = get_vaults_data_type_with_index(&env, &index);
+        let mut vaults: Vec<UserVault> = vec![&env] as Vec<UserVault>;
+
+        for result in data_keys.iter() {
+            let data_key: UserVaultDataType = result.unwrap();
+            let vault: UserVault = get_user_vault(&env, &data_key.user, &data_key.symbol);
+            vaults.push_back(vault);
+        }
+
+        vaults
+    }
+
     fn redeem(env: Env, caller: Address, amount_to_redeem: i128, denomination: Symbol) {
         caller.require_auth();
 
@@ -474,5 +489,40 @@ impl VaultsContractTrait for VaultsContract {
             &amount_to_deposit,
         );
         set_currency_stats(&env, &denomination, &currency_stats);
+    }
+
+    fn vaults_to_liquidate(env: Env, denomination: Symbol) -> Vec<UserVault> {
+        let indexes: Vec<i128> = get_sorted_indexes_list(&env, &denomination);
+        let mut vaults: Vec<UserVault> = vec![&env] as Vec<UserVault>;
+        let mut completed: bool = false;
+
+        let currency: Currency = get_currency(&env, &denomination);
+        let currency_vaults_conditions: CurrencyVaultsConditions =
+            get_currency_vault_conditions(&env, &denomination);
+
+        for result in indexes.iter() {
+            let index: i128 = result.unwrap();
+            let vaults_data_types: Vec<UserVaultDataType> =
+                get_vaults_data_type_with_index(&env, &index);
+
+            for result2 in vaults_data_types.iter() {
+                let vault_data_type: UserVaultDataType = result2.unwrap();
+                let user_vault: UserVault =
+                    get_user_vault(&env, &vault_data_type.user, &vault_data_type.symbol);
+
+                if can_be_liquidated(&user_vault, &currency, &currency_vaults_conditions) {
+                    vaults.push_back(user_vault);
+                } else {
+                    completed = true;
+                    break;
+                }
+            }
+
+            if completed {
+                break;
+            }
+        }
+
+        vaults
     }
 }

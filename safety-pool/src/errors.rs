@@ -9,4 +9,7 @@ pub enum SCErrors {
     // Deposits
     BelowMinDeposit = 10001,
     NothingToWithdraw = 10002,
+
+    // Liquidations
+    NoVaultsToLiquidate = 30000,
 }
