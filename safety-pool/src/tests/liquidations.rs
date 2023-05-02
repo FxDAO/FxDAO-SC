@@ -1,9 +1,9 @@
 #![cfg(test)]
 
 use crate::contract::{SafetyPoolContract, SafetyPoolContractClient};
-use crate::tests::utils::{create_test_data, create_token_contract, init_contract, TestData};
+use crate::tests::utils::create_token_contract;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{Address, BytesN, Env, Status, Symbol};
+use soroban_sdk::{vec, Address, BytesN, Env, Status, Symbol, Vec};
 
 use crate::vaults;
 
@@ -82,10 +82,11 @@ fn test_simple_liquidations_flow() {
 
     // Register and start safety pool's contract
     let pool_contract_id: BytesN<32> = env.register_contract(None, SafetyPoolContract);
-    let pool_contract_address: Address = Address::from_contract_id(&env, &pool_contract_id);
+    // let pool_contract_address: Address = Address::from_contract_id(&env, &pool_contract_id);
     let pool_contract_client = SafetyPoolContractClient::new(&env, &pool_contract_id);
     let pool_contract_admin: Address = Address::random(&env);
     let min_pool_deposit: u128 = 100_0000000;
+    let profit_share: Vec<u128> = vec![&env, 1u128, 2u128] as Vec<u128>;
 
     pool_contract_client.init(
         &pool_contract_admin,
@@ -95,6 +96,7 @@ fn test_simple_liquidations_flow() {
         &stable_token_client.contract_id,
         &stable_token_denomination,
         &min_pool_deposit,
+        &profit_share,
     );
 
     // We create the initial vaults, a total of 6 vaults will be created where two of them

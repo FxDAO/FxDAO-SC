@@ -2,7 +2,7 @@
 use crate::contract::{SafetyPoolContract, SafetyPoolContractClient};
 use crate::token;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{Address, Env, Symbol};
+use soroban_sdk::{vec, Address, Env, Symbol, Vec};
 
 pub fn create_token_contract(e: &Env, admin: &Address) -> token::Client {
     token::Client::new(&e, &e.register_stellar_asset_contract(admin.clone()))
@@ -20,6 +20,7 @@ pub struct TestData {
     pub min_deposit: u128,
     pub contract_address: Address,
     pub contract_client: SafetyPoolContractClient,
+    pub profit_share: Vec<u128>,
 }
 
 pub fn create_test_data(env: &Env) -> TestData {
@@ -50,6 +51,7 @@ pub fn create_test_data(env: &Env) -> TestData {
         min_deposit,
         contract_address: Address::from_contract_id(&env, &contract_client.contract_id),
         contract_client,
+        profit_share: vec![&env, 1u128, 2u128] as Vec<u128>,
     }
 }
 
@@ -62,5 +64,6 @@ pub fn init_contract(test_data: &TestData) {
         &test_data.deposit_asset.contract_id,
         &test_data.denomination_asset,
         &test_data.min_deposit,
+        &test_data.profit_share,
     );
 }

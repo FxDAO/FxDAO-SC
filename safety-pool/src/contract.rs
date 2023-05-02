@@ -2,7 +2,7 @@ use crate::errors::SCErrors;
 use crate::storage::core::CoreState;
 use crate::storage::deposits::Deposit;
 use crate::token;
-use crate::utils::core::{can_init_contract, get_core_state, set_admin, set_core_state};
+use crate::utils::core::{can_init_contract, get_core_state, set_core_state};
 use crate::utils::deposits::{
     get_deposit, get_depositors, is_depositor_listed, make_deposit, make_withdrawal,
     remove_deposit, remove_depositor_from_depositors, save_deposit, save_depositors,
@@ -22,7 +22,20 @@ pub trait SafetyPoolContractTrait {
         deposit_asset: BytesN<32>,
         denomination_asset: Symbol,
         min_deposit: u128,
+        treasury_share: Vec<u128>,
     );
+
+    fn get_core_state(env: Env) -> CoreState;
+
+    fn update_contract_admin(env: Env, contract_admin: Address);
+
+    fn update_vaults_contract(env: Env, vaults_contract: Address);
+
+    fn update_treasury_contract(env: Env, treasury_contract: Address);
+
+    fn update_min_deposit(env: Env, min_deposit: u128);
+
+    fn update_treasury_share(env: Env, treasury_share: Vec<u128>);
 
     fn deposit(env: Env, caller: Address, amount: u128);
 
@@ -42,27 +55,68 @@ pub struct SafetyPoolContract;
 impl SafetyPoolContractTrait for SafetyPoolContract {
     fn init(
         env: Env,
-        contract_admin: Address,
+        admin: Address,
         vaults_contract: Address,
         treasury_contract: Address,
         collateral_asset: BytesN<32>,
         deposit_asset: BytesN<32>,
         denomination_asset: Symbol,
         min_deposit: u128,
+        treasury_share: Vec<u128>,
     ) {
         can_init_contract(&env);
-        set_admin(&env, &contract_admin);
         set_core_state(
             &env,
             &CoreState {
+                admin,
                 collateral_asset,
                 deposit_asset,
                 vaults_contract,
                 treasury_contract,
                 denomination_asset,
                 min_deposit,
+                treasury_share,
             },
-        )
+        );
+    }
+
+    fn get_core_state(env: Env) -> CoreState {
+        get_core_state(&env)
+    }
+
+    fn update_contract_admin(env: Env, contract_admin: Address) {
+        let mut core_state: CoreState = get_core_state(&env);
+        core_state.admin.require_auth();
+        core_state.admin = contract_admin;
+        set_core_state(&env, &core_state);
+    }
+
+    fn update_vaults_contract(env: Env, vaults_contract: Address) {
+        let mut core_state: CoreState = get_core_state(&env);
+        core_state.admin.require_auth();
+        core_state.vaults_contract = vaults_contract;
+        set_core_state(&env, &core_state);
+    }
+
+    fn update_treasury_contract(env: Env, treasury_contract: Address) {
+        let mut core_state: CoreState = get_core_state(&env);
+        core_state.admin.require_auth();
+        core_state.treasury_contract = treasury_contract;
+        set_core_state(&env, &core_state);
+    }
+
+    fn update_min_deposit(env: Env, min_deposit: u128) {
+        let mut core_state: CoreState = get_core_state(&env);
+        core_state.admin.require_auth();
+        core_state.min_deposit = min_deposit;
+        set_core_state(&env, &core_state);
+    }
+
+    fn update_treasury_share(env: Env, treasury_share: Vec<u128>) {
+        let mut core_state: CoreState = get_core_state(&env);
+        core_state.admin.require_auth();
+        core_state.treasury_share = treasury_share;
+        set_core_state(&env, &core_state);
     }
 
     fn deposit(env: Env, caller: Address, amount: u128) {
@@ -167,7 +221,10 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
 
         let profit_from_liquidation: i128 = total_collateral - collateral_amount_paid;
 
-        let share_of_profit = div_floor(profit_from_liquidation, 2);
+        let share_of_profit = div_floor(
+            profit_from_liquidation * core_state.treasury_share.get(0).unwrap().unwrap() as i128,
+            core_state.treasury_share.get(1).unwrap().unwrap() as i128,
+        );
 
         let amount_to_distribute: i128 = collateral_amount_paid + share_of_profit;
 
