@@ -20,7 +20,8 @@ pub struct TestData {
     pub min_deposit: u128,
     pub contract_address: Address,
     pub contract_client: SafetyPoolContractClient,
-    pub profit_share: Vec<u128>,
+    pub profit_share: Vec<u32>,
+    pub liquidator_share: Vec<u32>,
 }
 
 pub fn create_test_data(env: &Env) -> TestData {
@@ -51,7 +52,8 @@ pub fn create_test_data(env: &Env) -> TestData {
         min_deposit,
         contract_address: Address::from_contract_id(&env, &contract_client.contract_id),
         contract_client,
-        profit_share: vec![&env, 1u128, 2u128] as Vec<u128>,
+        profit_share: vec![&env, 1u32, 2u32] as Vec<u32>,
+        liquidator_share: vec![&env, 1u32, 2u32] as Vec<u32>,
     }
 }
 
@@ -65,5 +67,6 @@ pub fn init_contract(test_data: &TestData) {
         &test_data.denomination_asset,
         &test_data.min_deposit,
         &test_data.profit_share,
+        &test_data.liquidator_share,
     );
 }

@@ -10,7 +10,8 @@ pub struct CoreState {
     pub deposit_asset: BytesN<32>,
     pub denomination_asset: Symbol,
     pub min_deposit: u128,
-    pub treasury_share: Vec<u128>,
+    pub treasury_share: Vec<u32>,
+    pub liquidator_share: Vec<u32>,
 }
 
 #[contracttype]

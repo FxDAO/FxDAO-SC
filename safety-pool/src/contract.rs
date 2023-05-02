@@ -22,7 +22,8 @@ pub trait SafetyPoolContractTrait {
         deposit_asset: BytesN<32>,
         denomination_asset: Symbol,
         min_deposit: u128,
-        treasury_share: Vec<u128>,
+        treasury_share: Vec<u32>,
+        liquidator_share: Vec<u32>,
     );
 
     fn get_core_state(env: Env) -> CoreState;
@@ -35,7 +36,9 @@ pub trait SafetyPoolContractTrait {
 
     fn update_min_deposit(env: Env, min_deposit: u128);
 
-    fn update_treasury_share(env: Env, treasury_share: Vec<u128>);
+    fn update_treasury_share(env: Env, treasury_share: Vec<u32>);
+
+    fn update_liquidator_share(env: Env, treasury_share: Vec<u32>);
 
     fn deposit(env: Env, caller: Address, amount: u128);
 
@@ -45,7 +48,7 @@ pub trait SafetyPoolContractTrait {
 
     fn withdraw(env: Env, caller: Address);
 
-    fn liquidate(env: Env);
+    fn liquidate(env: Env, liquidator: Address);
 }
 
 pub struct SafetyPoolContract;
@@ -62,7 +65,8 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         deposit_asset: BytesN<32>,
         denomination_asset: Symbol,
         min_deposit: u128,
-        treasury_share: Vec<u128>,
+        treasury_share: Vec<u32>,
+        liquidator_share: Vec<u32>,
     ) {
         can_init_contract(&env);
         set_core_state(
@@ -76,6 +80,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
                 denomination_asset,
                 min_deposit,
                 treasury_share,
+                liquidator_share,
             },
         );
     }
@@ -112,10 +117,17 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         set_core_state(&env, &core_state);
     }
 
-    fn update_treasury_share(env: Env, treasury_share: Vec<u128>) {
+    fn update_treasury_share(env: Env, treasury_share: Vec<u32>) {
         let mut core_state: CoreState = get_core_state(&env);
         core_state.admin.require_auth();
         core_state.treasury_share = treasury_share;
+        set_core_state(&env, &core_state);
+    }
+
+    fn update_liquidator_share(env: Env, liquidator_share: Vec<u32>) {
+        let mut core_state: CoreState = get_core_state(&env);
+        core_state.admin.require_auth();
+        core_state.liquidator_share = liquidator_share;
         set_core_state(&env, &core_state);
     }
 
@@ -175,8 +187,8 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
     /// 3.- We iterate among the vaults and calculate how many of them we can liquidate
     /// 4.- We call the vaults contract to liquidate the vaults (if is at least 1)
     /// 5.- After we receive the collateral, we distributed it to others minus the contract fee
-    /// 6.- The collateral left is distributed to the treasury
-    fn liquidate(env: Env) {
+    /// 6.- The collateral left is divided and distributed between the treasury and the liquidator
+    fn liquidate(env: Env, liquidator: Address) {
         let core_state: CoreState = get_core_state(&env);
         let stablecoin_balance: i128 = token::Client::new(&env, &core_state.deposit_asset)
             .balance(&env.current_contract_address());
@@ -246,10 +258,23 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         let collateral_left: i128 = token::Client::new(&env, &core_state.collateral_asset)
             .balance(&env.current_contract_address());
 
+        let liquidator_share: i128 = div_floor(
+            collateral_left * core_state.liquidator_share.get(0).unwrap().unwrap() as i128,
+            core_state.liquidator_share.get(1).unwrap().unwrap() as i128,
+        );
+
+        token::Client::new(&env, &core_state.collateral_asset).xfer(
+            &env.current_contract_address(),
+            &liquidator,
+            &liquidator_share,
+        );
+
+        let treasury_share: i128 = collateral_left - liquidator_share;
+
         token::Client::new(&env, &core_state.collateral_asset).xfer(
             &env.current_contract_address(),
             &core_state.treasury_contract,
-            &collateral_left,
+            &treasury_share,
         );
     }
 }

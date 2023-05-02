@@ -86,7 +86,8 @@ fn test_simple_liquidations_flow() {
     let pool_contract_client = SafetyPoolContractClient::new(&env, &pool_contract_id);
     let pool_contract_admin: Address = Address::random(&env);
     let min_pool_deposit: u128 = 100_0000000;
-    let profit_share: Vec<u128> = vec![&env, 1u128, 2u128] as Vec<u128>;
+    let profit_share: Vec<u32> = vec![&env, 1u32, 2u32] as Vec<u32>;
+    let liquidator_share: Vec<u32> = vec![&env, 1u32, 2u32] as Vec<u32>;
 
     pool_contract_client.init(
         &pool_contract_admin,
@@ -97,6 +98,7 @@ fn test_simple_liquidations_flow() {
         &stable_token_denomination,
         &min_pool_deposit,
         &profit_share,
+        &liquidator_share,
     );
 
     // We create the initial vaults, a total of 6 vaults will be created where two of them
@@ -131,8 +133,10 @@ fn test_simple_liquidations_flow() {
 
     env.budget().reset_unlimited(); // We reset the budget
 
+    let liquidator: Address = Address::random(&env);
+
     // We test that it should fail because there is no vault to liquidate yet
-    let no_vaults_error_result = pool_contract_client.try_liquidate().unwrap_err();
+    let no_vaults_error_result = pool_contract_client.try_liquidate(&liquidator).unwrap_err();
 
     assert_eq!(
         no_vaults_error_result,
@@ -144,12 +148,13 @@ fn test_simple_liquidations_flow() {
     vaults_contract_client.s_cy_rate(&stable_token_denomination, &new_currency_price);
 
     env.budget().reset_unlimited(); // We reset the budget
-    pool_contract_client.liquidate();
+    pool_contract_client.liquidate(&liquidator);
 
     // Now we confirm the distribution was correct, the calculations go this way:
     // 1.- 2 Vaults were liquidated so the vaults contract should only have a balance of 3_000_0000000 * 4 = 12_000_0000000 of collateral
     // 2.- With a rate of 0_0586660, the value in collateral is 5454_6074387 so a total of 545_3925613 profit will be shared between the depositors and the contract
-    // 3.- Depositors will receive 5454_6074387 + (545_3925613 / 2) = 5727_3037194 (14318259298 each) while the treasury 272_6962808
+    // 3.- Depositors will receive 5454_6074387 + (545_3925613 / 2) = 5727_3037194 (14318259298 each)
+    // 4.- Treasury and the liquidator will receive 272_6962808 / 2 each
     assert_eq!(
         collateral_token_client.balance(&vaults_contract_address),
         12_000_0000000
@@ -165,6 +170,11 @@ fn test_simple_liquidations_flow() {
 
     assert_eq!(
         collateral_token_client.balance(&treasury_contract),
-        272_6962808
+        272_6962808 / 2
+    );
+
+    assert_eq!(
+        collateral_token_client.balance(&liquidator),
+        272_6962808 / 2
     );
 }

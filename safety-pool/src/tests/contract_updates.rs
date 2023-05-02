@@ -23,7 +23,8 @@ fn update_contract_core_state() {
             deposit_asset: target_core_state.clone().deposit_asset,
             denomination_asset: target_core_state.clone().denomination_asset,
             min_deposit: target_core_state.clone().min_deposit,
-            treasury_share: target_core_state.clone().treasury_share
+            treasury_share: target_core_state.clone().treasury_share,
+            liquidator_share: target_core_state.clone().liquidator_share
         }
     );
 
@@ -41,7 +42,6 @@ fn update_contract_core_state() {
     );
 
     target_core_state.admin = new_admin;
-
     assert_eq!(
         test_data.contract_client.get_core_state(),
         target_core_state
@@ -63,7 +63,6 @@ fn update_contract_core_state() {
     );
 
     target_core_state.vaults_contract = new_vaults_contract;
-
     assert_eq!(
         test_data.contract_client.get_core_state(),
         target_core_state
@@ -85,7 +84,6 @@ fn update_contract_core_state() {
     );
 
     target_core_state.treasury_contract = new_treasury_contract;
-
     assert_eq!(
         test_data.contract_client.get_core_state(),
         target_core_state
@@ -107,14 +105,13 @@ fn update_contract_core_state() {
     );
 
     target_core_state.min_deposit = new_min_deposit;
-
     assert_eq!(
         test_data.contract_client.get_core_state(),
         target_core_state
     );
 
-    // Update treasury contract
-    let new_treasury_share: Vec<u128> = vec![&env, 2u128, 3u128] as Vec<u128>;
+    // Update treasury share
+    let new_treasury_share: Vec<u32> = vec![&env, 2u32, 3u32] as Vec<u32>;
     test_data
         .contract_client
         .update_treasury_share(&new_treasury_share);
@@ -129,7 +126,27 @@ fn update_contract_core_state() {
     );
 
     target_core_state.treasury_share = new_treasury_share;
+    assert_eq!(
+        test_data.contract_client.get_core_state(),
+        target_core_state
+    );
 
+    // Update liquidator share
+    let new_liquidator_share: Vec<u32> = vec![&env, 2u32, 3u32] as Vec<u32>;
+    test_data
+        .contract_client
+        .update_liquidator_share(&new_liquidator_share);
+    assert_eq!(
+        env.recorded_top_authorizations(),
+        std::vec![(
+            target_core_state.admin.clone(),
+            test_data.contract_client.contract_id.clone(),
+            Symbol::new(&env, "update_liquidator_share"),
+            (new_liquidator_share.clone(),).into_val(&env),
+        )]
+    );
+
+    target_core_state.liquidator_share = new_liquidator_share;
     assert_eq!(
         test_data.contract_client.get_core_state(),
         target_core_state
