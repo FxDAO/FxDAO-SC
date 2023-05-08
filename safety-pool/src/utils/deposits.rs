@@ -13,21 +13,23 @@ pub fn make_deposit(env: &Env, asset: &BytesN<32>, depositor: &Address, amount: 
 pub fn make_withdrawal(env: &Env, asset: &BytesN<32>, deposit: &Deposit) {
     token::Client::new(env, asset).xfer(
         &env.current_contract_address(),
-        &deposit.id,
+        &deposit.depositor,
         &(deposit.amount as i128),
     );
 }
 
 pub fn save_deposit(env: &Env, deposit: &Deposit) {
-    env.storage()
-        .set(&DepositsDataKeys::Deposit(deposit.id.clone()), deposit);
+    env.storage().set(
+        &DepositsDataKeys::Deposit(deposit.depositor.clone()),
+        deposit,
+    );
 }
 
 pub fn get_deposit(env: &Env, depositor: &Address) -> Deposit {
     env.storage()
         .get(&DepositsDataKeys::Deposit(depositor.clone()))
         .unwrap_or(Ok(Deposit {
-            id: depositor.clone(),
+            depositor: depositor.clone(),
             amount: 0,
             deposit_time: env.ledger().timestamp(),
         }))

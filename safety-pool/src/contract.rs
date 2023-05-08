@@ -15,7 +15,7 @@ use soroban_sdk::{contractimpl, panic_with_error, vec, Address, BytesN, Env, Sym
 pub trait SafetyPoolContractTrait {
     fn init(
         env: Env,
-        contract_admin: Address,
+        admin: Address,
         vaults_contract: Address,
         treasury_contract: Address,
         collateral_asset: BytesN<32>,

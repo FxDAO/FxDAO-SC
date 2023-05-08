@@ -2,7 +2,7 @@ use soroban_sdk::{contracttype, Address};
 
 #[contracttype]
 pub struct Deposit {
-    pub id: Address,
+    pub depositor: Address,
     pub amount: u128,
     pub deposit_time: u64,
 }

@@ -32,7 +32,7 @@ fn test_deposit_funds() {
 
     assert_eq!(
         invalid_amount_error_result,
-        Ok(Status::from_contract_error(10001))
+        Ok(Status::from_contract_error(20001))
     );
 
     let mut counter: u64 = 0;
@@ -69,7 +69,7 @@ fn test_deposit_funds() {
 
         assert_eq!(deposit.deposit_time, counter);
         assert_eq!(deposit.amount, mint_amount as u128 / 2);
-        assert_eq!(deposit.id, depositor.clone());
+        assert_eq!(deposit.depositor, depositor.clone());
 
         // Check the balance in the contract and depositor gets updated
         assert_eq!(test_data.deposit_asset.balance(&depositor), mint_amount / 2);
@@ -96,7 +96,7 @@ fn test_deposit_funds() {
 
         assert_eq!(deposit.deposit_time, counter - 3);
         assert_eq!(deposit.amount, mint_amount as u128);
-        assert_eq!(deposit.id, depositor.clone());
+        assert_eq!(deposit.depositor, depositor.clone());
 
         // Check the balance in the contract and depositor gets updated
         assert_eq!(test_data.deposit_asset.balance(&depositor), 0);
@@ -157,7 +157,7 @@ fn test_deposit_funds() {
 
         assert_eq!(
             already_withdrew_error_result,
-            Ok(Status::from_contract_error(10002))
+            Ok(Status::from_contract_error(20002))
         );
     }
 
