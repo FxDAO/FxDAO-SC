@@ -55,13 +55,14 @@ fn test_simple_liquidations_flow() {
         &stable_token_admin,
     );
 
-    vaults_contract_client.new_cy(&stable_token_denomination, &stable_token_client.contract_id);
+    vaults_contract_client
+        .create_currency(&stable_token_denomination, &stable_token_client.contract_id);
 
-    vaults_contract_client.s_cy_rate(&stable_token_denomination, &currency_price);
+    vaults_contract_client.set_currency_rate(&stable_token_denomination, &currency_price);
 
-    vaults_contract_client.toggle_cy(&stable_token_denomination, &true);
+    vaults_contract_client.toggle_currency(&stable_token_denomination, &true);
 
-    vaults_contract_client.s_c_v_c(
+    vaults_contract_client.set_vault_conditions(
         &min_collateral_rate,
         &opening_debt_amount,
         &opening_collateral_rate,
@@ -145,7 +146,7 @@ fn test_simple_liquidations_flow() {
 
     // We update the price in order to liquidate the two vaults
     let new_currency_price = 0_0586660;
-    vaults_contract_client.s_cy_rate(&stable_token_denomination, &new_currency_price);
+    vaults_contract_client.set_currency_rate(&stable_token_denomination, &new_currency_price);
 
     env.budget().reset_unlimited(); // We reset the budget
     pool_contract_client.liquidate(&liquidator);

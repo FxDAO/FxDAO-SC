@@ -34,9 +34,9 @@ pub struct InitialVariables {
     pub initial_debt: i128,
     pub collateral_amount: i128,
     pub contract_address: Address,
-    pub mn_col_rte: i128,
-    pub mn_v_c_amt: i128,
-    pub op_col_rte: i128,
+    pub min_col_rate: i128,
+    pub min_debt_creation: i128,
+    pub opening_col_rate: i128,
 }
 
 pub fn create_base_data(env: &Env) -> TestData {
@@ -78,9 +78,9 @@ pub fn create_base_variables(env: &Env, data: &TestData) -> InitialVariables {
         initial_debt: 50000000000,
         collateral_amount: 50000000000,
         contract_address: Address::from_contract_id(&env, &data.contract_client.contract_id),
-        mn_col_rte: 1_1000000,
-        mn_v_c_amt: 5000_0000000,
-        op_col_rte: 1_1500000,
+        min_col_rate: 1_1000000,
+        min_debt_creation: 5000_0000000,
+        opening_col_rate: 1_1500000,
     }
 }
 
@@ -91,23 +91,23 @@ pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVar
         &data.stable_token_issuer,
     );
 
-    data.contract_client.new_cy(
+    data.contract_client.create_currency(
         &data.stable_token_denomination,
         &data.stable_token_client.contract_id,
     );
 
-    data.contract_client.s_cy_rate(
+    data.contract_client.set_currency_rate(
         &data.stable_token_denomination,
         &base_variables.currency_price,
     );
 
     data.contract_client
-        .toggle_cy(&data.stable_token_denomination, &true);
+        .toggle_currency(&data.stable_token_denomination, &true);
 
-    data.contract_client.s_c_v_c(
-        &base_variables.mn_col_rte,
-        &base_variables.mn_v_c_amt,
-        &base_variables.op_col_rte,
+    data.contract_client.set_vault_conditions(
+        &base_variables.min_col_rate,
+        &base_variables.min_debt_creation,
+        &base_variables.opening_col_rate,
         &data.stable_token_denomination,
     );
 

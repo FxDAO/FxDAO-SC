@@ -8,7 +8,7 @@ pub fn get_user_vault(env: &Env, user: &Address, denomination: &Symbol) -> UserV
     env.storage()
         .get(&VaultsDataKeys::UserVault(UserVaultDataType {
             user: user.clone(),
-            symbol: denomination.clone(),
+            denomination: denomination.clone(),
         }))
         .unwrap()
         .unwrap()
@@ -33,7 +33,7 @@ pub fn save_new_user_vault(
         add_vault_to_vaults_with_index(&saved_vaults_with_index, &user, &denomination);
 
     env.storage().set(
-        &VaultsDataKeys::VltsWtIndx(user_vault.index),
+        &VaultsDataKeys::VaultsWithIndex(user_vault.index),
         &saved_vaults_with_index,
     );
 
@@ -78,10 +78,10 @@ pub fn update_user_vault(
 
     if old_vaults_with_index_record.len() == 0 {
         env.storage()
-            .remove(&VaultsDataKeys::VltsWtIndx(current_user_vault.index));
+            .remove(&VaultsDataKeys::VaultsWithIndex(current_user_vault.index));
     } else {
         env.storage().set(
-            &VaultsDataKeys::VltsWtIndx(current_user_vault.index),
+            &VaultsDataKeys::VaultsWithIndex(current_user_vault.index),
             &old_vaults_with_index_record,
         );
     }
@@ -93,7 +93,7 @@ pub fn update_user_vault(
         add_vault_to_vaults_with_index(&new_vaults_with_index_record, &user, &denomination);
 
     env.storage().set(
-        &VaultsDataKeys::VltsWtIndx(new_user_vault.index),
+        &VaultsDataKeys::VaultsWithIndex(new_user_vault.index),
         &new_vaults_with_index_record,
     );
 
@@ -124,7 +124,7 @@ pub fn remove_user_vault(env: &Env, user: &Address, denomination: &Symbol, user_
     env.storage()
         .remove(&VaultsDataKeys::UserVault(UserVaultDataType {
             user: user.clone(),
-            symbol: denomination.clone(),
+            denomination: denomination.clone(),
         }));
 
     let mut vaults_with_index_record: Vec<UserVaultDataType> =
@@ -135,10 +135,10 @@ pub fn remove_user_vault(env: &Env, user: &Address, denomination: &Symbol, user_
 
     if vaults_with_index_record.len() == 0 {
         env.storage()
-            .remove(&VaultsDataKeys::VltsWtIndx(user_vault.index));
+            .remove(&VaultsDataKeys::VaultsWithIndex(user_vault.index));
     } else {
         env.storage().set(
-            &VaultsDataKeys::VltsWtIndx(user_vault.index),
+            &VaultsDataKeys::VaultsWithIndex(user_vault.index),
             &vaults_with_index_record,
         );
     }
@@ -157,7 +157,7 @@ pub fn set_user_vault(env: &Env, user: &Address, denomination: &Symbol, user_vau
     env.storage().set(
         &VaultsDataKeys::UserVault(UserVaultDataType {
             user: user.clone(),
-            symbol: denomination.clone(),
+            denomination: denomination.clone(),
         }),
         user_vault,
     );
@@ -165,7 +165,7 @@ pub fn set_user_vault(env: &Env, user: &Address, denomination: &Symbol, user_vau
 
 pub fn get_vaults_data_type_with_index(env: &Env, index: &i128) -> Vec<UserVaultDataType> {
     env.storage()
-        .get(&VaultsDataKeys::VltsWtIndx(index.clone()))
+        .get(&VaultsDataKeys::VaultsWithIndex(index.clone()))
         .unwrap_or(Ok(vec![env] as Vec<UserVaultDataType>))
         .unwrap()
 }
@@ -178,7 +178,7 @@ pub fn get_sorted_indexes_list(env: &Env, denomination: &Symbol) -> Vec<i128> {
 }
 
 pub fn get_redeemable_vaults(env: &Env, amount: &i128, currency: &Currency) -> Vec<UserVault> {
-    let sorted_indexes_list: Vec<i128> = get_sorted_indexes_list(env, &currency.symbol);
+    let sorted_indexes_list: Vec<i128> = get_sorted_indexes_list(env, &currency.denomination);
     let mut users_vaults: Vec<UserVault> = vec![env] as Vec<UserVault>;
     let mut covered_amount: i128 = 0;
 
@@ -216,20 +216,16 @@ pub fn add_vault_to_vaults_with_index(
     let mut saved: bool = false;
 
     for item in updated_record.iter() {
-        match item {
-            Ok(value) => {
-                if user == &value.user && denomination == &value.symbol {
-                    saved = true;
-                }
-            }
-            Err(_) => {}
+        let vault_data_key = item.unwrap();
+        if user == &vault_data_key.user && denomination == &vault_data_key.denomination {
+            saved = true;
         }
     }
 
     if !saved {
         updated_record.push_back(UserVaultDataType {
             user: user.clone(),
-            symbol: denomination.clone(),
+            denomination: denomination.clone(),
         });
     }
 
@@ -246,7 +242,7 @@ pub fn remove_vault_from_vaults_with_index(
     for (i, el) in updated_record.iter().enumerate() {
         let vault_data_key = el.unwrap();
 
-        if &vault_data_key.user == user && &vault_data_key.symbol == denomination {
+        if &vault_data_key.user == user && &vault_data_key.denomination == denomination {
             updated_record.remove(i as u32);
         }
     }
@@ -306,7 +302,7 @@ pub fn can_be_liquidated(
 ) -> bool {
     let collateral_value: i128 = currency.rate * user_vault.total_col;
     let deposit_rate: i128 = div_floor(collateral_value, user_vault.total_debt);
-    deposit_rate < currency_vaults_conditions.mn_col_rte
+    deposit_rate < currency_vaults_conditions.min_col_rate
 }
 
 #[cfg(test)]

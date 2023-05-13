@@ -18,19 +18,19 @@ fn test_vault_indexes_logic_around() {
     set_initial_state(&env, &data, &base_variables);
 
     let currency_price: i128 = 920330;
-    let mn_col_rte: i128 = 11000000;
-    let mn_v_c_amt: i128 = 1000000000;
-    let op_col_rte: i128 = 11500000;
+    let min_col_rate: i128 = 11000000;
+    let min_debt_creation: i128 = 1000000000;
+    let opening_col_rate: i128 = 11500000;
 
-    data.contract_client.s_c_v_c(
-        &mn_col_rte,
-        &mn_v_c_amt,
-        &op_col_rte,
+    data.contract_client.set_vault_conditions(
+        &min_col_rate,
+        &min_debt_creation,
+        &opening_col_rate,
         &data.stable_token_denomination,
     );
 
     data.contract_client
-        .s_cy_rate(&data.stable_token_denomination, &currency_price);
+        .set_currency_rate(&data.stable_token_denomination, &currency_price);
 
     // 1st Set of tests
     // This section includes and checks that every time we create a new vault the values are updated
@@ -55,7 +55,7 @@ fn test_vault_indexes_logic_around() {
 
     let mut current_indexes: Vec<i128> = data
         .contract_client
-        .g_indexes(&data.stable_token_denomination);
+        .get_indexes(&data.stable_token_denomination);
 
     assert_eq!(current_indexes.len(), 1);
     assert_eq!(
@@ -83,7 +83,7 @@ fn test_vault_indexes_logic_around() {
 
     current_indexes = data
         .contract_client
-        .g_indexes(&data.stable_token_denomination);
+        .get_indexes(&data.stable_token_denomination);
 
     assert_eq!(current_indexes.len(), 2);
     assert_eq!(
@@ -115,7 +115,7 @@ fn test_vault_indexes_logic_around() {
 
     current_indexes = data
         .contract_client
-        .g_indexes(&data.stable_token_denomination);
+        .get_indexes(&data.stable_token_denomination);
 
     assert_eq!(current_indexes.len(), 3);
     assert_eq!(
@@ -147,7 +147,7 @@ fn test_vault_indexes_logic_around() {
 
     current_indexes = data
         .contract_client
-        .g_indexes(&data.stable_token_denomination);
+        .get_indexes(&data.stable_token_denomination);
 
     assert_eq!(current_indexes.len(), 3);
     assert_eq!(
@@ -179,7 +179,7 @@ fn test_vault_indexes_logic_around() {
 
     current_indexes = data
         .contract_client
-        .g_indexes(&data.stable_token_denomination);
+        .get_indexes(&data.stable_token_denomination);
 
     assert_eq!(current_indexes.len(), 4);
     assert_eq!(
@@ -211,6 +211,7 @@ fn test_vault_indexes_logic_around() {
                 id: depositor_5,
                 total_debt: depositor_5_debt,
                 total_col: depositor_5_collateral_amount,
+                denomination: data.stable_token_denomination.clone(),
             }
         ]
     );
@@ -228,16 +229,18 @@ fn test_vault_indexes_logic_around() {
         vec![
             &env,
             UserVault {
-                index: calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount,),
+                index: calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount),
                 id: depositor_3,
                 total_debt: depositor_3_debt,
                 total_col: depositor_3_collateral_amount,
+                denomination: data.stable_token_denomination.clone(),
             },
             UserVault {
-                index: calculate_user_vault_index(depositor_4_debt, depositor_4_collateral_amount,),
+                index: calculate_user_vault_index(depositor_4_debt, depositor_4_collateral_amount),
                 id: depositor_4,
                 total_debt: depositor_4_debt,
                 total_col: depositor_4_collateral_amount,
+                denomination: data.stable_token_denomination.clone(),
             },
         ]
     );
@@ -245,6 +248,7 @@ fn test_vault_indexes_logic_around() {
     // 3rd Section
     // This section checks that when we update a vault, values get updated correctly
     // We also include changes in the currency rates and new vaults creations in order to emulate a real scenario
+
     // 4th Section
     // TODO
 }

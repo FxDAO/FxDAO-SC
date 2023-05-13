@@ -29,9 +29,9 @@ fn test_new_vault() {
     let contract_address: Address =
         Address::from_contract_id(&env, &data.contract_client.contract_id);
 
-    let mn_col_rte: i128 = 1_1000000;
-    let mn_v_c_amt: i128 = 5000_0000000;
-    let op_col_rte: i128 = 1_1500000;
+    let min_col_rate: i128 = 1_1000000;
+    let min_debt_creation: i128 = 5000_0000000;
+    let opening_col_rate: i128 = 1_1500000;
 
     token::Client::new(&env, &data.stable_token_client.contract_id).incr_allow(
         &data.stable_token_issuer,
@@ -56,16 +56,16 @@ fn test_new_vault() {
         )
         .is_err());
 
-    data.contract_client.new_cy(
+    data.contract_client.create_currency(
         &data.stable_token_denomination,
         &data.stable_token_client.contract_id,
     );
 
     data.contract_client
-        .s_cy_rate(&data.stable_token_denomination, &currency_price);
+        .set_currency_rate(&data.stable_token_denomination, &currency_price);
 
     data.contract_client
-        .toggle_cy(&data.stable_token_denomination, &true);
+        .toggle_currency(&data.stable_token_denomination, &true);
 
     data.collateral_token_client.mint(
         &data.collateral_token_admin,
@@ -84,10 +84,10 @@ fn test_new_vault() {
         )
         .is_err());
 
-    data.contract_client.s_c_v_c(
-        &mn_col_rte,
-        &mn_v_c_amt,
-        &op_col_rte,
+    data.contract_client.set_vault_conditions(
+        &min_col_rate,
+        &min_debt_creation,
+        &opening_col_rate,
         &data.stable_token_denomination,
     );
 
@@ -127,7 +127,7 @@ fn test_new_vault() {
 
     let currency_stats: CurrencyStats = data
         .contract_client
-        .g_cy_stats(&data.stable_token_denomination);
+        .get_currency_stats(&data.stable_token_denomination);
 
     let user_vault = data
         .contract_client
@@ -135,11 +135,11 @@ fn test_new_vault() {
 
     let indexes_list: Vec<i128> = data
         .contract_client
-        .g_indexes(&data.stable_token_denomination);
+        .get_indexes(&data.stable_token_denomination);
 
-    assert_eq!(currency_stats.tot_vaults, 1);
-    assert_eq!(currency_stats.tot_debt, initial_debt);
-    assert_eq!(currency_stats.tot_col, collateral_amount);
+    assert_eq!(currency_stats.total_vaults, 1);
+    assert_eq!(currency_stats.total_debt, initial_debt);
+    assert_eq!(currency_stats.total_col, collateral_amount);
 
     assert_eq!(
         user_vault.index,
@@ -187,7 +187,7 @@ fn test_new_vault() {
 
     let updated_currency_stats: CurrencyStats = data
         .contract_client
-        .g_cy_stats(&data.stable_token_denomination);
+        .get_currency_stats(&data.stable_token_denomination);
 
     let second_user_vault = data
         .contract_client
@@ -195,11 +195,11 @@ fn test_new_vault() {
 
     let new_indexes_list: Vec<i128> = data
         .contract_client
-        .g_indexes(&data.stable_token_denomination);
+        .get_indexes(&data.stable_token_denomination);
 
-    assert_eq!(updated_currency_stats.tot_vaults, 2);
-    assert_eq!(updated_currency_stats.tot_debt, initial_debt * 2);
-    assert_eq!(updated_currency_stats.tot_col, collateral_amount * 2);
+    assert_eq!(updated_currency_stats.total_vaults, 2);
+    assert_eq!(updated_currency_stats.total_debt, initial_debt * 2);
+    assert_eq!(updated_currency_stats.total_col, collateral_amount * 2);
 
     assert_eq!(
         second_user_vault.index,
@@ -228,9 +228,9 @@ fn test_increase_collateral() {
     let contract_address: Address =
         Address::from_contract_id(&env, &data.contract_client.contract_id);
 
-    let mn_col_rte: i128 = 11000000;
-    let mn_v_c_amt: i128 = 50000000000;
-    let op_col_rte: i128 = 11500000;
+    let min_col_rate: i128 = 11000000;
+    let min_debt_creation: i128 = 50000000000;
+    let opening_col_rate: i128 = 11500000;
 
     data.collateral_token_client.mint(
         &data.collateral_token_admin,
@@ -244,10 +244,10 @@ fn test_increase_collateral() {
         &(initial_debt),
     );
 
-    data.contract_client.s_c_v_c(
-        &mn_col_rte,
-        &mn_v_c_amt,
-        &op_col_rte,
+    data.contract_client.set_vault_conditions(
+        &min_col_rate,
+        &min_debt_creation,
+        &opening_col_rate,
         &data.stable_token_denomination,
     );
 
@@ -270,11 +270,11 @@ fn test_increase_collateral() {
 
     let current_currency_stats: CurrencyStats = data
         .contract_client
-        .g_cy_stats(&data.stable_token_denomination);
+        .get_currency_stats(&data.stable_token_denomination);
 
-    assert_eq!(current_currency_stats.tot_vaults, 1);
-    assert_eq!(current_currency_stats.tot_debt, initial_debt);
-    assert_eq!(current_currency_stats.tot_col, collateral_amount);
+    assert_eq!(current_currency_stats.total_vaults, 1);
+    assert_eq!(current_currency_stats.total_debt, initial_debt);
+    assert_eq!(current_currency_stats.total_col, collateral_amount);
 
     data.contract_client.incr_col(
         &depositor,
@@ -304,11 +304,11 @@ fn test_increase_collateral() {
 
     let updated_currency_stats: CurrencyStats = data
         .contract_client
-        .g_cy_stats(&data.stable_token_denomination);
+        .get_currency_stats(&data.stable_token_denomination);
 
-    assert_eq!(updated_currency_stats.tot_vaults, 1);
-    assert_eq!(updated_currency_stats.tot_debt, initial_debt);
-    assert_eq!(updated_currency_stats.tot_col, collateral_amount * 2);
+    assert_eq!(updated_currency_stats.total_vaults, 1);
+    assert_eq!(updated_currency_stats.total_debt, initial_debt);
+    assert_eq!(updated_currency_stats.total_col, collateral_amount * 2);
 
     assert_eq!(data.collateral_token_client.balance(&depositor), 0);
     assert_eq!(
@@ -355,12 +355,15 @@ fn test_increase_debt() {
 
     let current_currency_stats: CurrencyStats = data
         .contract_client
-        .g_cy_stats(&data.stable_token_denomination);
+        .get_currency_stats(&data.stable_token_denomination);
 
-    assert_eq!(current_currency_stats.tot_vaults, 1);
-    assert_eq!(current_currency_stats.tot_debt, base_variables.initial_debt);
+    assert_eq!(current_currency_stats.total_vaults, 1);
     assert_eq!(
-        current_currency_stats.tot_col,
+        current_currency_stats.total_debt,
+        base_variables.initial_debt
+    );
+    assert_eq!(
+        current_currency_stats.total_col,
         base_variables.collateral_amount * 2
     );
 
@@ -397,15 +400,15 @@ fn test_increase_debt() {
 
     let updated_currency_stats: CurrencyStats = data
         .contract_client
-        .g_cy_stats(&data.stable_token_denomination);
+        .get_currency_stats(&data.stable_token_denomination);
 
-    assert_eq!(updated_currency_stats.tot_vaults, 1);
+    assert_eq!(updated_currency_stats.total_vaults, 1);
     assert_eq!(
-        updated_currency_stats.tot_debt,
+        updated_currency_stats.total_debt,
         base_variables.initial_debt * 2
     );
     assert_eq!(
-        updated_currency_stats.tot_col,
+        updated_currency_stats.total_col,
         base_variables.collateral_amount * 2
     );
 
@@ -429,12 +432,12 @@ fn test_pay_debt() {
     let contract_address: Address =
         Address::from_contract_id(&env, &data.contract_client.contract_id);
 
-    let mn_col_rte: i128 = 11000000;
-    let mn_v_c_amt: i128 = 50000000000;
-    let op_col_rte: i128 = 11500000;
+    let min_col_rate: i128 = 11000000;
+    let min_debt_creation: i128 = 50000000000;
+    let opening_col_rate: i128 = 11500000;
 
     data.contract_client
-        .s_cy_rate(&data.stable_token_denomination, &currency_price);
+        .set_currency_rate(&data.stable_token_denomination, &currency_price);
 
     data.collateral_token_client.mint(
         &data.collateral_token_admin,
@@ -448,10 +451,10 @@ fn test_pay_debt() {
         &(initial_debt * 10),
     );
 
-    data.contract_client.s_c_v_c(
-        &mn_col_rte,
-        &mn_v_c_amt,
-        &op_col_rte,
+    data.contract_client.set_vault_conditions(
+        &min_col_rate,
+        &min_debt_creation,
+        &opening_col_rate,
         &data.stable_token_denomination,
     );
 
@@ -474,11 +477,11 @@ fn test_pay_debt() {
 
     let current_currency_stats: CurrencyStats = data
         .contract_client
-        .g_cy_stats(&data.stable_token_denomination);
+        .get_currency_stats(&data.stable_token_denomination);
 
-    assert_eq!(current_currency_stats.tot_vaults, 1);
-    assert_eq!(current_currency_stats.tot_debt, initial_debt);
-    assert_eq!(current_currency_stats.tot_col, collateral_amount);
+    assert_eq!(current_currency_stats.total_vaults, 1);
+    assert_eq!(current_currency_stats.total_debt, initial_debt);
+    assert_eq!(current_currency_stats.total_col, collateral_amount);
 
     data.contract_client.pay_debt(
         &depositor,
@@ -508,11 +511,11 @@ fn test_pay_debt() {
 
     let updated_currency_stats: CurrencyStats = data
         .contract_client
-        .g_cy_stats(&data.stable_token_denomination);
+        .get_currency_stats(&data.stable_token_denomination);
 
-    assert_eq!(updated_currency_stats.tot_vaults, 1);
-    assert_eq!(updated_currency_stats.tot_debt, initial_debt / 2);
-    assert_eq!(updated_currency_stats.tot_col, collateral_amount);
+    assert_eq!(updated_currency_stats.total_vaults, 1);
+    assert_eq!(updated_currency_stats.total_debt, initial_debt / 2);
+    assert_eq!(updated_currency_stats.total_col, collateral_amount);
 
     assert_eq!(
         data.stable_token_client.balance(&depositor),
@@ -531,11 +534,11 @@ fn test_pay_debt() {
 
     let final_currency_stats: CurrencyStats = data
         .contract_client
-        .g_cy_stats(&data.stable_token_denomination);
+        .get_currency_stats(&data.stable_token_denomination);
 
-    assert_eq!(final_currency_stats.tot_vaults, 0);
-    assert_eq!(final_currency_stats.tot_debt, 0);
-    assert_eq!(final_currency_stats.tot_col, 0);
+    assert_eq!(final_currency_stats.total_vaults, 0);
+    assert_eq!(final_currency_stats.total_debt, 0);
+    assert_eq!(final_currency_stats.total_col, 0);
 
     assert_eq!(data.stable_token_client.balance(&depositor), 0);
     assert_eq!(data.collateral_token_client.balance(&contract_address), 0);

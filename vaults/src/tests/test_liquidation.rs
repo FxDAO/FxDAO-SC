@@ -22,7 +22,7 @@ fn test_liquidation() {
 
     let first_rate: i128 = 931953;
     data.contract_client
-        .s_cy_rate(&data.stable_token_denomination, &first_rate);
+        .set_currency_rate(&data.stable_token_denomination, &first_rate);
 
     let depositor: Address = Address::random(&env);
     let depositor_debt: i128 = 5_000_0000000;
@@ -77,7 +77,7 @@ fn test_liquidation() {
     // We update the collateral price in order to put the depositor's vault below the min collateral ratio
     let second_rate: i128 = 531953;
     data.contract_client
-        .s_cy_rate(&data.stable_token_denomination, &second_rate);
+        .set_currency_rate(&data.stable_token_denomination, &second_rate);
 
     data.contract_client.liquidate(
         &liquidator,
@@ -131,16 +131,16 @@ fn test_liquidation() {
     // check currency stats has been updated correctly
     let updated_currency_stats: CurrencyStats = data
         .contract_client
-        .g_cy_stats(&data.stable_token_denomination);
+        .get_currency_stats(&data.stable_token_denomination);
 
-    assert_eq!(updated_currency_stats.tot_col, liquidator_collateral);
-    assert_eq!(updated_currency_stats.tot_debt, liquidator_debt);
-    assert_eq!(updated_currency_stats.tot_vaults, 1);
+    assert_eq!(updated_currency_stats.total_col, liquidator_collateral);
+    assert_eq!(updated_currency_stats.total_debt, liquidator_debt);
+    assert_eq!(updated_currency_stats.total_vaults, 1);
 
     // Check the only index is the one from the liquidator's vault
     let updated_indexes: Vec<i128> = data
         .contract_client
-        .g_indexes(&data.stable_token_denomination);
+        .get_indexes(&data.stable_token_denomination);
 
     assert_eq!(
         updated_indexes,
@@ -162,7 +162,7 @@ fn test_vaults_to_liquidate() {
     let opening_debt_amount: i128 = 1_0000000;
     let opening_collateral_rate: i128 = 1_1500000;
 
-    data.contract_client.s_c_v_c(
+    data.contract_client.set_vault_conditions(
         &min_collateral_rate,
         &opening_debt_amount,
         &opening_collateral_rate,
@@ -173,7 +173,7 @@ fn test_vaults_to_liquidate() {
     let second_rate: i128 = 0_0586660;
 
     data.contract_client
-        .s_cy_rate(&data.stable_token_denomination, &first_rate);
+        .set_currency_rate(&data.stable_token_denomination, &first_rate);
 
     let depositor_1: Address = Address::random(&env);
     let depositor_2: Address = Address::random(&env);
@@ -220,7 +220,7 @@ fn test_vaults_to_liquidate() {
     assert_eq!(current_vaults_to_liquidate, vec![&env]);
 
     data.contract_client
-        .s_cy_rate(&data.stable_token_denomination, &second_rate);
+        .set_currency_rate(&data.stable_token_denomination, &second_rate);
 
     current_vaults_to_liquidate = data
         .contract_client

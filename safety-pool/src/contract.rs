@@ -195,7 +195,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
 
         let currency_stats: Currency =
             vaults::Client::new(&env, &core_state.vaults_contract.contract_id().unwrap())
-                .get_cy(&core_state.denomination_asset);
+                .get_currency(&core_state.denomination_asset);
 
         let vaults_to_liquidate: Vec<UserVault> =
             vaults::Client::new(&env, &core_state.vaults_contract.contract_id().unwrap())
@@ -207,7 +207,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
 
         for result in vaults_to_liquidate.iter() {
             let user_vault: UserVault = result.unwrap();
-            if amount_covered + user_vault.total_debt < stablecoin_balance {
+            if amount_covered + user_vault.total_debt <= stablecoin_balance {
                 target_users.push_back(user_vault.id);
                 amount_covered += user_vault.total_debt;
                 total_collateral += user_vault.total_col;

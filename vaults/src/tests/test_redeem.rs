@@ -31,12 +31,12 @@ fn test_redeem() {
 
     let rate: i128 = 931953;
     data.contract_client
-        .s_cy_rate(&data.stable_token_denomination, &rate);
+        .set_currency_rate(&data.stable_token_denomination, &rate);
 
-    data.contract_client.s_c_v_c(
-        &base_variables.mn_col_rte,
+    data.contract_client.set_vault_conditions(
+        &base_variables.min_col_rate,
         &1000000000,
-        &base_variables.op_col_rte,
+        &base_variables.opening_col_rate,
         &data.stable_token_denomination,
     );
 
@@ -171,11 +171,11 @@ fn test_redeem() {
     // Before redeeming
     let currency_stats: CurrencyStats = data
         .contract_client
-        .g_cy_stats(&data.stable_token_denomination);
+        .get_currency_stats(&data.stable_token_denomination);
 
-    assert_eq!(currency_stats.tot_vaults, 4);
-    assert_eq!(currency_stats.tot_debt, 495_0000000);
-    assert_eq!(currency_stats.tot_col, 12000_0000000);
+    assert_eq!(currency_stats.total_vaults, 4);
+    assert_eq!(currency_stats.total_debt, 495_0000000);
+    assert_eq!(currency_stats.total_col, 12000_0000000);
 
     data.contract_client.redeem(
         &redeem_user,
@@ -217,13 +217,13 @@ fn test_redeem() {
 
     let updated_currency_stats: CurrencyStats = data
         .contract_client
-        .g_cy_stats(&data.stable_token_denomination);
+        .get_currency_stats(&data.stable_token_denomination);
 
     // Check the currency stats were updated correctly
-    assert_eq!(updated_currency_stats.tot_vaults, 3);
-    assert_eq!(updated_currency_stats.tot_debt, 295_0000000);
+    assert_eq!(updated_currency_stats.total_vaults, 3);
+    assert_eq!(updated_currency_stats.total_debt, 295_0000000);
     assert_eq!(
-        updated_currency_stats.tot_col,
+        updated_currency_stats.total_col,
         12000_0000000 - depositor_2_collateral - div_floor(500000000 * 10000000, rate)
     );
 
