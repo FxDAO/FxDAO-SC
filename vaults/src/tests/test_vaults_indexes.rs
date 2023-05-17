@@ -4,7 +4,8 @@ extern crate std;
 
 use crate::storage_types::UserVault;
 use crate::tests::test_utils::{
-    create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
+    create_base_data, create_base_variables, set_allowance, set_initial_state, InitialVariables,
+    TestData,
 };
 use crate::utils::vaults::calculate_user_vault_index;
 use soroban_sdk::testutils::Address as _;
@@ -46,6 +47,8 @@ fn test_vault_indexes_logic_around() {
         &(depositor_1_collateral_amount * 2),
     );
 
+    set_allowance(&env, &data, &depositor_1);
+
     data.contract_client.new_vault(
         &depositor_1,
         &depositor_1_debt,
@@ -73,6 +76,8 @@ fn test_vault_indexes_logic_around() {
         &depositor_2,
         &(depositor_2_collateral_amount * 2),
     );
+
+    set_allowance(&env, &data, &depositor_2);
 
     data.contract_client.new_vault(
         &depositor_2,
@@ -106,6 +111,8 @@ fn test_vault_indexes_logic_around() {
         &(depositor_3_collateral_amount * 2),
     );
 
+    set_allowance(&env, &data, &depositor_3);
+
     data.contract_client.new_vault(
         &depositor_3,
         &depositor_3_debt,
@@ -138,6 +145,8 @@ fn test_vault_indexes_logic_around() {
         &(depositor_4_collateral_amount * 2),
     );
 
+    set_allowance(&env, &data, &depositor_4);
+
     data.contract_client.new_vault(
         &depositor_4,
         &depositor_4_debt,
@@ -169,6 +178,8 @@ fn test_vault_indexes_logic_around() {
         &depositor_5,
         &(depositor_5_collateral_amount * 2),
     );
+
+    set_allowance(&env, &data, &depositor_5);
 
     data.contract_client.new_vault(
         &depositor_5,

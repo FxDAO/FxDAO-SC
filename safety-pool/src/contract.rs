@@ -217,10 +217,16 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         }
 
         if target_users.len() == 0 {
-            panic_with_error!(&env, SCErrors::NoVaultsToLiquidate);
+            panic_with_error!(&env, SCErrors::CantLiquidateVaults);
         }
 
         let depositors: Vec<Address> = get_depositors(&env);
+
+        token::Client::new(&env, &core_state.deposit_asset).incr_allow(
+            &env.current_contract_address(),
+            &core_state.vaults_contract,
+            &amount_covered,
+        );
 
         vaults::Client::new(&env, &core_state.vaults_contract.contract_id().unwrap()).liquidate(
             &env.current_contract_address(),
@@ -242,7 +248,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
 
         for result in depositors.iter() {
             let depositor: Address = result.unwrap();
-            let deposit: Deposit = get_deposit(&env, &depositor);
+            let mut deposit: Deposit = get_deposit(&env, &depositor);
             let deposit_percentage: i128 =
                 div_floor(deposit.amount as i128 * 10000000, stablecoin_balance);
             let collateral_to_send: i128 =
@@ -253,6 +259,13 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
                 &depositor,
                 &collateral_to_send,
             );
+
+            let deposit_amount_used: i128 =
+                div_floor(deposit_percentage * amount_covered, 100_0000000) * 100;
+
+            deposit.amount = deposit.amount - deposit_amount_used as u128;
+
+            save_deposit(&env, &deposit);
         }
 
         let collateral_left: i128 = token::Client::new(&env, &core_state.collateral_asset)

@@ -9,7 +9,7 @@ use soroban_sdk::{contractimpl, panic_with_error, vec, Address, BytesN, Env, Sym
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
     /// Set up and management
-    fn init(env: Env, admin: Address, colla_tokn: BytesN<32>, stble_issr: Address);
+    fn init(env: Env, admin: Address, col_token: BytesN<32>, stable_issuer: Address);
     fn get_admin(env: Env) -> Address;
     fn get_core_state(env: Env) -> CoreState;
 
@@ -59,7 +59,7 @@ pub struct VaultsContract;
 // TODO: Add events for each function
 #[contractimpl]
 impl VaultsContractTrait for VaultsContract {
-    fn init(env: Env, admin: Address, colla_tokn: BytesN<32>, stble_issr: Address) {
+    fn init(env: Env, admin: Address, col_token: BytesN<32>, stable_issuer: Address) {
         if env.storage().has(&DataKeys::CoreState) {
             panic_with_error!(&env, SCErrors::AlreadyInit);
         }
@@ -67,8 +67,8 @@ impl VaultsContractTrait for VaultsContract {
         env.storage().set(
             &DataKeys::CoreState,
             &CoreState {
-                col_token: colla_tokn,
-                stable_issuer: stble_issr,
+                col_token,
+                stable_issuer,
             },
         );
         env.storage().set(&DataKeys::Admin, &admin);

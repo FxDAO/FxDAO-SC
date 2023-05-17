@@ -123,3 +123,16 @@ pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVar
         &90000000000000000000,
     );
 }
+
+pub fn set_allowance(env: &Env, data: &TestData, depositor: &Address) {
+    token::Client::new(&env, &data.collateral_token_client.contract_id).incr_allow(
+        &depositor,
+        &Address::from_contract_id(&env, &data.contract_client.contract_id),
+        &9000000000000000,
+    );
+    token::Client::new(&env, &data.stable_token_client.contract_id).incr_allow(
+        &depositor,
+        &Address::from_contract_id(&env, &data.contract_client.contract_id),
+        &9000000000000000,
+    );
+}

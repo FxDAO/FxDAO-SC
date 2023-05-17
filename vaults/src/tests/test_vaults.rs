@@ -4,7 +4,8 @@ extern crate std;
 
 use crate::storage_types::CurrencyStats;
 use crate::tests::test_utils::{
-    create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
+    create_base_data, create_base_variables, set_allowance, set_initial_state, InitialVariables,
+    TestData,
 };
 use crate::token;
 use num_integer::div_floor;
@@ -44,6 +45,8 @@ fn test_new_vault() {
         &data.stable_token_issuer,
         &90000000000000000000,
     );
+
+    set_allowance(&env, &data, &depositor);
 
     // If the method is called before before the currency is active it should fail
     assert!(data
@@ -173,6 +176,8 @@ fn test_new_vault() {
         &(collateral_amount * 2),
     );
 
+    set_allowance(&env, &data, &depositor_2);
+
     data.contract_client.new_vault(
         &depositor_2,
         &initial_debt,
@@ -243,6 +248,8 @@ fn test_increase_collateral() {
         &contract_address,
         &(initial_debt),
     );
+
+    set_allowance(&env, &data, &depositor);
 
     data.contract_client.set_vault_conditions(
         &min_col_rate,
@@ -335,6 +342,8 @@ fn test_increase_debt() {
         &base_variables.contract_address,
         &(base_variables.initial_debt * 5),
     );
+
+    set_allowance(&env, &data, &base_variables.depositor);
 
     // It should fail if the user doesn't have a Vault open
     assert!(data
@@ -444,6 +453,8 @@ fn test_pay_debt() {
         &depositor,
         &(collateral_amount),
     );
+
+    set_allowance(&env, &data, &depositor);
 
     data.stable_token_client.mint(
         &data.stable_token_issuer,
