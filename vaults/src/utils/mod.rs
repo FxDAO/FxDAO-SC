@@ -1,3 +1,4 @@
+pub mod indexes;
 pub mod vaults;
 
 use crate::storage_types::*;

@@ -206,12 +206,10 @@ fn test_vault_indexes_logic_around() {
     // We test the function get_vaults_with_index and confirm it returns correct vaults in their order
 
     // We test the index from depositor 5 and confirm we receive a single UserVault
-    let mut vaults_with_index: Vec<UserVault> =
-        data.contract_client
-            .get_vaults_with_index(&calculate_user_vault_index(
-                depositor_5_debt,
-                depositor_5_collateral_amount,
-            ));
+    let mut vaults_with_index: Vec<UserVault> = data.contract_client.get_vaults_with_index(
+        &data.stable_token_denomination,
+        &calculate_user_vault_index(depositor_5_debt, depositor_5_collateral_amount),
+    );
 
     assert_eq!(
         vaults_with_index,
@@ -228,12 +226,10 @@ fn test_vault_indexes_logic_around() {
     );
 
     // We now test the index from depositor 3 and confirm we receive two UserVaults (3 and 4)
-    vaults_with_index = data
-        .contract_client
-        .get_vaults_with_index(&calculate_user_vault_index(
-            depositor_3_debt,
-            depositor_3_collateral_amount,
-        ));
+    vaults_with_index = data.contract_client.get_vaults_with_index(
+        &data.stable_token_denomination,
+        &calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount),
+    );
 
     assert_eq!(
         vaults_with_index,

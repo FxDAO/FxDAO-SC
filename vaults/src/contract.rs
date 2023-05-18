@@ -4,6 +4,7 @@ use crate::utils::vaults::*;
 use crate::utils::*;
 use num_integer::div_floor;
 
+use crate::utils::indexes::get_vaults_data_type_with_index;
 use soroban_sdk::{contractimpl, panic_with_error, vec, Address, BytesN, Env, Symbol, Vec};
 
 // TODO: Explain each function here
@@ -43,7 +44,7 @@ pub trait VaultsContractTrait {
     fn incr_debt(env: Env, caller: Address, debt_amount: i128, denomination: Symbol);
     fn pay_debt(env: Env, caller: Address, amount: i128, denomination: Symbol);
     fn get_indexes(env: Env, denomination: Symbol) -> Vec<i128>;
-    fn get_vaults_with_index(env: Env, index: i128) -> Vec<UserVault>;
+    fn get_vaults_with_index(env: Env, denomination: Symbol, index: i128) -> Vec<UserVault>;
 
     /// Redeeming
     fn redeem(env: Env, caller: Address, amount: i128, denomination: Symbol);
@@ -369,8 +370,9 @@ impl VaultsContractTrait for VaultsContract {
         get_sorted_indexes_list(&env, &denomination)
     }
 
-    fn get_vaults_with_index(env: Env, index: i128) -> Vec<UserVault> {
-        let data_keys: Vec<UserVaultDataType> = get_vaults_data_type_with_index(&env, &index);
+    fn get_vaults_with_index(env: Env, denomination: Symbol, index: i128) -> Vec<UserVault> {
+        let data_keys: Vec<UserVaultDataType> =
+            get_vaults_data_type_with_index(&env, &denomination, &index);
         let mut vaults: Vec<UserVault> = vec![&env] as Vec<UserVault>;
 
         for result in data_keys.iter() {
@@ -511,7 +513,7 @@ impl VaultsContractTrait for VaultsContract {
         for result in indexes.iter() {
             let index: i128 = result.unwrap();
             let vaults_data_types: Vec<UserVaultDataType> =
-                get_vaults_data_type_with_index(&env, &index);
+                get_vaults_data_type_with_index(&env, &denomination, &index);
 
             for result2 in vaults_data_types.iter() {
                 let vault_data_type: UserVaultDataType = result2.unwrap();

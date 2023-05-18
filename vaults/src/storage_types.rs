@@ -56,6 +56,13 @@ pub struct UserVault {
     pub denomination: Symbol,
 }
 
+#[derive(Clone)]
+#[contracttype]
+pub struct VaultsWithIndexDataType {
+    pub index: i128,
+    pub denomination: Symbol,
+}
+
 /// I need to be able to check who is the lowest collateral ratio no matter the currency
 /// I need to be able to check the lowest one without needing to load a huge vector of values
 /// I need to be able to sort the vec from lower to higher in an efficient way
@@ -68,9 +75,9 @@ pub enum VaultsDataKeys {
     /// The Vec is sorted by the collateral ratio of the deposit IE the lower go first
     /// The Symbol value is the denomination of the currency
     Indexes(Symbol),
-    /// The "i128" is the Vault ratio
+
     /// The result is a Vec<UserVaultDataType>
-    VaultsWithIndex(i128),
+    VaultsWithIndex(VaultsWithIndexDataType),
 }
 
 #[contracterror]
