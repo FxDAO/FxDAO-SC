@@ -1,3 +1,4 @@
+pub mod indexes;
 pub mod vaults;
 
 use crate::storage_types::*;
@@ -139,7 +140,8 @@ pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Addres
 }
 
 pub fn deposit_collateral(env: &Env, core_state: &CoreState, depositor: &Address, amount: &i128) {
-    token::Client::new(&env, &core_state.col_token).xfer(
+    token::Client::new(&env, &core_state.col_token).xfer_from(
+        &env.current_contract_address(),
         &depositor,
         &env.current_contract_address(),
         &amount,
@@ -168,7 +170,8 @@ pub fn deposit_stablecoin(
     depositor: &Address,
     amount: &i128,
 ) {
-    token::Client::new(&env, &currency.contract).xfer(
+    token::Client::new(&env, &currency.contract).xfer_from(
+        &env.current_contract_address(),
         &depositor,
         &core_state.stable_issuer,
         &amount,

@@ -1,7 +1,8 @@
 #![cfg(test)]
 
 use crate::contract::{SafetyPoolContract, SafetyPoolContractClient};
-use crate::tests::utils::create_token_contract;
+use crate::storage::deposits::Deposit;
+use crate::tests::utils::{create_token_contract, set_allowance};
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{vec, Address, BytesN, Env, Status, Symbol, Vec};
 
@@ -105,11 +106,20 @@ fn test_simple_liquidations_flow() {
     // We create the initial vaults, a total of 6 vaults will be created where two of them
     // will be liquidated later, a total of 18k collateral (3k each) will be issued. The first 4
     // depositors will deposit all of the stablecoin balance into the pool (400 usd)
+    let assets: Vec<BytesN<32>> =
+        vec![&env, collateral_token_client.contract_id.clone()] as Vec<BytesN<32>>;
     for (i, depositor) in depositors.iter().enumerate() {
         collateral_token_client.mint(
             &collateral_token_admin,
             &depositor,
             &collateral_initial_balance,
+        );
+
+        set_allowance(
+            &env,
+            &assets,
+            &vaults_contract_client.contract_id,
+            &depositor,
         );
 
         let initial_debt: i128;
@@ -154,7 +164,7 @@ fn test_simple_liquidations_flow() {
     // Now we confirm the distribution was correct, the calculations go this way:
     // 1.- 2 Vaults were liquidated so the vaults contract should only have a balance of 3_000_0000000 * 4 = 12_000_0000000 of collateral
     // 2.- With a rate of 0_0586660, the value in collateral is 5454_6074387 so a total of 545_3925613 profit will be shared between the depositors and the contract
-    // 3.- Depositors will receive 5454_6074387 + (545_3925613 / 2) = 5727_3037194 (14318259298 each)
+    // 3.- Depositors will receive 5454_6074387 + (545_3925613 / 2) = 5727_3037194 (1431_8259298 each)
     // 4.- Treasury and the liquidator will receive 272_6962808 / 2 each
     assert_eq!(
         collateral_token_client.balance(&vaults_contract_address),
@@ -168,6 +178,18 @@ fn test_simple_liquidations_flow() {
             assert_eq!(collateral_token_client.balance(&depositor), 0);
         }
     }
+
+    // We now check that each deposit into the pool gets updated and reflect the current pool balance
+    let mut total_in_vaults: u128 = 0;
+    for depositor in depositors.iter() {
+        let deposit: Deposit = pool_contract_client.get_deposit(&depositor);
+        total_in_vaults = total_in_vaults + deposit.amount;
+    }
+
+    assert_eq!(
+        total_in_vaults as i128,
+        stable_token_client.balance(&(Address::from_contract_id(&env, &pool_contract_id)))
+    );
 
     assert_eq!(
         collateral_token_client.balance(&treasury_contract),

@@ -2,7 +2,7 @@
 use crate::contract::{SafetyPoolContract, SafetyPoolContractClient};
 use crate::token;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{vec, Address, Env, Symbol, Vec};
+use soroban_sdk::{vec, Address, BytesN, Env, Symbol, Vec};
 
 pub fn create_token_contract(e: &Env, admin: &Address) -> token::Client {
     token::Client::new(&e, &e.register_stellar_asset_contract(admin.clone()))
@@ -69,4 +69,20 @@ pub fn init_contract(test_data: &TestData) {
         &test_data.profit_share,
         &test_data.liquidator_share,
     );
+}
+
+pub fn set_allowance(
+    env: &Env,
+    assets: &Vec<BytesN<32>>,
+    contract: &BytesN<32>,
+    depositor: &Address,
+) {
+    for item in assets.iter() {
+        let asset = item.unwrap();
+        token::Client::new(&env, &asset).incr_allow(
+            &depositor,
+            &Address::from_contract_id(&env, contract),
+            &9000000000000000,
+        );
+    }
 }

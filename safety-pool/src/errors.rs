@@ -11,5 +11,5 @@ pub enum SCErrors {
     NothingToWithdraw = 20002,
 
     // Liquidations
-    NoVaultsToLiquidate = 30000,
+    CantLiquidateVaults = 30000,
 }

@@ -44,6 +44,18 @@ fn test_liquidation() {
         &liquidator_collateral,
     );
 
+    token::Client::new(&env, &data.collateral_token_client.contract_id).incr_allow(
+        &depositor,
+        &Address::from_contract_id(&env, &data.contract_client.contract_id),
+        &9000000000000000,
+    );
+
+    token::Client::new(&env, &data.collateral_token_client.contract_id).incr_allow(
+        &liquidator,
+        &Address::from_contract_id(&env, &data.contract_client.contract_id),
+        &9000000000000000,
+    );
+
     // Create both vaults
     data.contract_client.new_vault(
         &depositor,
@@ -78,6 +90,12 @@ fn test_liquidation() {
     let second_rate: i128 = 531953;
     data.contract_client
         .set_currency_rate(&data.stable_token_denomination, &second_rate);
+
+    token::Client::new(&env, &data.stable_token_client.contract_id).incr_allow(
+        &liquidator,
+        &Address::from_contract_id(&env, &data.contract_client.contract_id),
+        &9000000000000000,
+    );
 
     data.contract_client.liquidate(
         &liquidator,
@@ -204,6 +222,12 @@ fn test_vaults_to_liquidate() {
         } else {
             debt_amount = 160_0000000;
         }
+
+        token::Client::new(&env, &data.collateral_token_client.contract_id).incr_allow(
+            &depositor,
+            &Address::from_contract_id(&env, &data.contract_client.contract_id),
+            &9000000000000000,
+        );
 
         data.contract_client.new_vault(
             &depositor,

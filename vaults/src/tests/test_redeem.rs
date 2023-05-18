@@ -3,7 +3,8 @@ extern crate std;
 
 use crate::storage_types::{CurrencyStats, UserVault};
 use crate::tests::test_utils::{
-    create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
+    create_base_data, create_base_variables, set_allowance, set_initial_state, InitialVariables,
+    TestData,
 };
 use crate::token;
 use crate::utils::vaults::calculate_user_vault_index;
@@ -65,6 +66,8 @@ fn test_redeem() {
         &depositor_1_collateral,
     );
 
+    set_allowance(&env, &data, &depositor_1);
+
     data.contract_client.new_vault(
         &depositor_1,
         &depositor_1_debt,
@@ -83,6 +86,8 @@ fn test_redeem() {
         &depositor_2,
         &depositor_2_collateral,
     );
+
+    set_allowance(&env, &data, &depositor_2);
 
     data.contract_client.new_vault(
         &depositor_2,
@@ -103,6 +108,8 @@ fn test_redeem() {
         &depositor_3_collateral,
     );
 
+    set_allowance(&env, &data, &depositor_3);
+
     data.contract_client.new_vault(
         &depositor_3,
         &depositor_3_debt,
@@ -121,6 +128,8 @@ fn test_redeem() {
         &depositor_4,
         &depositor_4_collateral,
     );
+
+    set_allowance(&env, &data, &depositor_4);
 
     data.contract_client.new_vault(
         &depositor_4,
@@ -162,6 +171,8 @@ fn test_redeem() {
         &redeem_user,
         &500000000,
     );
+
+    set_allowance(&env, &data, &redeem_user);
 
     let amount_to_redeem: i128 =
         token::Client::new(&env, &data.stable_token_client.contract_id).balance(&redeem_user);
