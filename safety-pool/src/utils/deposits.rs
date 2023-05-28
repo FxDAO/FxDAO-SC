@@ -1,5 +1,4 @@
 use crate::storage::deposits::{Deposit, DepositsDataKeys};
-use crate::token;
 use soroban_sdk::{vec, Address, BytesN, Env, Vec};
 
 pub fn make_deposit(env: &Env, asset: &BytesN<32>, depositor: &Address, amount: &u128) {

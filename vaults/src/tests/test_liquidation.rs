@@ -5,10 +5,9 @@ use crate::storage_types::{CurrencyStats, UserVault};
 use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
 };
-use crate::token;
 use crate::utils::vaults::calculate_user_vault_index;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{vec, Address, Env, IntoVal, Status, Symbol, Vec};
+use soroban_sdk::{token, vec, Address, Env, IntoVal, Status, Symbol, Vec};
 
 /// It test a simple liquidation
 /// The vault must be removed and the collateral sent to the liquidator
@@ -28,31 +27,25 @@ fn test_liquidation() {
     let depositor_debt: i128 = 5_000_0000000;
     let depositor_collateral: i128 = 100_000_0000000;
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
-        &data.collateral_token_admin,
-        &depositor,
-        &depositor_collateral,
-    );
+    token::Client::new(&env, &data.collateral_token_client.address)
+        .mint(&depositor, &depositor_collateral);
 
     let liquidator: Address = Address::random(&env);
     let liquidator_debt: i128 = 5_000_0000000;
     let liquidator_collateral: i128 = 500_000_0000000;
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
-        &data.collateral_token_admin,
-        &liquidator,
-        &liquidator_collateral,
-    );
+    token::Client::new(&env, &data.collateral_token_client.address)
+        .mint(&liquidator, &liquidator_collateral);
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id).incr_allow(
+    token::Client::new(&env, &data.collateral_token_client.address).increase_allowance(
         &depositor,
-        &Address::from_contract_id(&env, &data.contract_client.contract_id),
+        &data.contract_client.address,
         &9000000000000000,
     );
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id).incr_allow(
+    token::Client::new(&env, &data.collateral_token_client.address).increase_allowance(
         &liquidator,
-        &Address::from_contract_id(&env, &data.contract_client.contract_id),
+        &data.contract_client.address,
         &9000000000000000,
     );
 
@@ -91,9 +84,9 @@ fn test_liquidation() {
     data.contract_client
         .set_currency_rate(&data.stable_token_denomination, &second_rate);
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).incr_allow(
+    token::Client::new(&env, &data.stable_token_client.address).increase_allowance(
         &liquidator,
-        &Address::from_contract_id(&env, &data.contract_client.contract_id),
+        &data.contract_client.address,
         &9000000000000000,
     );
 
@@ -105,12 +98,12 @@ fn test_liquidation() {
 
     // Check the function is requiring the sender approved this operation
     assert_eq!(
-        env.recorded_top_authorizations(),
-        std::vec![(
+        env.auths(),
+        [(
             // Address for which auth is performed
             liquidator.clone(),
             // Identifier of the called contract
-            data.contract_client.contract_id.clone(),
+            data.contract_client.address.clone(),
             // Name of the called function
             Symbol::short("liquidate"),
             // Arguments used (converted to the env-managed vector via `into_val`)
@@ -136,13 +129,13 @@ fn test_liquidation() {
 
     // The liquidator should now have the collateral from the depositor
     let liquidator_collateral_balance =
-        token::Client::new(&env, &data.collateral_token_client.contract_id).balance(&liquidator);
+        token::Client::new(&env, &data.collateral_token_client.address).balance(&liquidator);
 
     assert_eq!(liquidator_collateral_balance, depositor_collateral);
 
     // The liquidator should have 0 stablecoins
     let liquidator_debt_balance =
-        token::Client::new(&env, &data.stable_token_client.contract_id).balance(&liquidator);
+        token::Client::new(&env, &data.stable_token_client.address).balance(&liquidator);
 
     assert_eq!(liquidator_debt_balance, 0);
 
@@ -210,11 +203,8 @@ fn test_vaults_to_liquidate() {
     .iter()
     .enumerate()
     {
-        token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
-            &data.collateral_token_admin,
-            &depositor,
-            &depositor_collateral,
-        );
+        token::Client::new(&env, &data.collateral_token_client.address)
+            .mint(&depositor, &depositor_collateral);
 
         let debt_amount: i128;
         if i < 3 {
@@ -223,9 +213,9 @@ fn test_vaults_to_liquidate() {
             debt_amount = 160_0000000;
         }
 
-        token::Client::new(&env, &data.collateral_token_client.contract_id).incr_allow(
+        token::Client::new(&env, &data.collateral_token_client.address).increase_allowance(
             &depositor,
-            &Address::from_contract_id(&env, &data.contract_client.contract_id),
+            &data.contract_client.address,
             &9000000000000000,
         );
 

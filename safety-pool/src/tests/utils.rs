@@ -1,6 +1,5 @@
 #![cfg(test)]
 use crate::contract::{SafetyPoolContract, SafetyPoolContractClient};
-use crate::token;
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{vec, Address, BytesN, Env, Symbol, Vec};
 

@@ -1,7 +1,6 @@
 use crate::errors::SCErrors;
 use crate::storage::core::CoreState;
 use crate::storage::deposits::Deposit;
-use crate::token;
 use crate::utils::core::{can_init_contract, get_core_state, set_core_state};
 use crate::utils::deposits::{
     get_deposit, get_depositors, is_depositor_listed, make_deposit, make_withdrawal,

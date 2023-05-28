@@ -1,8 +1,8 @@
-use soroban_sdk::{contracterror, contracttype, Address, BytesN, Symbol};
+use soroban_sdk::{contracterror, contracttype, Address, Symbol};
 
 #[contracttype]
 pub struct CoreState {
-    pub col_token: BytesN<32>,
+    pub col_token: Address,
     pub stable_issuer: Address,
 }
 
@@ -10,7 +10,7 @@ pub struct CoreState {
 pub struct Currency {
     pub denomination: Symbol, // symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
     pub active: bool,
-    pub contract: BytesN<32>,
+    pub contract: Address,
     pub last_updte: u64, // This is the last time the price got updated
     pub rate: i128,      // This is the current price of the collateral in our protocol
 }

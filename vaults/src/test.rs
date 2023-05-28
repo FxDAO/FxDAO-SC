@@ -16,7 +16,7 @@ fn test_set_and_get_core_state() {
 
     data.contract_client.init(
         &data.contract_admin,
-        &data.collateral_token_client.contract_id,
+        &data.collateral_token_client.address,
         &data.stable_token_issuer,
     );
 
@@ -24,10 +24,7 @@ fn test_set_and_get_core_state() {
     let core_state: CoreState = data.contract_client.get_core_state();
 
     assert_eq!(saved_admin, data.contract_admin);
-    assert_eq!(
-        core_state.col_token,
-        data.collateral_token_client.contract_id
-    );
+    assert_eq!(core_state.col_token, data.collateral_token_client.address);
 }
 
 #[test]
@@ -38,13 +35,13 @@ fn test_init_panic() {
 
     data.contract_client.init(
         &data.contract_admin,
-        &data.collateral_token_client.contract_id,
+        &data.collateral_token_client.address,
         &data.stable_token_issuer,
     );
 
     data.contract_client.init(
         &data.contract_admin,
-        &data.collateral_token_client.contract_id,
+        &data.collateral_token_client.address,
         &data.stable_token_issuer,
     );
 }
@@ -57,7 +54,7 @@ fn test_set_and_get_currency_vault_conditions() {
 
     data.contract_client.init(
         &data.contract_admin,
-        &data.collateral_token_client.contract_id,
+        &data.collateral_token_client.address,
         &data.stable_token_issuer,
     );
 
@@ -70,12 +67,12 @@ fn test_set_and_get_currency_vault_conditions() {
 
     // Check the admin is the one who call it
     assert_eq!(
-        env.recorded_top_authorizations(),
-        std::vec![(
+        env.auths(),
+        [(
             // Address for which auth is performed
             data.contract_admin.clone(),
             // Identifier of the called contract
-            data.contract_client.contract_id.clone(),
+            data.contract_client.address.clone(),
             // Name of the called function
             Symbol::new(&env, "set_vault_conditions"),
             // Arguments used (converted to the, &data.stable_token_denomination env-managed vector via `into_val`)
@@ -122,12 +119,12 @@ fn test_set_and_get_rate() {
 
     // Check the function is requiring the sender approved this operation
     assert_eq!(
-        env.recorded_top_authorizations(),
-        std::vec![(
+        env.auths(),
+        [(
             // Address for which auth is performed
             data.contract_admin.clone(),
             // Identifier of the called contract
-            data.contract_client.contract_id.clone(),
+            data.contract_client.address.clone(),
             // Name of the called function
             Symbol::new(&env, "set_currency_rate"),
             // Arguments used (converted to the env-managed vector via `into_val`)

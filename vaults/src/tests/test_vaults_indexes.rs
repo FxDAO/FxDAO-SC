@@ -41,11 +41,8 @@ fn test_vault_indexes_logic_around() {
     let depositor_1_debt: i128 = 1500000000;
     let depositor_1_collateral_amount: i128 = 30000000000;
 
-    data.collateral_token_client.mint(
-        &data.collateral_token_admin,
-        &depositor_1,
-        &(depositor_1_collateral_amount * 2),
-    );
+    data.collateral_token_client
+        .mint(&depositor_1, &(depositor_1_collateral_amount * 2));
 
     set_allowance(&env, &data, &depositor_1);
 
@@ -71,11 +68,8 @@ fn test_vault_indexes_logic_around() {
     let depositor_2_debt: i128 = 1400000000;
     let depositor_2_collateral_amount: i128 = 26000000000;
 
-    data.collateral_token_client.mint(
-        &data.collateral_token_admin,
-        &depositor_2,
-        &(depositor_2_collateral_amount * 2),
-    );
+    data.collateral_token_client
+        .mint(&depositor_2, &(depositor_2_collateral_amount * 2));
 
     set_allowance(&env, &data, &depositor_2);
 
@@ -105,11 +99,8 @@ fn test_vault_indexes_logic_around() {
     let depositor_3_debt: i128 = 1000000000;
     let depositor_3_collateral_amount: i128 = 32500000000;
 
-    data.collateral_token_client.mint(
-        &data.collateral_token_admin,
-        &depositor_3,
-        &(depositor_3_collateral_amount * 2),
-    );
+    data.collateral_token_client
+        .mint(&depositor_3, &(depositor_3_collateral_amount * 2));
 
     set_allowance(&env, &data, &depositor_3);
 
@@ -139,11 +130,8 @@ fn test_vault_indexes_logic_around() {
     let depositor_4_debt: i128 = 1000000000;
     let depositor_4_collateral_amount: i128 = 32500000000;
 
-    data.collateral_token_client.mint(
-        &data.collateral_token_admin,
-        &depositor_4,
-        &(depositor_4_collateral_amount * 2),
-    );
+    data.collateral_token_client
+        .mint(&depositor_4, &(depositor_4_collateral_amount * 2));
 
     set_allowance(&env, &data, &depositor_4);
 
@@ -173,11 +161,8 @@ fn test_vault_indexes_logic_around() {
     let depositor_5_debt: i128 = 1400000000;
     let depositor_5_collateral_amount: i128 = 24590000000;
 
-    data.collateral_token_client.mint(
-        &data.collateral_token_admin,
-        &depositor_5,
-        &(depositor_5_collateral_amount * 2),
-    );
+    data.collateral_token_client
+        .mint(&depositor_5, &(depositor_5_collateral_amount * 2));
 
     set_allowance(&env, &data, &depositor_5);
 

@@ -2,8 +2,7 @@ pub mod indexes;
 pub mod vaults;
 
 use crate::storage_types::*;
-use crate::token;
-use soroban_sdk::{panic_with_error, Address, Env, Symbol};
+use soroban_sdk::{panic_with_error, token, Address, Env, Symbol};
 
 pub fn check_admin(env: &Env) {
     let admin: Address = env.storage().get(&DataKeys::Admin).unwrap().unwrap();
@@ -132,7 +131,7 @@ pub fn set_currency_stats(env: &Env, denomination: &Symbol, currency_stats: &Cur
 
 /// Payments Utils
 pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Address, amount: &i128) {
-    token::Client::new(&env, &core_state.col_token).xfer(
+    token::Client::new(&env, &core_state.col_token).transfer(
         &env.current_contract_address(),
         &requester,
         &amount,
@@ -140,7 +139,7 @@ pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Addres
 }
 
 pub fn deposit_collateral(env: &Env, core_state: &CoreState, depositor: &Address, amount: &i128) {
-    token::Client::new(&env, &core_state.col_token).xfer_from(
+    token::Client::new(&env, &core_state.col_token).transfer_from(
         &env.current_contract_address(),
         &depositor,
         &env.current_contract_address(),
@@ -155,7 +154,7 @@ pub fn withdraw_stablecoin(
     recipient: &Address,
     amount: &i128,
 ) {
-    token::Client::new(&env, &currency.contract).xfer_from(
+    token::Client::new(&env, &currency.contract).transfer_from(
         &env.current_contract_address(),
         &core_state.stable_issuer,
         &recipient,
@@ -170,7 +169,7 @@ pub fn deposit_stablecoin(
     depositor: &Address,
     amount: &i128,
 ) {
-    token::Client::new(&env, &currency.contract).xfer_from(
+    token::Client::new(&env, &currency.contract).transfer_from(
         &env.current_contract_address(),
         &depositor,
         &core_state.stable_issuer,

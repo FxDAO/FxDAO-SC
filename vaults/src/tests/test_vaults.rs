@@ -7,10 +7,10 @@ use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_allowance, set_initial_state, InitialVariables,
     TestData,
 };
-use crate::token;
+
 use num_integer::div_floor;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{Address, Env, IntoVal, Symbol, Vec};
+use soroban_sdk::{token, Address, Env, IntoVal, Symbol, Vec};
 
 #[test]
 fn test_new_vault() {
@@ -19,7 +19,7 @@ fn test_new_vault() {
 
     data.contract_client.init(
         &data.contract_admin,
-        &data.collateral_token_client.contract_id,
+        &data.collateral_token_client.address,
         &data.stable_token_issuer,
     );
 
@@ -27,24 +27,20 @@ fn test_new_vault() {
     let depositor = Address::random(&env);
     let initial_debt: i128 = 5_000_0000000; // USD 5000
     let collateral_amount: i128 = 90_347_8867088; // 90,347.8867088 XLM
-    let contract_address: Address =
-        Address::from_contract_id(&env, &data.contract_client.contract_id);
+    let contract_address: Address = data.contract_client.address.clone();
 
     let min_col_rate: i128 = 1_1000000;
     let min_debt_creation: i128 = 5000_0000000;
     let opening_col_rate: i128 = 1_1500000;
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).incr_allow(
+    token::Client::new(&env, &data.stable_token_client.address).increase_allowance(
         &data.stable_token_issuer,
         &contract_address,
         &90000000000000000000,
     );
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).mint(
-        &data.stable_token_issuer,
-        &data.stable_token_issuer,
-        &90000000000000000000,
-    );
+    token::Client::new(&env, &data.stable_token_client.address)
+        .mint(&data.stable_token_issuer, &90000000000000000000);
 
     set_allowance(&env, &data, &depositor);
 
@@ -61,7 +57,7 @@ fn test_new_vault() {
 
     data.contract_client.create_currency(
         &data.stable_token_denomination,
-        &data.stable_token_client.contract_id,
+        &data.stable_token_client.address,
     );
 
     data.contract_client
@@ -70,11 +66,8 @@ fn test_new_vault() {
     data.contract_client
         .toggle_currency(&data.stable_token_denomination, &true);
 
-    data.collateral_token_client.mint(
-        &data.collateral_token_admin,
-        &depositor,
-        &(collateral_amount * 2),
-    );
+    data.collateral_token_client
+        .mint(&depositor, &(collateral_amount * 2));
 
     // If the method is called before protocol state is set it should fail
     assert!(data
@@ -103,12 +96,12 @@ fn test_new_vault() {
 
     // Check the function is requiring the sender approved this operation
     assert_eq!(
-        env.recorded_top_authorizations(),
-        std::vec![(
+        env.auths(),
+        [(
             // Address for which auth is performed
             depositor.clone(),
             // Identifier of the called contract
-            data.contract_client.contract_id.clone(),
+            data.contract_client.address.clone(),
             // Name of the called function
             Symbol::short("new_vault"),
             // Arguments used (converted to the env-managed vector via `into_val`)
@@ -170,11 +163,8 @@ fn test_new_vault() {
 
     let depositor_2 = Address::random(&env);
 
-    data.collateral_token_client.mint(
-        &data.collateral_token_admin,
-        &depositor_2,
-        &(collateral_amount * 2),
-    );
+    data.collateral_token_client
+        .mint(&depositor_2, &(collateral_amount * 2));
 
     set_allowance(&env, &data, &depositor_2);
 
@@ -230,24 +220,17 @@ fn test_increase_collateral() {
     let depositor = Address::random(&env);
     let initial_debt: i128 = 50000000000;
     let collateral_amount: i128 = 50000000000;
-    let contract_address: Address =
-        Address::from_contract_id(&env, &data.contract_client.contract_id);
+    let contract_address: Address = data.contract_client.address.clone();
 
     let min_col_rate: i128 = 11000000;
     let min_debt_creation: i128 = 50000000000;
     let opening_col_rate: i128 = 11500000;
 
-    data.collateral_token_client.mint(
-        &data.collateral_token_admin,
-        &depositor,
-        &(collateral_amount * 2),
-    );
+    data.collateral_token_client
+        .mint(&depositor, &(collateral_amount * 2));
 
-    data.stable_token_client.mint(
-        &data.stable_token_issuer,
-        &contract_address,
-        &(initial_debt),
-    );
+    data.stable_token_client
+        .mint(&contract_address, &(initial_debt));
 
     set_allowance(&env, &data, &depositor);
 
@@ -291,12 +274,12 @@ fn test_increase_collateral() {
 
     // Check the function is requiring the sender approved this operation
     assert_eq!(
-        env.recorded_top_authorizations(),
-        std::vec![(
+        env.auths(),
+        [(
             // Address for which auth is performed
             depositor.clone(),
             // Identifier of the called contract
-            data.contract_client.contract_id.clone(),
+            data.contract_client.address.clone(),
             // Name of the called function
             Symbol::short("incr_col"),
             // Arguments used (converted to the env-managed vector via `into_val`)
@@ -332,13 +315,11 @@ fn test_increase_debt() {
     set_initial_state(&env, &data, &base_variables);
 
     data.collateral_token_client.mint(
-        &data.collateral_token_admin,
         &base_variables.depositor,
         &(base_variables.collateral_amount * 5),
     );
 
     data.stable_token_client.mint(
-        &data.stable_token_issuer,
         &base_variables.contract_address,
         &(base_variables.initial_debt * 5),
     );
@@ -389,12 +370,12 @@ fn test_increase_debt() {
 
     // Check the function is requiring the sender approved this operation
     assert_eq!(
-        env.recorded_top_authorizations(),
-        std::vec![(
+        env.auths(),
+        [(
             // Address for which auth is performed
             base_variables.depositor.clone(),
             // Identifier of the called contract
-            data.contract_client.contract_id.clone(),
+            data.contract_client.address.clone(),
             // Name of the called function
             Symbol::short("incr_debt"),
             // Arguments used (converted to the env-managed vector via `into_val`)
@@ -438,8 +419,7 @@ fn test_pay_debt() {
     let depositor = Address::random(&env);
     let initial_debt: i128 = 50000000000;
     let collateral_amount: i128 = 50000000000;
-    let contract_address: Address =
-        Address::from_contract_id(&env, &data.contract_client.contract_id);
+    let contract_address: Address = data.contract_client.address.clone();
 
     let min_col_rate: i128 = 11000000;
     let min_debt_creation: i128 = 50000000000;
@@ -448,19 +428,13 @@ fn test_pay_debt() {
     data.contract_client
         .set_currency_rate(&data.stable_token_denomination, &currency_price);
 
-    data.collateral_token_client.mint(
-        &data.collateral_token_admin,
-        &depositor,
-        &(collateral_amount),
-    );
+    data.collateral_token_client
+        .mint(&depositor, &(collateral_amount));
 
     set_allowance(&env, &data, &depositor);
 
-    data.stable_token_client.mint(
-        &data.stable_token_issuer,
-        &contract_address,
-        &(initial_debt * 10),
-    );
+    data.stable_token_client
+        .mint(&contract_address, &(initial_debt * 10));
 
     data.contract_client.set_vault_conditions(
         &min_col_rate,
@@ -502,12 +476,12 @@ fn test_pay_debt() {
 
     // Check the function is requiring the sender approved this operation
     assert_eq!(
-        env.recorded_top_authorizations(),
-        std::vec![(
+        env.auths(),
+        [(
             // Address for which auth is performed
             depositor.clone(),
             // Identifier of the called contract
-            data.contract_client.contract_id.clone(),
+            data.contract_client.address.clone(),
             // Name of the called function
             Symbol::short("pay_debt"),
             // Arguments used (converted to the env-managed vector via `into_val`)

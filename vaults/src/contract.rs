@@ -1,16 +1,15 @@
 use crate::storage_types::*;
-use crate::token;
 use crate::utils::vaults::*;
 use crate::utils::*;
 use num_integer::div_floor;
 
 use crate::utils::indexes::get_vaults_data_type_with_index;
-use soroban_sdk::{contractimpl, panic_with_error, vec, Address, BytesN, Env, Symbol, Vec};
+use soroban_sdk::{contractimpl, panic_with_error, token, vec, Address, Env, Symbol, Vec};
 
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
     /// Set up and management
-    fn init(env: Env, admin: Address, col_token: BytesN<32>, stable_issuer: Address);
+    fn init(env: Env, admin: Address, col_token: Address, stable_issuer: Address);
     fn get_admin(env: Env) -> Address;
     fn get_core_state(env: Env) -> CoreState;
 
@@ -25,7 +24,7 @@ pub trait VaultsContractTrait {
     fn get_vault_conditions(env: Env, denomination: Symbol) -> CurrencyVaultsConditions;
 
     /// Currencies methods
-    fn create_currency(env: Env, denomination: Symbol, contract: BytesN<32>);
+    fn create_currency(env: Env, denomination: Symbol, contract: Address);
     fn get_currency(env: Env, denomination: Symbol) -> Currency;
     fn get_currency_stats(env: Env, denomination: Symbol) -> CurrencyStats;
     fn set_currency_rate(env: Env, denomination: Symbol, rate: i128);
@@ -60,7 +59,7 @@ pub struct VaultsContract;
 // TODO: Add events for each function
 #[contractimpl]
 impl VaultsContractTrait for VaultsContract {
-    fn init(env: Env, admin: Address, col_token: BytesN<32>, stable_issuer: Address) {
+    fn init(env: Env, admin: Address, col_token: Address, stable_issuer: Address) {
         if env.storage().has(&DataKeys::CoreState) {
             panic_with_error!(&env, SCErrors::AlreadyInit);
         }
@@ -107,7 +106,7 @@ impl VaultsContractTrait for VaultsContract {
         get_currency_vault_conditions(&env, &denomination)
     }
 
-    fn create_currency(env: Env, denomination: Symbol, contract: BytesN<32>) {
+    fn create_currency(env: Env, denomination: Symbol, contract: Address) {
         check_admin(&env);
 
         if env.storage().has(&DataKeys::Currency(denomination.clone())) {
@@ -117,7 +116,7 @@ impl VaultsContractTrait for VaultsContract {
         save_currency(
             &env,
             &Currency {
-                denomination: denomination,
+                denomination,
                 active: false,
                 contract,
                 rate: 0,
@@ -339,7 +338,7 @@ impl VaultsContractTrait for VaultsContract {
             currency_stats.total_vaults = currency_stats.total_vaults - 1;
             currency_stats.total_col = currency_stats.total_col - current_user_vault.total_col;
 
-            token::Client::new(&env, &core_state.col_token).xfer(
+            token::Client::new(&env, &core_state.col_token).transfer(
                 &env.current_contract_address(),
                 &caller,
                 &current_user_vault.total_col,
