@@ -1,7 +1,7 @@
 #![cfg(test)]
 extern crate std;
 
-use crate::storage_types::CurrencyStats;
+use crate::storage_types::{CurrencyStats, UserVault};
 use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
 };
@@ -22,7 +22,7 @@ fn test_liquidation() {
 
     let first_rate: i128 = 931953;
     data.contract_client
-        .s_cy_rate(&data.stable_token_denomination, &first_rate);
+        .set_currency_rate(&data.stable_token_denomination, &first_rate);
 
     let depositor: Address = Address::random(&env);
     let depositor_debt: i128 = 5_000_0000000;
@@ -42,6 +42,18 @@ fn test_liquidation() {
         &data.collateral_token_admin,
         &liquidator,
         &liquidator_collateral,
+    );
+
+    token::Client::new(&env, &data.collateral_token_client.contract_id).incr_allow(
+        &depositor,
+        &Address::from_contract_id(&env, &data.contract_client.contract_id),
+        &9000000000000000,
+    );
+
+    token::Client::new(&env, &data.collateral_token_client.contract_id).incr_allow(
+        &liquidator,
+        &Address::from_contract_id(&env, &data.contract_client.contract_id),
+        &9000000000000000,
     );
 
     // Create both vaults
@@ -77,7 +89,13 @@ fn test_liquidation() {
     // We update the collateral price in order to put the depositor's vault below the min collateral ratio
     let second_rate: i128 = 531953;
     data.contract_client
-        .s_cy_rate(&data.stable_token_denomination, &second_rate);
+        .set_currency_rate(&data.stable_token_denomination, &second_rate);
+
+    token::Client::new(&env, &data.stable_token_client.contract_id).incr_allow(
+        &liquidator,
+        &Address::from_contract_id(&env, &data.contract_client.contract_id),
+        &9000000000000000,
+    );
 
     data.contract_client.liquidate(
         &liquidator,
@@ -131,16 +149,16 @@ fn test_liquidation() {
     // check currency stats has been updated correctly
     let updated_currency_stats: CurrencyStats = data
         .contract_client
-        .g_cy_stats(&data.stable_token_denomination);
+        .get_currency_stats(&data.stable_token_denomination);
 
-    assert_eq!(updated_currency_stats.tot_col, liquidator_collateral);
-    assert_eq!(updated_currency_stats.tot_debt, liquidator_debt);
-    assert_eq!(updated_currency_stats.tot_vaults, 1);
+    assert_eq!(updated_currency_stats.total_col, liquidator_collateral);
+    assert_eq!(updated_currency_stats.total_debt, liquidator_debt);
+    assert_eq!(updated_currency_stats.total_vaults, 1);
 
     // Check the only index is the one from the liquidator's vault
     let updated_indexes: Vec<i128> = data
         .contract_client
-        .g_indexes(&data.stable_token_denomination);
+        .get_indexes(&data.stable_token_denomination);
 
     assert_eq!(
         updated_indexes,
@@ -149,4 +167,88 @@ fn test_liquidation() {
             calculate_user_vault_index(liquidator_debt, liquidator_collateral)
         ]
     );
+}
+
+#[test]
+fn test_vaults_to_liquidate() {
+    let env = Env::default();
+    let data: TestData = create_base_data(&env);
+    let base_variables: InitialVariables = create_base_variables(&env, &data);
+    set_initial_state(&env, &data, &base_variables);
+
+    let min_collateral_rate: i128 = 1_1000000;
+    let opening_debt_amount: i128 = 1_0000000;
+    let opening_collateral_rate: i128 = 1_1500000;
+
+    data.contract_client.set_vault_conditions(
+        &min_collateral_rate,
+        &opening_debt_amount,
+        &opening_collateral_rate,
+        &data.stable_token_denomination,
+    );
+
+    let first_rate: i128 = 0_0958840;
+    let second_rate: i128 = 0_0586660;
+
+    data.contract_client
+        .set_currency_rate(&data.stable_token_denomination, &first_rate);
+
+    let depositor_1: Address = Address::random(&env);
+    let depositor_2: Address = Address::random(&env);
+    let depositor_3: Address = Address::random(&env);
+    let depositor_4: Address = Address::random(&env);
+    let depositor_5: Address = Address::random(&env);
+    let depositor_collateral: i128 = 3000_0000000;
+
+    for (i, depositor) in [
+        depositor_1,
+        depositor_2,
+        depositor_3,
+        depositor_4,
+        depositor_5,
+    ]
+    .iter()
+    .enumerate()
+    {
+        token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
+            &data.collateral_token_admin,
+            &depositor,
+            &depositor_collateral,
+        );
+
+        let debt_amount: i128;
+        if i < 3 {
+            debt_amount = 100_0000000;
+        } else {
+            debt_amount = 160_0000000;
+        }
+
+        token::Client::new(&env, &data.collateral_token_client.contract_id).incr_allow(
+            &depositor,
+            &Address::from_contract_id(&env, &data.contract_client.contract_id),
+            &9000000000000000,
+        );
+
+        data.contract_client.new_vault(
+            &depositor,
+            &debt_amount,
+            &depositor_collateral,
+            &data.stable_token_denomination,
+        );
+    }
+
+    let mut current_vaults_to_liquidate: Vec<UserVault> = data
+        .contract_client
+        .vaults_to_liquidate(&data.stable_token_denomination);
+
+    assert_eq!(current_vaults_to_liquidate, vec![&env]);
+
+    data.contract_client
+        .set_currency_rate(&data.stable_token_denomination, &second_rate);
+
+    current_vaults_to_liquidate = data
+        .contract_client
+        .vaults_to_liquidate(&data.stable_token_denomination);
+
+    assert_eq!(current_vaults_to_liquidate.len(), 2);
 }

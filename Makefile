@@ -10,14 +10,15 @@ test-optimized: build-optimized
 
 build:
 	cargo build --target wasm32-unknown-unknown --release -p vaults
+	cargo build --target wasm32-unknown-unknown --release -p safety-pool
 	cd target/wasm32-unknown-unknown/release/ && \
 		for i in *.wasm ; do \
 			ls -l "$$i"; \
 		done
 
 build-optimized:
-	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p brain
 	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p vaults
+	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p safety-pool
 	cd target/wasm32-unknown-unknown/release/ && \
 		for i in *.wasm ; do \
 			wasm-opt -Oz "$$i" -o "$$i.tmp" && mv "$$i.tmp" "$$i"; \
@@ -61,6 +62,8 @@ standalone_fund_accounts:
 	curl "http://localhost:8000/friendbot?addr=GCQDSTJQKHSZICYDHGI3U73VOYCPGI5QEEOCVUORFWCYN5MH26XHH2LZ" && \
 	curl "http://localhost:8000/friendbot?addr=GBMHIX37J3IZC4H2TVOQ6RKYGLCNNX543NU3OI3SP4LDBERVCO3DCCOD" && \
 	curl "http://localhost:8000/friendbot?addr=GAZ5H54I4O7QF64HBLVWWAPDZ7OYRI3EGMJ27YJGSTBE2L7VQNNEIWZF" && \
-	curl "http://localhost:8000/friendbot?addr=GDGMFR44SMGNCWTZFP6YPHBOX2IYNY7WQGCBZQBTU7QYKPLP4V7BG4NI"
+	curl "http://localhost:8000/friendbot?addr=GDGMFR44SMGNCWTZFP6YPHBOX2IYNY7WQGCBZQBTU7QYKPLP4V7BG4NI" && \
+	curl "http://localhost:8000/friendbot?addr=GDPOWRFN5CZXNSPTYOSSUTKRFZ23MOZBMFA2H2Q4ACIL62QNILIDWWSU" && \
+	curl "http://localhost:8000/friendbot?addr=GDE3RXHI2IQKFAOFC23GZIGR6FMQD2GKQ2IUJDIN3JGH4Z5COIZWGT2A"
 
 

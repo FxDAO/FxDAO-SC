@@ -21,11 +21,11 @@ fn test_set_and_get_core_state() {
     );
 
     let saved_admin: Address = data.contract_client.get_admin();
-    let core_state: CoreState = data.contract_client.g_c_state();
+    let core_state: CoreState = data.contract_client.get_core_state();
 
     assert_eq!(saved_admin, data.contract_admin);
     assert_eq!(
-        core_state.colla_tokn,
+        core_state.col_token,
         data.collateral_token_client.contract_id
     );
 }
@@ -61,10 +61,10 @@ fn test_set_and_get_currency_vault_conditions() {
         &data.stable_token_issuer,
     );
 
-    data.contract_client.s_c_v_c(
-        &base_variables.mn_col_rte,
-        &base_variables.mn_v_c_amt,
-        &base_variables.op_col_rte,
+    data.contract_client.set_vault_conditions(
+        &base_variables.min_col_rate,
+        &base_variables.min_debt_creation,
+        &base_variables.opening_col_rate,
         &data.stable_token_denomination,
     );
 
@@ -77,12 +77,12 @@ fn test_set_and_get_currency_vault_conditions() {
             // Identifier of the called contract
             data.contract_client.contract_id.clone(),
             // Name of the called function
-            Symbol::short("s_c_v_c"),
+            Symbol::new(&env, "set_vault_conditions"),
             // Arguments used (converted to the, &data.stable_token_denomination env-managed vector via `into_val`)
             (
-                base_variables.mn_col_rte.clone(),
-                base_variables.mn_v_c_amt.clone(),
-                base_variables.op_col_rte.clone(),
+                base_variables.min_col_rate.clone(),
+                base_variables.min_debt_creation.clone(),
+                base_variables.opening_col_rate.clone(),
                 data.stable_token_denomination.clone()
             )
                 .into_val(&env)
@@ -92,9 +92,9 @@ fn test_set_and_get_currency_vault_conditions() {
     // Fail if one value is neative
     assert!(data
         .contract_client
-        .try_s_c_v_c(
-            &base_variables.mn_col_rte,
-            &base_variables.mn_v_c_amt,
+        .try_set_vault_conditions(
+            &base_variables.min_col_rate,
+            &base_variables.min_debt_creation,
             &-23,
             &data.stable_token_denomination,
         )
@@ -102,11 +102,11 @@ fn test_set_and_get_currency_vault_conditions() {
 
     let currency_vault_conditions = data
         .contract_client
-        .g_c_v_c(&data.stable_token_denomination);
+        .get_vault_conditions(&data.stable_token_denomination);
 
-    assert_eq!(currency_vault_conditions.mn_col_rte, 11000000);
-    assert_eq!(currency_vault_conditions.mn_v_c_amt, 50000000000);
-    assert_eq!(currency_vault_conditions.op_col_rte, 11500000);
+    assert_eq!(currency_vault_conditions.min_col_rate, 11000000);
+    assert_eq!(currency_vault_conditions.min_debt_creation, 50000000000);
+    assert_eq!(currency_vault_conditions.opening_col_rate, 11500000);
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn test_set_and_get_rate() {
 
     let rate: i128 = 931953;
     data.contract_client
-        .s_cy_rate(&data.stable_token_denomination, &rate);
+        .set_currency_rate(&data.stable_token_denomination, &rate);
 
     // Check the function is requiring the sender approved this operation
     assert_eq!(
@@ -129,14 +129,15 @@ fn test_set_and_get_rate() {
             // Identifier of the called contract
             data.contract_client.contract_id.clone(),
             // Name of the called function
-            Symbol::short("s_cy_rate"),
+            Symbol::new(&env, "set_currency_rate"),
             // Arguments used (converted to the env-managed vector via `into_val`)
             (data.stable_token_denomination.clone(), rate.clone()).into_val(&env.clone())
         )]
     );
 
-    let current_currency_rate: Currency =
-        data.contract_client.get_cy(&data.stable_token_denomination);
+    let current_currency_rate: Currency = data
+        .contract_client
+        .get_currency(&data.stable_token_denomination);
 
     // We test that the first update is done correctly
     assert_eq!(&current_currency_rate.rate, &rate);
@@ -144,9 +145,11 @@ fn test_set_and_get_rate() {
     let new_rate: i128 = 941953;
 
     data.contract_client
-        .s_cy_rate(&data.stable_token_denomination, &new_rate);
+        .set_currency_rate(&data.stable_token_denomination, &new_rate);
 
-    let new_protocol_rate: Currency = data.contract_client.get_cy(&data.stable_token_denomination);
+    let new_protocol_rate: Currency = data
+        .contract_client
+        .get_currency(&data.stable_token_denomination);
 
     // Testing that the state gets updated from the one saved before
     assert_eq!(&new_protocol_rate.rate, &new_rate);

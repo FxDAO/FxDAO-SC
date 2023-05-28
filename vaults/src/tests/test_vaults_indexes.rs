@@ -2,12 +2,14 @@
 
 extern crate std;
 
+use crate::storage_types::UserVault;
 use crate::tests::test_utils::{
-    create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
+    create_base_data, create_base_variables, set_allowance, set_initial_state, InitialVariables,
+    TestData,
 };
 use crate::utils::vaults::calculate_user_vault_index;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{Address, Env, Vec};
+use soroban_sdk::{vec, Address, Env, Vec};
 
 #[test]
 fn test_vault_indexes_logic_around() {
@@ -17,19 +19,19 @@ fn test_vault_indexes_logic_around() {
     set_initial_state(&env, &data, &base_variables);
 
     let currency_price: i128 = 920330;
-    let mn_col_rte: i128 = 11000000;
-    let mn_v_c_amt: i128 = 1000000000;
-    let op_col_rte: i128 = 11500000;
+    let min_col_rate: i128 = 11000000;
+    let min_debt_creation: i128 = 1000000000;
+    let opening_col_rate: i128 = 11500000;
 
-    data.contract_client.s_c_v_c(
-        &mn_col_rte,
-        &mn_v_c_amt,
-        &op_col_rte,
+    data.contract_client.set_vault_conditions(
+        &min_col_rate,
+        &min_debt_creation,
+        &opening_col_rate,
         &data.stable_token_denomination,
     );
 
     data.contract_client
-        .s_cy_rate(&data.stable_token_denomination, &currency_price);
+        .set_currency_rate(&data.stable_token_denomination, &currency_price);
 
     // 1st Set of tests
     // This section includes and checks that every time we create a new vault the values are updated
@@ -45,6 +47,8 @@ fn test_vault_indexes_logic_around() {
         &(depositor_1_collateral_amount * 2),
     );
 
+    set_allowance(&env, &data, &depositor_1);
+
     data.contract_client.new_vault(
         &depositor_1,
         &depositor_1_debt,
@@ -54,7 +58,7 @@ fn test_vault_indexes_logic_around() {
 
     let mut current_indexes: Vec<i128> = data
         .contract_client
-        .g_indexes(&data.stable_token_denomination);
+        .get_indexes(&data.stable_token_denomination);
 
     assert_eq!(current_indexes.len(), 1);
     assert_eq!(
@@ -73,6 +77,8 @@ fn test_vault_indexes_logic_around() {
         &(depositor_2_collateral_amount * 2),
     );
 
+    set_allowance(&env, &data, &depositor_2);
+
     data.contract_client.new_vault(
         &depositor_2,
         &depositor_2_debt,
@@ -82,7 +88,7 @@ fn test_vault_indexes_logic_around() {
 
     current_indexes = data
         .contract_client
-        .g_indexes(&data.stable_token_denomination);
+        .get_indexes(&data.stable_token_denomination);
 
     assert_eq!(current_indexes.len(), 2);
     assert_eq!(
@@ -105,6 +111,8 @@ fn test_vault_indexes_logic_around() {
         &(depositor_3_collateral_amount * 2),
     );
 
+    set_allowance(&env, &data, &depositor_3);
+
     data.contract_client.new_vault(
         &depositor_3,
         &depositor_3_debt,
@@ -114,7 +122,7 @@ fn test_vault_indexes_logic_around() {
 
     current_indexes = data
         .contract_client
-        .g_indexes(&data.stable_token_denomination);
+        .get_indexes(&data.stable_token_denomination);
 
     assert_eq!(current_indexes.len(), 3);
     assert_eq!(
@@ -137,6 +145,8 @@ fn test_vault_indexes_logic_around() {
         &(depositor_4_collateral_amount * 2),
     );
 
+    set_allowance(&env, &data, &depositor_4);
+
     data.contract_client.new_vault(
         &depositor_4,
         &depositor_4_debt,
@@ -146,7 +156,7 @@ fn test_vault_indexes_logic_around() {
 
     current_indexes = data
         .contract_client
-        .g_indexes(&data.stable_token_denomination);
+        .get_indexes(&data.stable_token_denomination);
 
     assert_eq!(current_indexes.len(), 3);
     assert_eq!(
@@ -169,6 +179,8 @@ fn test_vault_indexes_logic_around() {
         &(depositor_5_collateral_amount * 2),
     );
 
+    set_allowance(&env, &data, &depositor_5);
+
     data.contract_client.new_vault(
         &depositor_5,
         &depositor_5_debt,
@@ -178,7 +190,7 @@ fn test_vault_indexes_logic_around() {
 
     current_indexes = data
         .contract_client
-        .g_indexes(&data.stable_token_denomination);
+        .get_indexes(&data.stable_token_denomination);
 
     assert_eq!(current_indexes.len(), 4);
     assert_eq!(
@@ -191,8 +203,59 @@ fn test_vault_indexes_logic_around() {
     );
 
     // 2nd Section
+    // We test the function get_vaults_with_index and confirm it returns correct vaults in their order
+
+    // We test the index from depositor 5 and confirm we receive a single UserVault
+    let mut vaults_with_index: Vec<UserVault> = data.contract_client.get_vaults_with_index(
+        &data.stable_token_denomination,
+        &calculate_user_vault_index(depositor_5_debt, depositor_5_collateral_amount),
+    );
+
+    assert_eq!(
+        vaults_with_index,
+        vec![
+            &env,
+            UserVault {
+                index: calculate_user_vault_index(depositor_5_debt, depositor_5_collateral_amount,),
+                id: depositor_5,
+                total_debt: depositor_5_debt,
+                total_col: depositor_5_collateral_amount,
+                denomination: data.stable_token_denomination.clone(),
+            }
+        ]
+    );
+
+    // We now test the index from depositor 3 and confirm we receive two UserVaults (3 and 4)
+    vaults_with_index = data.contract_client.get_vaults_with_index(
+        &data.stable_token_denomination,
+        &calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount),
+    );
+
+    assert_eq!(
+        vaults_with_index,
+        vec![
+            &env,
+            UserVault {
+                index: calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount),
+                id: depositor_3,
+                total_debt: depositor_3_debt,
+                total_col: depositor_3_collateral_amount,
+                denomination: data.stable_token_denomination.clone(),
+            },
+            UserVault {
+                index: calculate_user_vault_index(depositor_4_debt, depositor_4_collateral_amount),
+                id: depositor_4,
+                total_debt: depositor_4_debt,
+                total_col: depositor_4_collateral_amount,
+                denomination: data.stable_token_denomination.clone(),
+            },
+        ]
+    );
+
+    // 3rd Section
     // This section checks that when we update a vault, values get updated correctly
     // We also include changes in the currency rates and new vaults creations in order to emulate a real scenario
-    // 3rd Section
+
+    // 4th Section
     // TODO
 }

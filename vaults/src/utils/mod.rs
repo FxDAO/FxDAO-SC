@@ -1,3 +1,4 @@
+pub mod indexes;
 pub mod vaults;
 
 use crate::storage_types::*;
@@ -18,7 +19,7 @@ pub fn valid_initial_debt(
     currency_vault_conditions: &CurrencyVaultsConditions,
     initial_debt: i128,
 ) {
-    if currency_vault_conditions.mn_v_c_amt > initial_debt {
+    if currency_vault_conditions.min_debt_creation > initial_debt {
         panic_with_error!(env, SCErrors::InvalidInitialDebtAmount);
     }
 }
@@ -35,7 +36,7 @@ pub fn validate_user_vault(env: &Env, user: &Address, denomination: &Symbol) {
         .storage()
         .has(&VaultsDataKeys::UserVault(UserVaultDataType {
             user: user.clone(),
-            symbol: denomination.clone(),
+            denomination: denomination.clone(),
         }))
     {
         panic_with_error!(&env, SCErrors::UserVaultDoesntExist);
@@ -47,7 +48,7 @@ pub fn vault_spot_available(env: &Env, user: Address, denomination: &Symbol) {
         .storage()
         .has(&VaultsDataKeys::UserVault(UserVaultDataType {
             user,
-            symbol: denomination.clone(),
+            denomination: denomination.clone(),
         }))
     {
         panic_with_error!(&env, SCErrors::UserAlreadyHasDenominationVault);
@@ -75,7 +76,7 @@ pub fn is_currency_active(env: &Env, denomination: &Symbol) {
 
 pub fn save_currency(env: &Env, currency: &Currency) {
     env.storage()
-        .set(&DataKeys::Currency(currency.symbol.clone()), currency);
+        .set(&DataKeys::Currency(currency.denomination.clone()), currency);
 }
 
 pub fn get_currency(env: &Env, denomination: &Symbol) -> Currency {
@@ -88,24 +89,24 @@ pub fn get_currency(env: &Env, denomination: &Symbol) -> Currency {
 /// Currency Vault conditions
 pub fn get_currency_vault_conditions(env: &Env, denomination: &Symbol) -> CurrencyVaultsConditions {
     env.storage()
-        .get(&DataKeys::CyVltCond(denomination.clone()))
+        .get(&DataKeys::CurrencyVaultConditions(denomination.clone()))
         .unwrap()
         .unwrap()
 }
 
 pub fn set_currency_vault_conditions(
     env: &Env,
-    mn_col_rte: &i128,
-    mn_v_c_amt: &i128,
-    op_col_rte: &i128,
+    min_col_rate: &i128,
+    min_debt_creation: &i128,
+    opening_col_rate: &i128,
     denomination: &Symbol,
 ) {
     env.storage().set(
-        &DataKeys::CyVltCond(denomination.clone()),
+        &DataKeys::CurrencyVaultConditions(denomination.clone()),
         &CurrencyVaultsConditions {
-            mn_col_rte: mn_col_rte.clone(),
-            mn_v_c_amt: mn_v_c_amt.clone(),
-            op_col_rte: op_col_rte.clone(),
+            min_col_rate: min_col_rate.clone(),
+            min_debt_creation: min_debt_creation.clone(),
+            opening_col_rate: opening_col_rate.clone(),
         },
     );
 }
@@ -113,23 +114,25 @@ pub fn set_currency_vault_conditions(
 /// Currency Stats Utils
 pub fn get_currency_stats(env: &Env, denomination: &Symbol) -> CurrencyStats {
     env.storage()
-        .get(&DataKeys::CyStats(denomination.clone()))
+        .get(&DataKeys::CurrencyStats(denomination.clone()))
         .unwrap_or(Ok(CurrencyStats {
-            tot_vaults: 0,
-            tot_debt: 0,
-            tot_col: 0,
+            total_vaults: 0,
+            total_debt: 0,
+            total_col: 0,
         }))
         .unwrap()
 }
 
 pub fn set_currency_stats(env: &Env, denomination: &Symbol, currency_stats: &CurrencyStats) {
-    env.storage()
-        .set(&DataKeys::CyStats(denomination.clone()), currency_stats);
+    env.storage().set(
+        &DataKeys::CurrencyStats(denomination.clone()),
+        currency_stats,
+    );
 }
 
 /// Payments Utils
 pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Address, amount: &i128) {
-    token::Client::new(&env, &core_state.colla_tokn).xfer(
+    token::Client::new(&env, &core_state.col_token).xfer(
         &env.current_contract_address(),
         &requester,
         &amount,
@@ -137,7 +140,8 @@ pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Addres
 }
 
 pub fn deposit_collateral(env: &Env, core_state: &CoreState, depositor: &Address, amount: &i128) {
-    token::Client::new(&env, &core_state.colla_tokn).xfer(
+    token::Client::new(&env, &core_state.col_token).xfer_from(
+        &env.current_contract_address(),
         &depositor,
         &env.current_contract_address(),
         &amount,
@@ -153,7 +157,7 @@ pub fn withdraw_stablecoin(
 ) {
     token::Client::new(&env, &currency.contract).xfer_from(
         &env.current_contract_address(),
-        &core_state.stble_issr,
+        &core_state.stable_issuer,
         &recipient,
         &amount,
     );
@@ -166,5 +170,10 @@ pub fn deposit_stablecoin(
     depositor: &Address,
     amount: &i128,
 ) {
-    token::Client::new(&env, &currency.contract).xfer(&depositor, &core_state.stble_issr, &amount);
+    token::Client::new(&env, &currency.contract).xfer_from(
+        &env.current_contract_address(),
+        &depositor,
+        &core_state.stable_issuer,
+        &amount,
+    );
 }

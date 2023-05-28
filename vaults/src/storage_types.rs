@@ -2,13 +2,13 @@ use soroban_sdk::{contracterror, contracttype, Address, BytesN, Symbol};
 
 #[contracttype]
 pub struct CoreState {
-    pub colla_tokn: BytesN<32>,
-    pub stble_issr: Address,
+    pub col_token: BytesN<32>,
+    pub stable_issuer: Address,
 }
 
 #[contracttype]
 pub struct Currency {
-    pub symbol: Symbol, // symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
+    pub denomination: Symbol, // symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
     pub active: bool,
     pub contract: BytesN<32>,
     pub last_updte: u64, // This is the last time the price got updated
@@ -17,16 +17,16 @@ pub struct Currency {
 
 #[contracttype]
 pub struct CurrencyStats {
-    pub tot_vaults: i64,
-    pub tot_debt: i128,
-    pub tot_col: i128,
+    pub total_vaults: i64,
+    pub total_debt: i128,
+    pub total_col: i128,
 }
 
 #[contracttype]
 pub struct CurrencyVaultsConditions {
-    pub mn_col_rte: i128, // Min collateral ratio - ex: 1.10
-    pub mn_v_c_amt: i128, // Min vault creation amount - ex: 5000
-    pub op_col_rte: i128, // Opening collateral ratio - ex: 1.15
+    pub min_col_rate: i128,      // Min collateral ratio - ex: 1.10
+    pub min_debt_creation: i128, // Min vault creation amount - ex: 5000
+    pub opening_col_rate: i128,  // Opening collateral ratio - ex: 1.15
 }
 
 #[contracttype]
@@ -34,8 +34,8 @@ pub enum DataKeys {
     CoreState,
     Admin,
     Currency(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
-    CyStats(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
-    CyVltCond(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
+    CurrencyStats(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
+    CurrencyVaultConditions(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
     PanicMode,
 }
 
@@ -43,7 +43,7 @@ pub enum DataKeys {
 #[contracttype]
 pub struct UserVaultDataType {
     pub user: Address,
-    pub symbol: Symbol, // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
+    pub denomination: Symbol, // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
 }
 
 #[derive(Clone, Debug)]
@@ -53,6 +53,14 @@ pub struct UserVault {
     pub total_debt: i128,
     pub total_col: i128,
     pub index: i128,
+    pub denomination: Symbol,
+}
+
+#[derive(Clone)]
+#[contracttype]
+pub struct VaultsWithIndexDataType {
+    pub index: i128,
+    pub denomination: Symbol,
 }
 
 /// I need to be able to check who is the lowest collateral ratio no matter the currency
@@ -67,10 +75,9 @@ pub enum VaultsDataKeys {
     /// The Vec is sorted by the collateral ratio of the deposit IE the lower go first
     /// The Symbol value is the denomination of the currency
     Indexes(Symbol),
-    /// The UsersRatio(i128) is a map to index the UserVaultDataType that are currently at an specific Vault Ratio
-    /// The "i128" is the Vault ratio
+
     /// The result is a Vec<UserVaultDataType>
-    VltsWtIndx(i128),
+    VaultsWithIndex(VaultsWithIndexDataType),
 }
 
 #[contracterror]
