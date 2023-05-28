@@ -660,7 +660,7 @@ checksum = "7b4b9743ed687d4b4bcedf9ff5eaa7398495ae14e61cba0a295704edbc7decde"
 
 [[package]]
 name = "safety-pool"
-version = "0.1.0"
+version = "0.2.1"
 dependencies = [
  "num-integer",
  "soroban-sdk",
@@ -1097,7 +1097,7 @@ checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
 
 [[package]]
 name = "vaults"
-version = "0.1.0"
+version = "0.2.1"
 dependencies = [
  "num-integer",
  "soroban-sdk",

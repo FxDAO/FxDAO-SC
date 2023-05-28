@@ -10,6 +10,7 @@ use soroban_sdk::{Address, Env, IntoVal, Status, Symbol, Vec};
 #[test]
 fn test_deposit_funds() {
     let env: Env = Env::default();
+    env.mock_all_auths();
     let test_data: TestData = create_test_data(&env);
     init_contract(&test_data);
 
@@ -20,9 +21,7 @@ fn test_deposit_funds() {
     let depositor_3: Address = Address::random(&env);
 
     for depositor in [&depositor_1, &depositor_2, &depositor_3] {
-        test_data
-            .deposit_asset
-            .mint(&test_data.deposit_asset_admin, &depositor, &mint_amount);
+        test_data.deposit_asset.mint(&depositor, &mint_amount);
     }
 
     let invalid_amount_error_result = test_data
@@ -50,14 +49,15 @@ fn test_deposit_funds() {
             .contract_client
             .deposit(&depositor, &(mint_amount as u128 / 2));
 
+        let current_auths = env.auths();
         // Check the function is requiring the sender approved this operation
         assert_eq!(
-            env.recorded_top_authorizations(),
-            std::vec![(
+            [current_auths.first().unwrap()],
+            [&(
                 // Address for which auth is performed
                 depositor.clone(),
                 // Identifier of the called contract
-                test_data.contract_client.contract_id.clone(),
+                test_data.contract_client.address.clone(),
                 // Name of the called function
                 Symbol::short("deposit"),
                 // Arguments used (converted to the env-managed vector via `into_val`)
@@ -74,7 +74,9 @@ fn test_deposit_funds() {
         // Check the balance in the contract and depositor gets updated
         assert_eq!(test_data.deposit_asset.balance(&depositor), mint_amount / 2);
         assert_eq!(
-            test_data.deposit_asset.balance(&test_data.contract_address),
+            test_data
+                .deposit_asset
+                .balance(&test_data.contract_client.address),
             (mint_amount / 2) * counter as i128
         );
     }
@@ -101,7 +103,9 @@ fn test_deposit_funds() {
         // Check the balance in the contract and depositor gets updated
         assert_eq!(test_data.deposit_asset.balance(&depositor), 0);
         assert_eq!(
-            test_data.deposit_asset.balance(&test_data.contract_address),
+            test_data
+                .deposit_asset
+                .balance(&test_data.contract_client.address),
             (mint_amount / 2) * counter as i128
         );
     }
@@ -124,12 +128,12 @@ fn test_deposit_funds() {
 
         // Check the function is requiring the sender approved this operation
         assert_eq!(
-            env.recorded_top_authorizations(),
-            std::vec![(
+            env.auths(),
+            [(
                 // Address for which auth is performed
                 address.clone(),
                 // Identifier of the called contract
-                test_data.contract_client.contract_id.clone(),
+                test_data.contract_client.address.clone(),
                 // Name of the called function
                 Symbol::short("withdraw"),
                 // Arguments used (converted to the env-managed vector via `into_val`)
@@ -163,7 +167,9 @@ fn test_deposit_funds() {
 
     // we confirm the contract balance gets drained
     assert_eq!(
-        test_data.deposit_asset.balance(&test_data.contract_address),
+        test_data
+            .deposit_asset
+            .balance(&test_data.contract_client.address),
         0
     );
 }
