@@ -9,6 +9,8 @@ use soroban_sdk::{vec, Address, Env, IntoVal, Symbol, Vec};
 #[test]
 fn update_contract_core_state() {
     let env: Env = Env::default();
+    env.mock_all_auths();
+
     let test_data: TestData = create_test_data(&env);
     init_contract(&test_data);
 
@@ -32,10 +34,10 @@ fn update_contract_core_state() {
     let new_admin: Address = Address::random(&env);
     test_data.contract_client.update_contract_admin(&new_admin);
     assert_eq!(
-        env.recorded_top_authorizations(),
-        std::vec![(
+        env.auths(),
+        [(
             target_core_state.admin.clone(),
-            test_data.contract_client.contract_id.clone(),
+            test_data.contract_client.address.clone(),
             Symbol::new(&env, "update_contract_admin"),
             (new_admin.clone(),).into_val(&env),
         )]
@@ -53,10 +55,10 @@ fn update_contract_core_state() {
         .contract_client
         .update_vaults_contract(&new_vaults_contract);
     assert_eq!(
-        env.recorded_top_authorizations(),
-        std::vec![(
+        env.auths(),
+        [(
             target_core_state.admin.clone(),
-            test_data.contract_client.contract_id.clone(),
+            test_data.contract_client.address.clone(),
             Symbol::new(&env, "update_vaults_contract"),
             (new_vaults_contract.clone(),).into_val(&env),
         )]
@@ -74,10 +76,10 @@ fn update_contract_core_state() {
         .contract_client
         .update_treasury_contract(&new_treasury_contract);
     assert_eq!(
-        env.recorded_top_authorizations(),
-        std::vec![(
+        env.auths(),
+        [(
             target_core_state.admin.clone(),
-            test_data.contract_client.contract_id.clone(),
+            test_data.contract_client.address.clone(),
             Symbol::new(&env, "update_treasury_contract"),
             (new_treasury_contract.clone(),).into_val(&env),
         )]
@@ -95,10 +97,10 @@ fn update_contract_core_state() {
         .contract_client
         .update_min_deposit(&new_min_deposit);
     assert_eq!(
-        env.recorded_top_authorizations(),
-        std::vec![(
+        env.auths(),
+        [(
             target_core_state.admin.clone(),
-            test_data.contract_client.contract_id.clone(),
+            test_data.contract_client.address.clone(),
             Symbol::new(&env, "update_min_deposit"),
             (new_min_deposit.clone(),).into_val(&env),
         )]
@@ -116,10 +118,10 @@ fn update_contract_core_state() {
         .contract_client
         .update_treasury_share(&new_treasury_share);
     assert_eq!(
-        env.recorded_top_authorizations(),
-        std::vec![(
+        env.auths(),
+        [(
             target_core_state.admin.clone(),
-            test_data.contract_client.contract_id.clone(),
+            test_data.contract_client.address.clone(),
             Symbol::new(&env, "update_treasury_share"),
             (new_treasury_share.clone(),).into_val(&env),
         )]
@@ -137,10 +139,10 @@ fn update_contract_core_state() {
         .contract_client
         .update_liquidator_share(&new_liquidator_share);
     assert_eq!(
-        env.recorded_top_authorizations(),
-        std::vec![(
+        env.auths(),
+        [(
             target_core_state.admin.clone(),
-            test_data.contract_client.contract_id.clone(),
+            test_data.contract_client.address.clone(),
             Symbol::new(&env, "update_liquidator_share"),
             (new_liquidator_share.clone(),).into_val(&env),
         )]

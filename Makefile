@@ -34,18 +34,6 @@ fmt:
 clean:
 	cargo clean
 
-sandbox_install_contracts:
-	make build
-	soroban contract deploy --wasm target/wasm32-unknown-unknown/release/vaults.wasm --id 0000000000000000000000000000000000000000000000000000000000000001
-
-sandbox_deploy_assets:
-	# d98fc10ef20b3291ceb69d3170fa7965e98c67ad81983ce6d326cfbe56dfd20a
-	soroban lab token wrap --asset native
-	# 553b2a327dc588ee541fd3f96163fb920a93bf523bc7cd6b3a7713fd5fc32bb9
-	soroban lab token wrap --asset PROTOCOL:GBMHIX37J3IZC4H2TVOQ6RKYGLCNNX543NU3OI3SP4LDBERVCO3DCCOD
-	# 53a8fc79bddbb9eddbdf6226018249175de2b947fcddaed2ebee7d06715b834a
-	soroban lab token wrap --asset STABLE:GAZ5H54I4O7QF64HBLVWWAPDZ7OYRI3EGMJ27YJGSTBE2L7VQNNEIWZF
-
 sandbox_full_set_up:
 	make sandbox_install_contracts
 	make sandbox_deploy_assets
@@ -54,7 +42,7 @@ launch_standalone:
 	docker run -d -it \
       -p 8000:8000 \
       --name stellar-soroban-network \
-      stellar/quickstart:soroban-dev@sha256:a057ec6f06c6702c005693f8265ed1261e901b153a754e97cf18b0962257e872 \
+      stellar/quickstart:soroban-dev@sha256:57e8ab498bfa14c65595fbb01cb94b1cdee9637ef2e6634e59d54f6958c05bdb \
       --standalone \
       --enable-soroban-rpc
 

@@ -1,17 +1,16 @@
 use crate::storage::deposits::{Deposit, DepositsDataKeys};
-use crate::token;
-use soroban_sdk::{vec, Address, BytesN, Env, Vec};
+use soroban_sdk::{token, vec, Address, Env, Vec};
 
-pub fn make_deposit(env: &Env, asset: &BytesN<32>, depositor: &Address, amount: &u128) {
-    token::Client::new(env, asset).xfer(
+pub fn make_deposit(env: &Env, asset: &Address, depositor: &Address, amount: &u128) {
+    token::Client::new(env, asset).transfer(
         depositor,
         &env.current_contract_address(),
         &(amount.clone() as i128),
     );
 }
 
-pub fn make_withdrawal(env: &Env, asset: &BytesN<32>, deposit: &Deposit) {
-    token::Client::new(env, asset).xfer(
+pub fn make_withdrawal(env: &Env, asset: &Address, deposit: &Deposit) {
+    token::Client::new(env, asset).transfer(
         &env.current_contract_address(),
         &deposit.depositor,
         &(deposit.amount as i128),

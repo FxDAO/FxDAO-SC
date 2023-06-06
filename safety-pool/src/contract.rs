@@ -1,7 +1,6 @@
 use crate::errors::SCErrors;
 use crate::storage::core::CoreState;
 use crate::storage::deposits::Deposit;
-use crate::token;
 use crate::utils::core::{can_init_contract, get_core_state, set_core_state};
 use crate::utils::deposits::{
     get_deposit, get_depositors, is_depositor_listed, make_deposit, make_withdrawal,
@@ -10,7 +9,7 @@ use crate::utils::deposits::{
 use crate::vaults;
 use crate::vaults::{Currency, UserVault};
 use num_integer::div_floor;
-use soroban_sdk::{contractimpl, panic_with_error, vec, Address, BytesN, Env, Symbol, Vec};
+use soroban_sdk::{contractimpl, panic_with_error, token, vec, Address, Env, Symbol, Vec};
 
 pub trait SafetyPoolContractTrait {
     fn init(
@@ -18,8 +17,8 @@ pub trait SafetyPoolContractTrait {
         admin: Address,
         vaults_contract: Address,
         treasury_contract: Address,
-        collateral_asset: BytesN<32>,
-        deposit_asset: BytesN<32>,
+        collateral_asset: Address,
+        deposit_asset: Address,
         denomination_asset: Symbol,
         min_deposit: u128,
         treasury_share: Vec<u32>,
@@ -61,8 +60,8 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         admin: Address,
         vaults_contract: Address,
         treasury_contract: Address,
-        collateral_asset: BytesN<32>,
-        deposit_asset: BytesN<32>,
+        collateral_asset: Address,
+        deposit_asset: Address,
         denomination_asset: Symbol,
         min_deposit: u128,
         treasury_share: Vec<u32>,
@@ -193,12 +192,11 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         let stablecoin_balance: i128 = token::Client::new(&env, &core_state.deposit_asset)
             .balance(&env.current_contract_address());
 
-        let currency_stats: Currency =
-            vaults::Client::new(&env, &core_state.vaults_contract.contract_id().unwrap())
-                .get_currency(&core_state.denomination_asset);
+        let currency_stats: Currency = vaults::Client::new(&env, &core_state.vaults_contract)
+            .get_currency(&core_state.denomination_asset);
 
         let vaults_to_liquidate: Vec<UserVault> =
-            vaults::Client::new(&env, &core_state.vaults_contract.contract_id().unwrap())
+            vaults::Client::new(&env, &core_state.vaults_contract)
                 .vaults_to_liquidate(&core_state.denomination_asset);
 
         let mut target_users: Vec<Address> = vec![&env] as Vec<Address>;
@@ -222,13 +220,13 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
 
         let depositors: Vec<Address> = get_depositors(&env);
 
-        token::Client::new(&env, &core_state.deposit_asset).incr_allow(
+        token::Client::new(&env, &core_state.deposit_asset).increase_allowance(
             &env.current_contract_address(),
             &core_state.vaults_contract,
             &amount_covered,
         );
 
-        vaults::Client::new(&env, &core_state.vaults_contract.contract_id().unwrap()).liquidate(
+        vaults::Client::new(&env, &core_state.vaults_contract).liquidate(
             &env.current_contract_address(),
             &core_state.denomination_asset,
             &target_users,
@@ -254,7 +252,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
             let collateral_to_send: i128 =
                 div_floor(deposit_percentage * amount_to_distribute, 10000000);
 
-            token::Client::new(&env, &core_state.collateral_asset).xfer(
+            token::Client::new(&env, &core_state.collateral_asset).transfer(
                 &env.current_contract_address(),
                 &depositor,
                 &collateral_to_send,
@@ -276,7 +274,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
             core_state.liquidator_share.get(1).unwrap().unwrap() as i128,
         );
 
-        token::Client::new(&env, &core_state.collateral_asset).xfer(
+        token::Client::new(&env, &core_state.collateral_asset).transfer(
             &env.current_contract_address(),
             &liquidator,
             &liquidator_share,
@@ -284,7 +282,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
 
         let treasury_share: i128 = collateral_left - liquidator_share;
 
-        token::Client::new(&env, &core_state.collateral_asset).xfer(
+        token::Client::new(&env, &core_state.collateral_asset).transfer(
             &env.current_contract_address(),
             &core_state.treasury_contract,
             &treasury_share,

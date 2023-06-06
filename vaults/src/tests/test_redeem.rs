@@ -6,11 +6,10 @@ use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_allowance, set_initial_state, InitialVariables,
     TestData,
 };
-use crate::token;
 use crate::utils::vaults::calculate_user_vault_index;
 use num_integer::div_floor;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{Address, Env, IntoVal, Symbol};
+use soroban_sdk::{token, Address, Env, IntoVal, Symbol};
 
 /// It tests the redeem method, this must comply with the next behaviour:
 ///
@@ -60,11 +59,8 @@ fn test_redeem() {
     let depositor_4_debt: i128 = 1200000000;
     let depositor_4_index: i128 = 25000000000;
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
-        &data.collateral_token_admin,
-        &depositor_1,
-        &depositor_1_collateral,
-    );
+    token::Client::new(&env, &data.collateral_token_client.address)
+        .mint(&depositor_1, &depositor_1_collateral);
 
     set_allowance(&env, &data, &depositor_1);
 
@@ -81,11 +77,8 @@ fn test_redeem() {
 
     assert_eq!(depositor_1_vault.index, depositor_1_index);
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
-        &data.collateral_token_admin,
-        &depositor_2,
-        &depositor_2_collateral,
-    );
+    token::Client::new(&env, &data.collateral_token_client.address)
+        .mint(&depositor_2, &depositor_2_collateral);
 
     set_allowance(&env, &data, &depositor_2);
 
@@ -102,11 +95,8 @@ fn test_redeem() {
 
     assert_eq!(depositor_2_vault.index, depositor_2_index);
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
-        &data.collateral_token_admin,
-        &depositor_3,
-        &depositor_3_collateral,
-    );
+    token::Client::new(&env, &data.collateral_token_client.address)
+        .mint(&depositor_3, &depositor_3_collateral);
 
     set_allowance(&env, &data, &depositor_3);
 
@@ -123,11 +113,8 @@ fn test_redeem() {
 
     assert_eq!(depositor_3_vault.index, depositor_3_index);
 
-    token::Client::new(&env, &data.collateral_token_client.contract_id).mint(
-        &data.collateral_token_admin,
-        &depositor_4,
-        &depositor_4_collateral,
-    );
+    token::Client::new(&env, &data.collateral_token_client.address)
+        .mint(&depositor_4, &depositor_4_collateral);
 
     set_allowance(&env, &data, &depositor_4);
 
@@ -148,25 +135,25 @@ fn test_redeem() {
 
     let redeem_user: Address = Address::random(&env);
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).xfer(
+    token::Client::new(&env, &data.stable_token_client.address).transfer(
         &depositor_1,
         &redeem_user,
         &500000000,
     );
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).xfer(
+    token::Client::new(&env, &data.stable_token_client.address).transfer(
         &depositor_2,
         &redeem_user,
         &500000000,
     );
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).xfer(
+    token::Client::new(&env, &data.stable_token_client.address).transfer(
         &depositor_3,
         &redeem_user,
         &500000000,
     );
 
-    token::Client::new(&env, &data.stable_token_client.contract_id).xfer(
+    token::Client::new(&env, &data.stable_token_client.address).transfer(
         &depositor_4,
         &redeem_user,
         &500000000,
@@ -175,7 +162,7 @@ fn test_redeem() {
     set_allowance(&env, &data, &redeem_user);
 
     let amount_to_redeem: i128 =
-        token::Client::new(&env, &data.stable_token_client.contract_id).balance(&redeem_user);
+        token::Client::new(&env, &data.stable_token_client.address).balance(&redeem_user);
 
     assert_eq!(amount_to_redeem, 200_0000000);
 
@@ -196,12 +183,12 @@ fn test_redeem() {
 
     // Check the function is requiring the sender approved this operation
     assert_eq!(
-        env.recorded_top_authorizations(),
-        std::vec![(
+        env.auths(),
+        [(
             // Address for which auth is performed
             redeem_user.clone(),
             // Identifier of the called contract
-            data.contract_client.contract_id.clone(),
+            data.contract_client.address.clone(),
             // Name of the called function
             Symbol::short("redeem"),
             // Arguments used (converted to the env-managed vector via `into_val`)
@@ -216,9 +203,9 @@ fn test_redeem() {
 
     // We check the results after redeeming
     let remaining_stable_amount_balance =
-        token::Client::new(&env, &data.stable_token_client.contract_id).balance(&redeem_user);
+        token::Client::new(&env, &data.stable_token_client.address).balance(&redeem_user);
     let collateral_redeemed =
-        token::Client::new(&env, &data.collateral_token_client.contract_id).balance(&redeem_user);
+        token::Client::new(&env, &data.collateral_token_client.address).balance(&redeem_user);
 
     assert_eq!(remaining_stable_amount_balance, 0);
     assert_eq!(
@@ -240,7 +227,7 @@ fn test_redeem() {
 
     // Check the depositor whose vault was closed received his extra collateral
     let depositor_2_collateral_balance: i128 =
-        token::Client::new(&env, &data.collateral_token_client.contract_id).balance(&depositor_2);
+        token::Client::new(&env, &data.collateral_token_client.address).balance(&depositor_2);
 
     assert_eq!(
         depositor_2_collateral_balance,
