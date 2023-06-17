@@ -11,6 +11,7 @@ test-optimized: build-optimized
 build:
 	cargo build --target wasm32-unknown-unknown --release -p vaults
 	cargo build --target wasm32-unknown-unknown --release -p safety-pool
+	cargo build --target wasm32-unknown-unknown --release -p governance
 	cd target/wasm32-unknown-unknown/release/ && \
 		for i in *.wasm ; do \
 			ls -l "$$i"; \
