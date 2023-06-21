@@ -4,7 +4,7 @@ use crate::utils::*;
 use num_integer::div_floor;
 
 use crate::utils::indexes::get_vaults_data_type_with_index;
-use soroban_sdk::{contractimpl, panic_with_error, token, vec, Address, Env, Symbol, Vec};
+use soroban_sdk::{contractimpl, panic_with_error, token, vec, Address, BytesN, Env, Symbol, Vec};
 
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
@@ -12,6 +12,8 @@ pub trait VaultsContractTrait {
     fn init(env: Env, admin: Address, col_token: Address, stable_issuer: Address);
     fn get_admin(env: Env) -> Address;
     fn get_core_state(env: Env) -> CoreState;
+    fn upgrade(env: Env, new_wasm_hash: BytesN<32>);
+    fn version(env: Env) -> Symbol;
 
     /// Currency vaults conditions
     fn set_vault_conditions(
@@ -50,7 +52,6 @@ pub trait VaultsContractTrait {
 
     /// Liquidation
     fn liquidate(env: Env, caller: Address, denomination: Symbol, owners: Vec<Address>);
-    // TODO: Create test which we verify this function works correctly in multi currencies cases
     fn vaults_to_liquidate(env: Env, denomination: Symbol) -> Vec<UserVault>;
 }
 
@@ -80,6 +81,15 @@ impl VaultsContractTrait for VaultsContract {
 
     fn get_core_state(env: Env) -> CoreState {
         get_core_state(&env)
+    }
+
+    fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        check_admin(&env);
+        env.update_current_contract_wasm(&new_wasm_hash);
+    }
+
+    fn version(env: Env) -> Symbol {
+        Symbol::short("0.3.0")
     }
 
     fn set_vault_conditions(

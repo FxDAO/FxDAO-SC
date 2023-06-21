@@ -31,9 +31,14 @@ pub fn test_creating_new_proposal_single_proposer() {
         .governance_token
         .mint(&proposer, &12_00_000_0000000);
 
-    test_data
-        .contract_client
-        .create_proposal(&id, &proposal_type, &proposers, &voting_time);
+    test_data.contract_client.create_proposal(
+        &id,
+        &proposal_type,
+        &proposers,
+        &voting_time,
+        &false,
+        &test_data.dumb_params,
+    );
 
     // Check the function is requiring the sender approved this operation
     assert_eq!(
@@ -48,6 +53,8 @@ pub fn test_creating_new_proposal_single_proposer() {
                     proposal_type.clone(),
                     proposers.clone(),
                     voting_time.clone(),
+                    false,
+                    test_data.dumb_params.clone(),
                 )
                     .into_val(&env),
             ),
@@ -71,7 +78,14 @@ pub fn test_creating_new_proposal_single_proposer() {
     // If we try to create a new proposal with the same id it should fail
     let id_already_in_use_error_result = test_data
         .contract_client
-        .try_create_proposal(&id, &proposal_type, &proposers, &voting_time)
+        .try_create_proposal(
+            &id,
+            &proposal_type,
+            &proposers,
+            &voting_time,
+            &false,
+            &test_data.dumb_params,
+        )
         .unwrap_err();
 
     assert_eq!(
@@ -89,6 +103,8 @@ pub fn test_creating_new_proposal_single_proposer() {
             &proposal_type,
             &proposers,
             &voting_time,
+            &false,
+            &test_data.dumb_params,
         )
         .unwrap_err();
 
@@ -110,7 +126,7 @@ pub fn test_creating_new_proposal_single_proposer() {
     assert_eq!(proposal.created_at, env.ledger().timestamp());
     assert_eq!(
         proposal.ends_at,
-        env.ledger().timestamp() + (3600 * 24 * 14)
+        env.ledger().timestamp() + voting_time.clone()
     );
 }
 
@@ -155,9 +171,14 @@ pub fn test_create_new_proposal_multiple_proposers() {
             .mint(&proposer.unwrap().id, &12_00_000_0000000);
     }
 
-    test_data
-        .contract_client
-        .create_proposal(&id, &proposal_type, &proposers, &voting_time);
+    test_data.contract_client.create_proposal(
+        &id,
+        &proposal_type,
+        &proposers,
+        &voting_time,
+        &false,
+        &test_data.dumb_params,
+    );
 
     // Check that all of the proposers signed it and were authorized
     let mut value = std::vec![] as std::vec::Vec<(Address, Address, Symbol, Vec<RawVal>)>;
@@ -172,6 +193,8 @@ pub fn test_create_new_proposal_multiple_proposers() {
                 proposal_type.clone(),
                 proposers.clone(),
                 voting_time.clone(),
+                false,
+                test_data.dumb_params.clone(),
             )
                 .into_val(&env),
         ));
@@ -242,9 +265,14 @@ pub fn test_proposals_ids() {
         .mint(&proposer, &(12_00_000_0000000 * 4));
 
     for id in ids.iter() {
-        test_data
-            .contract_client
-            .create_proposal(&id, &proposal_type, &proposers, &voting_time);
+        test_data.contract_client.create_proposal(
+            &id,
+            &proposal_type,
+            &proposers,
+            &voting_time,
+            &false,
+            &test_data.dumb_params,
+        );
     }
 
     let proposal_ids: Vec<BytesN<32>> = test_data.contract_client.get_proposals_ids();
@@ -262,5 +290,15 @@ pub fn test_proposals_ids() {
 //
 // #[test]
 // pub fn test_multiple_proposal_voting() {
+//     todo!()
+// }
+
+// #[test]
+// pub fn test_end_proposal() {
+//     todo!()
+// }
+
+// #[test]
+// pub fn text_execute_proposal_result() {
 //     todo!()
 // }

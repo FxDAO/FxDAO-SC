@@ -1,7 +1,11 @@
 #![cfg(test)]
 use crate::contract::{GovernanceContract, GovernanceContractClient};
+use crate::storage::proposals::{
+    ProposalExecutionParams, TreasuryPaymentProposalOption, TreasuryPaymentProposalParams,
+    UpdateContractProposalOption,
+};
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{token, Address, Env};
+use soroban_sdk::{token, vec, Address, Env, Vec};
 use token::Client as TokenClient;
 
 pub const TEST_PROPOSAL_FEE: u128 = 12_00_000_0000000;
@@ -16,6 +20,8 @@ pub struct TestData<'a> {
     pub governance_token: TokenClient<'a>,
     pub contract_admin: Address,
     pub contract_client: GovernanceContractClient<'a>,
+    pub cooldown_period: u64,
+    pub dumb_params: ProposalExecutionParams,
 }
 
 pub fn create_test_data(env: &Env) -> TestData {
@@ -31,6 +37,11 @@ pub fn create_test_data(env: &Env) -> TestData {
         governance_token,
         contract_admin,
         contract_client,
+        cooldown_period: 3600 * 24, // TODO: Implement this at the create proposal level IE proposers cooldown checks
+        dumb_params: ProposalExecutionParams {
+            treasury_payment: TreasuryPaymentProposalOption::None,
+            update_contract: UpdateContractProposalOption::None,
+        },
     }
 }
 
@@ -40,5 +51,6 @@ pub fn init_contract(test_data: &TestData) {
         &TEST_PROPOSAL_FEE,
         &TEST_VOTING_CREDIT_PRICE,
         &test_data.contract_admin,
+        &test_data.cooldown_period,
     );
 }

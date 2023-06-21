@@ -1,6 +1,6 @@
 use crate::errors::SCErrors;
 use crate::storage::core::{CoreState, CoreStorageKeys};
-use soroban_sdk::{panic_with_error, token, Address, BytesN, Env};
+use soroban_sdk::{panic_with_error, token, Address, BytesN, Env, Map, Symbol, Vec};
 
 pub fn can_init_contract(env: &Env) {
     if env.storage().has(&CoreStorageKeys::CoreState) {
@@ -26,4 +26,28 @@ pub fn get_governance_token(env: &Env) -> (Address, token::Client) {
         core_state.governance_token.clone(),
         token::Client::new(&env, &core_state.governance_token),
     )
+}
+
+pub fn save_managing_contracts(env: &Env, addresses: &Vec<Address>) {
+    env.storage()
+        .set(&CoreStorageKeys::ManagingContracts, addresses);
+}
+
+pub fn get_managing_contracts(env: &Env) -> Vec<Address> {
+    env.storage()
+        .get(&CoreStorageKeys::ManagingContracts)
+        .unwrap()
+        .unwrap()
+}
+
+pub fn save_allowed_contracts_functions(env: &Env, data: &Map<Address, Vec<Symbol>>) {
+    env.storage()
+        .set(&CoreStorageKeys::AllowedContractsFunctions, data);
+}
+
+pub fn get_allowed_contracts_functions(env: &Env) -> Map<Address, Vec<Symbol>> {
+    env.storage()
+        .get(&CoreStorageKeys::AllowedContractsFunctions)
+        .unwrap()
+        .unwrap()
 }

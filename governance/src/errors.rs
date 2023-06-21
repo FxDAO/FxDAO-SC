@@ -13,7 +13,13 @@ pub enum SCErrors {
     ProposalIdAlreadyInUse = 20003,
     ProposalIsNotActive = 20004,
     InvalidVotingTime = 20005,
+    ProposalAlreadyExecuted = 20006,
+    UnsupportedProposalType = 20007,
 
     // Voting Errors
     CanNotVote = 30000,
+    ProposalPeriodHasNotEnded = 30001,
+
+    // Execution Errors
+    ExecutionParamsAreInvalid = 40000,
 }

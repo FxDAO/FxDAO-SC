@@ -1,11 +1,12 @@
 use crate::errors::SCErrors;
 use crate::storage::core::{CoreState, CoreStorageKeys};
 use crate::storage::proposals::{
-    Proposal, ProposalStatus, ProposalType, ProposalVote, ProposalsStorageKeys, ProposerStat,
+    Proposal, ProposalExecutionParams, ProposalStatus, ProposalType, ProposalVote,
+    ProposalVoteIndex, ProposalsStorageKeys, ProposerStat, TreasuryPaymentProposalParams,
 };
 
 use crate::utils::core::{get_core_state, get_governance_token};
-use soroban_sdk::{panic_with_error, vec, Address, BytesN, Env, IntoVal, Vec};
+use soroban_sdk::{panic_with_error, token, vec, Address, BytesN, Env, Map, Vec};
 
 // PROPOSERS FUNCTIONS
 
@@ -39,19 +40,31 @@ pub fn calculate_proposal_vote_price(
     }
 }
 
-pub fn validate_can_vote(
-    voter: &Address,
-    proposal: &Proposal,
-    proposal_votes: &Vec<ProposalVote>,
-) -> bool {
-    // If the voter voted already, it can't vote again and instead it should update it
-    for proposal_vote in proposal_votes.iter() {
-        if &proposal_vote.unwrap().voter == voter {
-            return false;
-        }
+/// This functions checks if the voter already has voted in this proposal
+/// If it already did, it can not vote again and instead it needs to update its current vote
+/// It checks if the proposal status is Active
+pub fn validate_can_vote(env: &Env, voter_id: &Address, proposal: &Proposal) -> bool {
+    if env
+        .storage()
+        .has(&ProposalsStorageKeys::ProposalVote(ProposalVoteIndex {
+            voter_id: voter_id.clone(),
+            proposal_id: proposal.id.clone(),
+        }))
+    {
+        return false;
     }
 
     proposal.status == ProposalStatus::Active
+}
+
+pub fn get_proposal_vote(env: &Env, voter_id: &Address, proposal_id: BytesN<32>) -> ProposalVote {
+    env.storage()
+        .get(&ProposalsStorageKeys::ProposalVote(ProposalVoteIndex {
+            voter_id: voter_id.clone(),
+            proposal_id: proposal_id.clone(),
+        }))
+        .unwrap()
+        .unwrap()
 }
 
 /// PROPOSALS FUNCTIONS
@@ -148,6 +161,8 @@ pub fn new_proposal(
     proposal_type: &ProposalType,
     created_at: u64,
     ends_at: u64,
+    emergency_proposal: bool,
+    execution_params: ProposalExecutionParams,
 ) -> Proposal {
     Proposal {
         id: id.clone(),
@@ -162,6 +177,9 @@ pub fn new_proposal(
         votes_against: 0,
         created_at,
         ends_at,
+        emergency_proposal,
+        execution_params,
+        executed: false,
     }
 }
 
@@ -172,10 +190,10 @@ pub fn get_proposals_ids(env: &Env) -> Vec<BytesN<32>> {
         .unwrap()
 }
 
-pub fn get_proposal_votes(env: &Env, proposal_id: &BytesN<32>) -> Vec<ProposalVote> {
+pub fn get_proposal_votes(env: &Env, proposal_id: &BytesN<32>) -> Vec<ProposalVoteIndex> {
     env.storage()
         .get(&ProposalsStorageKeys::ProposalVotes(proposal_id.clone()))
-        .unwrap_or(Ok(vec![&env] as Vec<ProposalVote>))
+        .unwrap_or(Ok(vec![&env] as Vec<ProposalVoteIndex>))
         .unwrap()
 }
 
@@ -203,7 +221,7 @@ pub fn charge_proposal_vote(env: &Env, voter: &Address, vote_price: &u128) {
     );
 }
 
-pub fn save_proposal_votes(env: &Env, proposal_id: &BytesN<32>, votes: &Vec<ProposalVote>) {
+pub fn save_proposal_votes(env: &Env, proposal_id: &BytesN<32>, votes: &Vec<ProposalVoteIndex>) {
     env.storage().set(
         &ProposalsStorageKeys::ProposalVotes(proposal_id.clone()),
         votes,
@@ -213,6 +231,26 @@ pub fn save_proposal_votes(env: &Env, proposal_id: &BytesN<32>, votes: &Vec<Prop
 pub fn is_proposal_active(env: &Env, proposal: &Proposal) -> bool {
     let timestamp: u64 = env.ledger().timestamp();
     timestamp <= proposal.ends_at
+}
+
+pub fn proposal_can_be_ended(env: &Env, proposal: &Proposal) -> bool {
+    env.ledger().timestamp() > proposal.ends_at
+}
+
+/// PROPOSAL EXECUTION FUNCTIONS
+
+pub fn make_treasury_payment(
+    env: &Env,
+    core_state: &CoreState,
+    recipient: &Address,
+    amount: &u128,
+) {
+    let token = token::Client::new(&env, &core_state.governance_token);
+    token.transfer(
+        &env.current_contract_address(),
+        &recipient,
+        &(amount.clone() as i128),
+    )
 }
 
 #[cfg(test)]

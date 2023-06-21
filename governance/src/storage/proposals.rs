@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, BytesN, Vec};
+use soroban_sdk::{contracttype, vec, Address, BytesN, RawVal, Symbol, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
@@ -38,6 +38,42 @@ pub enum ProposalStatus {
 }
 
 #[contracttype]
+#[derive(Clone)]
+pub struct TreasuryPaymentProposalParams {
+    pub recipient: Address,
+    pub amount: u128,
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub enum TreasuryPaymentProposalOption {
+    None,
+    Some(TreasuryPaymentProposalParams),
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub struct UpdateContractProposalParams {
+    pub contract_id: Address,
+    pub function_name: Symbol,
+    pub params: Vec<RawVal>,
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub enum UpdateContractProposalOption {
+    None,
+    Some(UpdateContractProposalParams),
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub struct ProposalExecutionParams {
+    pub treasury_payment: TreasuryPaymentProposalOption,
+    pub update_contract: UpdateContractProposalOption,
+}
+
+#[contracttype]
 pub struct Proposal {
     /// The proposal id is the SHA256 hash of the text used in the proposal
     pub id: BytesN<32>,
@@ -52,6 +88,9 @@ pub struct Proposal {
     pub votes_against: u128,
     pub created_at: u64,
     pub ends_at: u64,
+    pub emergency_proposal: bool,
+    pub execution_params: ProposalExecutionParams,
+    pub executed: bool,
 }
 
 #[contracttype]
@@ -71,12 +110,21 @@ pub struct ProposalVote {
 }
 
 #[contracttype]
+pub struct ProposalVoteIndex {
+    pub proposal_id: BytesN<32>,
+    pub voter_id: Address,
+}
+
+#[contracttype]
 pub enum ProposalsStorageKeys {
     /// A Vec with the Ids of the proposals sorted from newest to oldest
     ProposalsIds,
 
     Proposal(BytesN<32>),
 
-    /// A Vec<ProposalVote> value with the votes in order from newest to oldest
+    /// A Vec<ProposalVoteIndex> value with the votes in order from newest to oldest
     ProposalVotes(BytesN<32>),
+
+    /// The struct returned is ProposalVote
+    ProposalVote(ProposalVoteIndex),
 }
