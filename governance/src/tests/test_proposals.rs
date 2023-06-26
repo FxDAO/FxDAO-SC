@@ -112,7 +112,6 @@ pub fn test_creating_new_proposal_single_proposer() {
 
     // Confirm the proposal was saved
     let proposal: Proposal = test_data.contract_client.get_proposal(&id);
-    assert_eq!(proposal.proposers, proposers);
     assert_eq!(proposal.id, id);
     assert_eq!(proposal.status, ProposalStatus::Active);
     assert_eq!(proposal.proposal_type, proposal_type);

@@ -15,6 +15,7 @@ pub enum SCErrors {
     InvalidVotingTime = 20005,
     ProposalAlreadyExecuted = 20006,
     UnsupportedProposalType = 20007,
+    InvalidExecutionParams = 20008,
 
     // Voting Errors
     CanNotVote = 30000,
@@ -22,4 +23,5 @@ pub enum SCErrors {
 
     // Execution Errors
     ExecutionParamsAreInvalid = 40000,
+    ExecutionCooldownUncompleted = 40001,
 }

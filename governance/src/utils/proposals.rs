@@ -3,10 +3,11 @@ use crate::storage::core::{CoreState, CoreStorageKeys};
 use crate::storage::proposals::{
     Proposal, ProposalExecutionParams, ProposalStatus, ProposalType, ProposalVote,
     ProposalVoteIndex, ProposalsStorageKeys, ProposerStat, TreasuryPaymentProposalParams,
+    UpdateContractProposalOption,
 };
 
 use crate::utils::core::{get_core_state, get_governance_token};
-use soroban_sdk::{panic_with_error, token, vec, Address, BytesN, Env, Map, Vec};
+use soroban_sdk::{panic_with_error, token, vec, Address, BytesN, Env, Map, Symbol, Vec};
 
 // PROPOSERS FUNCTIONS
 
@@ -235,6 +236,36 @@ pub fn is_proposal_active(env: &Env, proposal: &Proposal) -> bool {
 
 pub fn proposal_can_be_ended(env: &Env, proposal: &Proposal) -> bool {
     env.ledger().timestamp() > proposal.ends_at
+}
+
+pub fn are_update_contract_params_valid(
+    managing_contracts: &Vec<Address>,
+    allowed_contracts_functions: &Map<Address, Vec<Symbol>>,
+    params: &ProposalExecutionParams,
+) -> bool {
+    let mut valid: bool = false;
+
+    if let UpdateContractProposalOption::Some(data) = &params.update_contract {
+        for managing_contract in managing_contracts.iter() {
+            let address = managing_contract.unwrap();
+            if &address == &data.contract_id {
+                let allowed_functions = allowed_contracts_functions.get(address).unwrap();
+
+                for allowed_function in allowed_functions.unwrap().iter() {
+                    let result = allowed_function.unwrap();
+                    if result == data.function_name {
+                        valid = true;
+                    }
+                }
+            }
+        }
+    }
+
+    valid
+}
+
+pub fn proposal_cooldown_completed(env: &Env, proposal: &Proposal, core_state: &CoreState) -> bool {
+    proposal.ends_at + core_state.cooldown_period < env.ledger().timestamp()
 }
 
 /// PROPOSAL EXECUTION FUNCTIONS

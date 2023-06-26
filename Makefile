@@ -9,9 +9,9 @@ test-optimized: build-optimized
 	cargo test --features testutils
 
 build:
-	cargo build --target wasm32-unknown-unknown --release -p vaults
-	cargo build --target wasm32-unknown-unknown --release -p safety-pool
-	cargo build --target wasm32-unknown-unknown --release -p governance
+	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package vaults
+	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package safety-pool
+	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package governance
 	cd target/wasm32-unknown-unknown/release/ && \
 		for i in *.wasm ; do \
 			ls -l "$$i"; \

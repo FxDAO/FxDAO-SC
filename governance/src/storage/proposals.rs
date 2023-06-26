@@ -52,7 +52,7 @@ pub enum TreasuryPaymentProposalOption {
 }
 
 #[contracttype]
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct UpdateContractProposalParams {
     pub contract_id: Address,
     pub function_name: Symbol,
@@ -60,7 +60,7 @@ pub struct UpdateContractProposalParams {
 }
 
 #[contracttype]
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum UpdateContractProposalOption {
     None,
     Some(UpdateContractProposalParams),

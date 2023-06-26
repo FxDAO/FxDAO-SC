@@ -5,7 +5,7 @@ use crate::storage::proposals::{
     UpdateContractProposalOption,
 };
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{token, vec, Address, Env, Vec};
+use soroban_sdk::{map, token, vec, Address, Env, Map, Symbol, Vec};
 use token::Client as TokenClient;
 
 pub const TEST_PROPOSAL_FEE: u128 = 12_00_000_0000000;
@@ -22,6 +22,8 @@ pub struct TestData<'a> {
     pub contract_client: GovernanceContractClient<'a>,
     pub cooldown_period: u64,
     pub dumb_params: ProposalExecutionParams,
+    pub managing_contracts: Vec<Address>,
+    pub allowed_contracts_functions: Map<Address, Vec<Symbol>>,
 }
 
 pub fn create_test_data(env: &Env) -> TestData {
@@ -42,6 +44,8 @@ pub fn create_test_data(env: &Env) -> TestData {
             treasury_payment: TreasuryPaymentProposalOption::None,
             update_contract: UpdateContractProposalOption::None,
         },
+        managing_contracts: vec![&env] as Vec<Address>,
+        allowed_contracts_functions: map![&env],
     }
 }
 
@@ -52,5 +56,7 @@ pub fn init_contract(test_data: &TestData) {
         &TEST_VOTING_CREDIT_PRICE,
         &test_data.contract_admin,
         &test_data.cooldown_period,
+        &test_data.managing_contracts,
+        &test_data.allowed_contracts_functions,
     );
 }

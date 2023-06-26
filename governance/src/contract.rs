@@ -1,20 +1,19 @@
 use crate::errors::SCErrors;
 use crate::storage::core::CoreState;
 use crate::storage::proposals::{
-    Proposal, ProposalExecutionParams, ProposalStatus, ProposalType, ProposalVote,
-    ProposalVoteIndex, ProposalVoteType, ProposerStat, TreasuryPaymentProposalOption,
-    UpdateContractProposalOption,
+    Proposal, ProposalExecutionParams, ProposalStatus, ProposalType, ProposalVoteIndex,
+    ProposalVoteType, ProposerStat, TreasuryPaymentProposalOption, UpdateContractProposalOption,
 };
 use crate::utils::core::{
-    can_init_contract, get_core_state, save_allowed_contracts_functions, save_managing_contracts,
-    set_core_state,
+    can_init_contract, get_allowed_contracts_functions, get_core_state, get_managing_contracts,
+    save_allowed_contracts_functions, save_managing_contracts, set_core_state,
 };
 use crate::utils::proposals::{
-    calculate_proposal_vote_price, charge_proposal_vote, charge_proposers, get_proposal,
-    get_proposal_votes, get_proposals_fee, get_proposals_ids, is_proposal_active,
-    is_voting_time_valid, make_treasury_payment, new_proposal, proposal_can_be_ended,
-    save_new_proposal_id, save_proposal, save_proposal_votes, validate_can_vote,
-    validate_new_proposal_id, validate_proposers_payment,
+    are_update_contract_params_valid, calculate_proposal_vote_price, charge_proposal_vote,
+    charge_proposers, get_proposal, get_proposal_votes, get_proposals_fee, get_proposals_ids,
+    is_proposal_active, is_voting_time_valid, make_treasury_payment, new_proposal,
+    proposal_can_be_ended, proposal_cooldown_completed, save_new_proposal_id, save_proposal,
+    save_proposal_votes, validate_can_vote, validate_new_proposal_id, validate_proposers_payment,
 };
 use soroban_sdk::{contractimpl, panic_with_error, Address, BytesN, Env, Map, RawVal, Symbol, Vec};
 
@@ -112,6 +111,21 @@ impl GovernanceContractTrait for GovernanceContract {
             panic_with_error!(&env, SCErrors::InvalidProposalFee);
         }
 
+        // TODO: test this
+        // If the proposal type is UpdateContract, confirm that the target contract and function name is valid
+        // This is with the goal of avoiding this contract calling a malicious contract
+        if proposal_type == ProposalType::UpdateContract {
+            let managing_contracts = get_managing_contracts(&env);
+            let allowed_contracts_functions = get_allowed_contracts_functions(&env);
+            if !are_update_contract_params_valid(
+                &managing_contracts,
+                &allowed_contracts_functions,
+                &execution_params,
+            ) {
+                panic_with_error!(&env, SCErrors::InvalidExecutionParams);
+            }
+        }
+
         // TODO: Prevent wrong params
         // TODO: Create a test for such cases
         // TODO: The check needs to make sure the type of the proposal goes ok with the params
@@ -199,7 +213,7 @@ impl GovernanceContractTrait for GovernanceContract {
             panic_with_error!(&env, &SCErrors::ProposalIsNotActive);
         }
 
-        if proposal_can_be_ended(&env, &proposal) {
+        if !proposal_can_be_ended(&env, &proposal) {
             panic_with_error!(&env, SCErrors::ProposalPeriodHasNotEnded);
         }
 
@@ -220,11 +234,16 @@ impl GovernanceContractTrait for GovernanceContract {
             panic_with_error!(&env, SCErrors::ProposalAlreadyExecuted);
         }
 
+        if !proposal_cooldown_completed(&env, &proposal, &core_state) {
+            panic_with_error!(&env, SCErrors::ExecutionCooldownUncompleted);
+        }
+
         match proposal.proposal_type {
             ProposalType::Simple => {
                 // We don't do anything in this type because the Simple proposal type doesn't include any execution logic
             }
             ProposalType::UpgradeContract => {
+                // TODO:
                 panic_with_error!(&env, SCErrors::UnsupportedProposalType);
             }
             ProposalType::UpdateContract => match &proposal.execution_params.update_contract {
@@ -248,6 +267,7 @@ impl GovernanceContractTrait for GovernanceContract {
                 }
             },
             ProposalType::Structural => {
+                // TODO:
                 panic_with_error!(&env, SCErrors::UnsupportedProposalType);
             }
         }
