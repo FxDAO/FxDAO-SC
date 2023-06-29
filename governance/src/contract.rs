@@ -3,6 +3,7 @@ use crate::storage::core::CoreState;
 use crate::storage::proposals::{
     Proposal, ProposalExecutionParams, ProposalStatus, ProposalType, ProposalVoteIndex,
     ProposalVoteType, ProposerStat, TreasuryPaymentProposalOption, UpdateContractProposalOption,
+    UpgradeContractProposalOption,
 };
 use crate::utils::core::{
     can_init_contract, get_allowed_contracts_functions, get_core_state, get_managing_contracts,
@@ -11,11 +12,17 @@ use crate::utils::core::{
 use crate::utils::proposals::{
     are_update_contract_params_valid, calculate_proposal_vote_price, charge_proposal_vote,
     charge_proposers, get_proposal, get_proposal_votes, get_proposals_fee, get_proposals_ids,
-    is_proposal_active, is_voting_time_valid, make_treasury_payment, new_proposal,
-    proposal_can_be_ended, proposal_cooldown_completed, save_new_proposal_id, save_proposal,
-    save_proposal_votes, validate_can_vote, validate_new_proposal_id, validate_proposers_payment,
+    is_contract_to_upgrade_valid, is_proposal_active, is_voting_time_valid, make_treasury_payment,
+    new_proposal, proposal_can_be_ended, proposal_cooldown_completed, save_new_proposal_id,
+    save_proposal, save_proposal_votes, validate_can_vote, validate_new_proposal_id,
+    validate_proposers_payment,
 };
-use soroban_sdk::{contractimpl, panic_with_error, Address, BytesN, Env, Map, RawVal, Symbol, Vec};
+use soroban_sdk::{
+    contractimpl, panic_with_error, vec, Address, BytesN, Env, Map, RawVal, Symbol, Vec,
+};
+
+pub const CONTRACT_DESCRIPTION: Symbol = Symbol::short("Gov");
+pub const CONTRACT_VERSION: Symbol = Symbol::short("0_3_0");
 
 pub trait GovernanceContractTrait {
     fn init(
@@ -29,13 +36,16 @@ pub trait GovernanceContractTrait {
         allowed_contracts_functions: Map<Address, Vec<Symbol>>,
     );
 
+    fn upgrade(env: Env, new_wasm_hash: BytesN<32>);
+
+    fn version(env: Env) -> (Symbol, Symbol);
+
     fn create_proposal(
         env: Env,
         id: BytesN<32>,
         proposal_type: ProposalType,
         proposers: Vec<ProposerStat>,
         voting_time: u64,
-        emergency_proposal: bool,
         execution_params: ProposalExecutionParams,
     );
 
@@ -86,23 +96,42 @@ impl GovernanceContractTrait for GovernanceContract {
         save_allowed_contracts_functions(&env, &allowed_contracts_functions);
     }
 
+    fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        let core_state: CoreState = get_core_state(&env);
+        core_state.contract_admin.require_auth();
+        env.update_current_contract_wasm(&new_wasm_hash);
+    }
+
+    fn version(env: Env) -> (Symbol, Symbol) {
+        (CONTRACT_DESCRIPTION, CONTRACT_VERSION)
+    }
+
     fn create_proposal(
         env: Env,
         id: BytesN<32>,
         proposal_type: ProposalType,
         proposers: Vec<ProposerStat>,
         voting_time: u64,
-        emergency_proposal: bool,
         execution_params: ProposalExecutionParams,
     ) {
         validate_new_proposal_id(&env, &id);
+
+        // This value is set as true if one of the proposers is the admin and the proposal type is to upgrade a contract
+        let mut admin_upgrade = false;
+        let core_state = get_core_state(&env);
+
         for item in proposers.iter() {
             let proposer: ProposerStat = item.unwrap();
             proposer.id.require_auth();
+            if proposal_type == ProposalType::UpgradeContract
+                && core_state.contract_admin == proposer.id
+            {
+                admin_upgrade = true;
+            }
         }
 
         // TODO: Test this
-        if !is_voting_time_valid(&env, voting_time.clone(), &proposal_type, &proposers) {
+        if !is_voting_time_valid(voting_time.clone(), &proposal_type, admin_upgrade) {
             panic_with_error!(&env, SCErrors::InvalidVotingTime);
         }
 
@@ -111,7 +140,6 @@ impl GovernanceContractTrait for GovernanceContract {
             panic_with_error!(&env, SCErrors::InvalidProposalFee);
         }
 
-        // TODO: test this
         // If the proposal type is UpdateContract, confirm that the target contract and function name is valid
         // This is with the goal of avoiding this contract calling a malicious contract
         if proposal_type == ProposalType::UpdateContract {
@@ -122,6 +150,14 @@ impl GovernanceContractTrait for GovernanceContract {
                 &allowed_contracts_functions,
                 &execution_params,
             ) {
+                panic_with_error!(&env, SCErrors::InvalidExecutionParams);
+            }
+        }
+
+        // If the proposal is type UpgradeContract, confirm that the target contract is a valid id
+        if proposal_type == ProposalType::UpgradeContract {
+            let managing_contracts = get_managing_contracts(&env);
+            if !is_contract_to_upgrade_valid(&managing_contracts, &execution_params) {
                 panic_with_error!(&env, SCErrors::InvalidExecutionParams);
             }
         }
@@ -137,11 +173,13 @@ impl GovernanceContractTrait for GovernanceContract {
             &proposal_type,
             env.ledger().timestamp(),
             voting_time,
-            emergency_proposal,
+            admin_upgrade,
             execution_params,
         );
 
-        charge_proposers(&env, &proposers);
+        if !admin_upgrade {
+            charge_proposers(&env, &proposers);
+        }
         save_proposal(&env, &new_proposal);
         save_new_proposal_id(&env, &id);
     }
@@ -230,6 +268,7 @@ impl GovernanceContractTrait for GovernanceContract {
         let core_state: CoreState = get_core_state(&env);
         let mut proposal: Proposal = get_proposal(&env, &proposal_id);
 
+        // TODO: test this
         if proposal.executed {
             panic_with_error!(&env, SCErrors::ProposalAlreadyExecuted);
         }
@@ -242,10 +281,18 @@ impl GovernanceContractTrait for GovernanceContract {
             ProposalType::Simple => {
                 // We don't do anything in this type because the Simple proposal type doesn't include any execution logic
             }
-            ProposalType::UpgradeContract => {
-                // TODO:
-                panic_with_error!(&env, SCErrors::UnsupportedProposalType);
-            }
+            ProposalType::UpgradeContract => match &proposal.execution_params.upgrade_contract {
+                UpgradeContractProposalOption::None => {
+                    panic_with_error!(&env, SCErrors::ExecutionParamsAreInvalid);
+                }
+                UpgradeContractProposalOption::Some(data) => {
+                    env.invoke_contract::<RawVal>(
+                        &data.contract_id.clone(),
+                        &Symbol::short("upgrade"),
+                        vec![&env, data.new_contract_hash.to_raw()] as Vec<RawVal>,
+                    );
+                }
+            },
             ProposalType::UpdateContract => match &proposal.execution_params.update_contract {
                 UpdateContractProposalOption::None => {
                     panic_with_error!(&env, SCErrors::ExecutionParamsAreInvalid);

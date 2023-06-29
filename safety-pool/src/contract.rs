@@ -9,7 +9,10 @@ use crate::utils::deposits::{
 use crate::vaults;
 use crate::vaults::{Currency, UserVault};
 use num_integer::div_floor;
-use soroban_sdk::{contractimpl, panic_with_error, token, vec, Address, Env, Symbol, Vec};
+use soroban_sdk::{contractimpl, panic_with_error, token, vec, Address, BytesN, Env, Symbol, Vec};
+
+pub const CONTRACT_DESCRIPTION: Symbol = Symbol::short("SafetyP");
+pub const CONTRACT_VERSION: Symbol = Symbol::short("0_3_0");
 
 pub trait SafetyPoolContractTrait {
     fn init(
@@ -26,6 +29,10 @@ pub trait SafetyPoolContractTrait {
     );
 
     fn get_core_state(env: Env) -> CoreState;
+
+    fn upgrade(env: Env, new_wasm_hash: BytesN<32>);
+
+    fn version(env: Env) -> (Symbol, Symbol);
 
     fn update_contract_admin(env: Env, contract_admin: Address);
 
@@ -86,6 +93,16 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
 
     fn get_core_state(env: Env) -> CoreState {
         get_core_state(&env)
+    }
+
+    fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        let core_state: CoreState = get_core_state(&env);
+        core_state.admin.require_auth();
+        env.update_current_contract_wasm(&new_wasm_hash);
+    }
+
+    fn version(env: Env) -> (Symbol, Symbol) {
+        (CONTRACT_DESCRIPTION, CONTRACT_VERSION)
     }
 
     fn update_contract_admin(env: Env, contract_admin: Address) {

@@ -6,6 +6,9 @@ use num_integer::div_floor;
 use crate::utils::indexes::get_vaults_data_type_with_index;
 use soroban_sdk::{contractimpl, panic_with_error, token, vec, Address, BytesN, Env, Symbol, Vec};
 
+pub const CONTRACT_DESCRIPTION: Symbol = Symbol::short("Vaults");
+pub const CONTRACT_VERSION: Symbol = Symbol::short("0_3_0");
+
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
     /// Set up and management
@@ -13,7 +16,7 @@ pub trait VaultsContractTrait {
     fn get_admin(env: Env) -> Address;
     fn get_core_state(env: Env) -> CoreState;
     fn upgrade(env: Env, new_wasm_hash: BytesN<32>);
-    fn version(env: Env) -> Symbol;
+    fn version(env: Env) -> (Symbol, Symbol);
 
     /// Currency vaults conditions
     fn set_vault_conditions(
@@ -88,8 +91,8 @@ impl VaultsContractTrait for VaultsContract {
         env.update_current_contract_wasm(&new_wasm_hash);
     }
 
-    fn version(env: Env) -> Symbol {
-        Symbol::short("0.3.0")
+    fn version(env: Env) -> (Symbol, Symbol) {
+        (CONTRACT_DESCRIPTION, CONTRACT_VERSION)
     }
 
     fn set_vault_conditions(

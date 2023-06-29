@@ -2,7 +2,7 @@
 use crate::contract::{GovernanceContract, GovernanceContractClient};
 use crate::storage::proposals::{
     ProposalExecutionParams, TreasuryPaymentProposalOption, TreasuryPaymentProposalParams,
-    UpdateContractProposalOption,
+    UpdateContractProposalOption, UpgradeContractProposalOption,
 };
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{map, token, vec, Address, Env, Map, Symbol, Vec};
@@ -41,6 +41,7 @@ pub fn create_test_data(env: &Env) -> TestData {
         contract_client,
         cooldown_period: 3600 * 24, // TODO: Implement this at the create proposal level IE proposers cooldown checks
         dumb_params: ProposalExecutionParams {
+            upgrade_contract: UpgradeContractProposalOption::None,
             treasury_payment: TreasuryPaymentProposalOption::None,
             update_contract: UpdateContractProposalOption::None,
         },

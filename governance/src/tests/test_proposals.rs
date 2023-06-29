@@ -36,7 +36,6 @@ pub fn test_creating_new_proposal_single_proposer() {
         &proposal_type,
         &proposers,
         &voting_time,
-        &false,
         &test_data.dumb_params,
     );
 
@@ -83,7 +82,6 @@ pub fn test_creating_new_proposal_single_proposer() {
             &proposal_type,
             &proposers,
             &voting_time,
-            &false,
             &test_data.dumb_params,
         )
         .unwrap_err();
@@ -103,7 +101,6 @@ pub fn test_creating_new_proposal_single_proposer() {
             &proposal_type,
             &proposers,
             &voting_time,
-            &false,
             &test_data.dumb_params,
         )
         .unwrap_err();
@@ -175,7 +172,6 @@ pub fn test_create_new_proposal_multiple_proposers() {
         &proposal_type,
         &proposers,
         &voting_time,
-        &false,
         &test_data.dumb_params,
     );
 
@@ -269,7 +265,6 @@ pub fn test_proposals_ids() {
             &proposal_type,
             &proposers,
             &voting_time,
-            &false,
             &test_data.dumb_params,
         );
     }

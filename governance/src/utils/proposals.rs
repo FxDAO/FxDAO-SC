@@ -3,7 +3,7 @@ use crate::storage::core::{CoreState, CoreStorageKeys};
 use crate::storage::proposals::{
     Proposal, ProposalExecutionParams, ProposalStatus, ProposalType, ProposalVote,
     ProposalVoteIndex, ProposalsStorageKeys, ProposerStat, TreasuryPaymentProposalParams,
-    UpdateContractProposalOption,
+    UpdateContractProposalOption, UpgradeContractProposalOption,
 };
 
 use crate::utils::core::{get_core_state, get_governance_token};
@@ -123,26 +123,15 @@ pub fn validate_new_proposal_id(env: &Env, proposal_id: &BytesN<32>) {
 }
 
 pub fn is_voting_time_valid(
-    env: &Env,
     voting_time: u64,
     proposal_type: &ProposalType,
-    proposers: &Vec<ProposerStat>,
+    admin_upgrade: bool,
 ) -> bool {
     match proposal_type {
         ProposalType::Simple => voting_time > 3600 * 24 * 5,
         ProposalType::UpgradeContract => {
-            let mut is_admin: bool = false;
-            let core_state: CoreState = get_core_state(&env);
-
-            for result in proposers.iter() {
-                let proposer: ProposerStat = result.unwrap();
-                if proposer.id == core_state.contract_admin {
-                    is_admin = true
-                }
-            }
-
-            if is_admin {
-                voting_time > 3600 * 3
+            if admin_upgrade {
+                voting_time > 3600
             } else {
                 voting_time > 3600 * 24 * 14
             }
@@ -162,7 +151,7 @@ pub fn new_proposal(
     proposal_type: &ProposalType,
     created_at: u64,
     ends_at: u64,
-    emergency_proposal: bool,
+    admin_upgrade: bool,
     execution_params: ProposalExecutionParams,
 ) -> Proposal {
     Proposal {
@@ -178,7 +167,7 @@ pub fn new_proposal(
         votes_against: 0,
         created_at,
         ends_at,
-        emergency_proposal,
+        admin_upgrade,
         execution_params,
         executed: false,
     }
@@ -257,6 +246,23 @@ pub fn are_update_contract_params_valid(
                         valid = true;
                     }
                 }
+            }
+        }
+    }
+
+    valid
+}
+
+pub fn is_contract_to_upgrade_valid(
+    managing_contracts: &Vec<Address>,
+    params: &ProposalExecutionParams,
+) -> bool {
+    let mut valid: bool = false;
+
+    if let UpgradeContractProposalOption::Some(data) = &params.upgrade_contract {
+        for managing_contract in managing_contracts.iter() {
+            if managing_contract.unwrap() == data.contract_id {
+                valid = true;
             }
         }
     }

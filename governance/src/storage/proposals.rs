@@ -67,10 +67,25 @@ pub enum UpdateContractProposalOption {
 }
 
 #[contracttype]
+#[derive(Clone, PartialEq)]
+pub struct UpgradeContractProposalParams {
+    pub contract_id: Address,
+    pub new_contract_hash: BytesN<32>,
+}
+
+#[contracttype]
+#[derive(Clone, PartialEq)]
+pub enum UpgradeContractProposalOption {
+    None,
+    Some(UpgradeContractProposalParams),
+}
+
+#[contracttype]
 #[derive(Clone)]
 pub struct ProposalExecutionParams {
     pub treasury_payment: TreasuryPaymentProposalOption,
     pub update_contract: UpdateContractProposalOption,
+    pub upgrade_contract: UpgradeContractProposalOption,
 }
 
 #[contracttype]
@@ -88,7 +103,7 @@ pub struct Proposal {
     pub votes_against: u128,
     pub created_at: u64,
     pub ends_at: u64,
-    pub emergency_proposal: bool,
+    pub admin_upgrade: bool,
     pub execution_params: ProposalExecutionParams,
     pub executed: bool,
 }

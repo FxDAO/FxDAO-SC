@@ -5,7 +5,7 @@ use crate::contract::{GovernanceContract, GovernanceContractClient};
 use crate::storage::proposals::{
     Proposal, ProposalExecutionParams, ProposalStatus, ProposalType, ProposalVoteType,
     ProposerStat, TreasuryPaymentProposalOption, UpdateContractProposalOption,
-    UpdateContractProposalParams,
+    UpdateContractProposalParams, UpgradeContractProposalOption, UpgradeContractProposalParams,
 };
 use soroban_sdk::testutils::{Address as _, BytesN as __, Ledger, LedgerInfo};
 use soroban_sdk::{
@@ -275,8 +275,8 @@ pub fn test_create_update_proposal_wrong_params() {
                 },
             ],
             &voting_time,
-            &false,
             &ProposalExecutionParams {
+                upgrade_contract: UpgradeContractProposalOption::None,
                 treasury_payment: TreasuryPaymentProposalOption::None,
                 update_contract: UpdateContractProposalOption::None,
             },
@@ -298,8 +298,8 @@ pub fn test_create_update_proposal_wrong_params() {
                 },
             ],
             &voting_time,
-            &false,
             &ProposalExecutionParams {
+                upgrade_contract: UpgradeContractProposalOption::None,
                 treasury_payment: TreasuryPaymentProposalOption::None,
                 update_contract: UpdateContractProposalOption::Some(UpdateContractProposalParams {
                     params: vec![&env] as Vec<RawVal>,
@@ -328,8 +328,8 @@ pub fn test_create_update_proposal_wrong_params() {
                 },
             ],
             &voting_time,
-            &false,
             &ProposalExecutionParams {
+                upgrade_contract: UpgradeContractProposalOption::None,
                 treasury_payment: TreasuryPaymentProposalOption::None,
                 update_contract: UpdateContractProposalOption::Some(UpdateContractProposalParams {
                     params: vec![&env] as Vec<RawVal>,
@@ -387,8 +387,8 @@ pub fn test_update_proposal_flow() {
         &ProposalType::UpdateContract,
         &proposers,
         &voting_time,
-        &false,
         &ProposalExecutionParams {
+            upgrade_contract: UpgradeContractProposalOption::None,
             treasury_payment: TreasuryPaymentProposalOption::None,
             update_contract: UpdateContractProposalOption::Some(UpdateContractProposalParams {
                 contract_id: test_data.usd_safety_pool_contract_address.clone(),
@@ -442,4 +442,179 @@ pub fn test_update_proposal_flow() {
         &updated_usd_pool_core_state.min_deposit,
         &(test_data.min_deposit_usd_safety_pool - 25_0000000u128),
     );
+}
+
+#[test]
+pub fn test_create_upgrade_proposal_flow_wrong_params() {
+    let env: Env = Env::default();
+    env.mock_all_auths();
+    let test_data: TestData = create_test_data(&env);
+    setup_contracts(&env, &test_data);
+
+    let proposer = Address::random(&env);
+
+    test_data
+        .governance_token_client
+        .mint(&proposer, &(test_data.governance_proposals_fee as i128));
+
+    // Should fail because it's using a voting time only for admins
+    let invalid_time_error = test_data
+        .governance_contract_client
+        .try_create_proposal(
+            &BytesN::random(&env),
+            &ProposalType::UpgradeContract,
+            &vec![
+                &env,
+                ProposerStat {
+                    amount: test_data.governance_proposals_fee,
+                    id: proposer.clone(),
+                },
+            ],
+            &(3600 * 5),
+            &ProposalExecutionParams {
+                upgrade_contract: UpgradeContractProposalOption::None,
+                treasury_payment: TreasuryPaymentProposalOption::None,
+                update_contract: UpdateContractProposalOption::None,
+            },
+        )
+        .unwrap_err();
+
+    assert_eq!(&invalid_time_error, &Ok(Status::from_contract_error(20005)));
+
+    // Should fail because even admins have a min voting time
+    let invalid_admin_time_error = test_data
+        .governance_contract_client
+        .try_create_proposal(
+            &BytesN::random(&env),
+            &ProposalType::UpgradeContract,
+            &vec![
+                &env,
+                ProposerStat {
+                    amount: test_data.governance_proposals_fee,
+                    id: test_data.governance_contract_admin.clone(),
+                },
+            ],
+            &3500,
+            &ProposalExecutionParams {
+                upgrade_contract: UpgradeContractProposalOption::None,
+                treasury_payment: TreasuryPaymentProposalOption::None,
+                update_contract: UpdateContractProposalOption::None,
+            },
+        )
+        .unwrap_err();
+
+    assert_eq!(
+        &invalid_admin_time_error,
+        &Ok(Status::from_contract_error(20005))
+    );
+
+    // Should fail because the target contract to upgrade is not one we are admins
+    let invalid_target_contract = test_data
+        .governance_contract_client
+        .try_create_proposal(
+            &BytesN::random(&env),
+            &ProposalType::UpgradeContract,
+            &vec![
+                &env,
+                ProposerStat {
+                    amount: test_data.governance_proposals_fee,
+                    id: test_data.governance_contract_admin.clone(),
+                },
+            ],
+            &(3600 * 24 * 15),
+            &ProposalExecutionParams {
+                upgrade_contract: UpgradeContractProposalOption::Some(
+                    UpgradeContractProposalParams {
+                        contract_id: Address::random(&env),
+                        new_contract_hash: BytesN::random(&env),
+                    },
+                ),
+                treasury_payment: TreasuryPaymentProposalOption::None,
+                update_contract: UpdateContractProposalOption::None,
+            },
+        )
+        .unwrap_err();
+
+    assert_eq!(
+        &invalid_target_contract,
+        &Ok(Status::from_contract_error(20008))
+    );
+}
+
+#[test]
+pub fn test_upgrade_proposal_flow() {
+    let env: Env = Env::default();
+    env.mock_all_auths();
+    let test_data = create_test_data(&env);
+    setup_contracts(&env, &test_data);
+
+    let proposer: Address = Address::random(&env);
+    let voter: Address = Address::random(&env);
+
+    test_data
+        .governance_token_client
+        .mint(&proposer, &(test_data.governance_proposals_fee as i128));
+
+    test_data
+        .governance_token_client
+        .mint(&voter, &(test_data.governance_proposals_fee as i128));
+
+    // We create a new governance contract instance, we will update the safety pool with this one
+    let new_wasm = env.install_contract_wasm(safety_pool::WASM);
+
+    let proposal_id: BytesN<32> = BytesN::random(&env);
+    test_data.governance_contract_client.create_proposal(
+        &proposal_id,
+        &ProposalType::UpgradeContract,
+        &(vec![
+            &env,
+            ProposerStat {
+                amount: test_data.governance_proposals_fee.clone(),
+                id: proposer.clone(),
+            },
+        ] as Vec<ProposerStat>),
+        &(3600 * 24 * 15),
+        &ProposalExecutionParams {
+            treasury_payment: TreasuryPaymentProposalOption::None,
+            update_contract: UpdateContractProposalOption::None,
+            upgrade_contract: UpgradeContractProposalOption::Some(UpgradeContractProposalParams {
+                contract_id: test_data.vaults_contract_client.address.clone(),
+                new_contract_hash: new_wasm.clone(),
+            }),
+        },
+    );
+
+    let (description, _) = test_data.vaults_contract_client.version();
+    assert_eq!(description, Symbol::short("Vaults"));
+
+    test_data
+        .governance_contract_client
+        .vote(&voter, &proposal_id, &ProposalVoteType::For, &1);
+
+    env.ledger().set(LedgerInfo {
+        timestamp: env.ledger().timestamp() + (3600 * 24 * 16),
+        protocol_version: 1,
+        sequence_number: 10,
+        network_id: Default::default(),
+        base_reserve: 10,
+    });
+
+    test_data
+        .governance_contract_client
+        .end_proposal(&proposal_id);
+
+    env.ledger().set(LedgerInfo {
+        timestamp: env.ledger().timestamp() + test_data.governance_cooldown_period + 1,
+        protocol_version: 1,
+        sequence_number: 10,
+        network_id: Default::default(),
+        base_reserve: 10,
+    });
+
+    test_data
+        .governance_contract_client
+        .execute_proposal_result(&proposal_id);
+
+    let (description, _) = test_data.vaults_contract_client.version();
+    assert_eq!(description, Symbol::short("SafetyP"));
 }
