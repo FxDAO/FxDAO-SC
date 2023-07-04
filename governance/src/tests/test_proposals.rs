@@ -52,7 +52,6 @@ pub fn test_creating_new_proposal_single_proposer() {
                     proposal_type.clone(),
                     proposers.clone(),
                     voting_time.clone(),
-                    false,
                     test_data.dumb_params.clone(),
                 )
                     .into_val(&env),
@@ -188,7 +187,6 @@ pub fn test_create_new_proposal_multiple_proposers() {
                 proposal_type.clone(),
                 proposers.clone(),
                 voting_time.clone(),
-                false,
                 test_data.dumb_params.clone(),
             )
                 .into_val(&env),

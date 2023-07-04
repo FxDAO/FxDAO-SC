@@ -19,6 +19,8 @@ fn test_new_vault() {
 
     data.contract_client.init(
         &data.contract_admin,
+        &data.oracle_admin,
+        &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
     );

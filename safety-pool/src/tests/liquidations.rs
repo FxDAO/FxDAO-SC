@@ -52,6 +52,8 @@ fn test_simple_liquidations_flow() {
 
     vaults_contract_client.init(
         &vaults_contract_admin,
+        &vaults_contract_admin,
+        &vaults_contract_admin,
         &collateral_token_client.address,
         &stable_token_admin,
     );

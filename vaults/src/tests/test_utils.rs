@@ -12,6 +12,8 @@ pub fn create_token_contract<'a>(e: &Env, admin: &Address) -> TokenClient<'a> {
 pub struct TestData<'a> {
     // Contract data
     pub contract_admin: Address,
+    pub oracle_admin: Address,
+    pub protocol_manager: Address,
     pub contract_client: VaultsContractClient<'a>,
 
     // Collateral token data
@@ -57,11 +59,15 @@ pub fn create_base_data(env: &Env) -> TestData {
 
     // Create the contract
     let contract_admin = Address::random(&env);
+    let oracle_admin = Address::random(&env);
+    let protocol_manager = Address::random(&env);
     let contract_client =
         VaultsContractClient::new(&env, &env.register_contract(None, VaultsContract));
 
     return TestData {
         contract_admin,
+        oracle_admin,
+        protocol_manager,
         contract_client,
         collateral_token_admin,
         collateral_token_client,
@@ -89,6 +95,8 @@ pub fn create_base_variables(env: &Env, data: &TestData) -> InitialVariables {
 pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVariables) {
     data.contract_client.init(
         &data.contract_admin,
+        &data.oracle_admin,
+        &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
     );

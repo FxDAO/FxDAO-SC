@@ -165,6 +165,8 @@ fn create_test_data(env: &Env) -> TestData {
 fn setup_contracts(env: &Env, test_data: &TestData) {
     test_data.vaults_contract_client.init(
         &test_data.governance_contract_address,
+        &test_data.governance_contract_address,
+        &test_data.governance_contract_address,
         &test_data.collateral_token_client.address,
         &test_data.stablecoin_issuer_admin,
     );

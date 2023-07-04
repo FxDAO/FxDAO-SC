@@ -9,6 +9,20 @@ pub fn check_admin(env: &Env) {
     admin.require_auth();
 }
 
+pub fn check_oracle_admin(env: &Env) {
+    let admin: Address = env.storage().get(&DataKeys::OracleAdmin).unwrap().unwrap();
+    admin.require_auth();
+}
+
+pub fn check_protocol_manager(env: &Env) {
+    let admin: Address = env
+        .storage()
+        .get(&DataKeys::ProtocolManager)
+        .unwrap()
+        .unwrap();
+    admin.require_auth();
+}
+
 pub fn get_core_state(env: &Env) -> CoreState {
     env.storage().get(&DataKeys::CoreState).unwrap().unwrap()
 }
