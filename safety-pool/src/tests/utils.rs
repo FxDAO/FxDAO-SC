@@ -21,6 +21,7 @@ pub struct TestData<'a> {
     pub contract_client: SafetyPoolContractClient<'a>,
     pub profit_share: Vec<u32>,
     pub liquidator_share: Vec<u32>,
+    pub governance_asset: TokenClient<'a>,
 }
 
 pub fn create_test_data(env: &Env) -> TestData {
@@ -33,6 +34,9 @@ pub fn create_test_data(env: &Env) -> TestData {
 
     let collateral_asset_admin = Address::random(&env);
     let collateral_asset = create_token_contract(&env, &deposit_asset_admin);
+
+    let governance_asset_admin = Address::random(&env);
+    let governance_asset = create_token_contract(&env, &governance_asset_admin);
 
     let min_deposit: u128 = 1000000000;
 
@@ -52,6 +56,7 @@ pub fn create_test_data(env: &Env) -> TestData {
         contract_client,
         profit_share: vec![&env, 1u32, 2u32] as Vec<u32>,
         liquidator_share: vec![&env, 1u32, 2u32] as Vec<u32>,
+        governance_asset,
     }
 }
 
@@ -66,6 +71,7 @@ pub fn init_contract(test_data: &TestData) {
         &test_data.min_deposit,
         &test_data.profit_share,
         &test_data.liquidator_share,
+        &test_data.governance_asset.address,
     );
 }
 

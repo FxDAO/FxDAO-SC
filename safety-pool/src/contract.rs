@@ -1,7 +1,10 @@
 use crate::errors::SCErrors;
 use crate::storage::core::CoreState;
 use crate::storage::deposits::Deposit;
-use crate::utils::core::{can_init_contract, get_core_state, set_core_state};
+use crate::utils::core::{
+    can_init_contract, get_core_state, get_last_governance_token_distribution_time, set_core_state,
+    set_last_governance_token_distribution_time,
+};
 use crate::utils::deposits::{
     get_deposit, get_depositors, is_depositor_listed, make_deposit, make_withdrawal,
     remove_deposit, remove_depositor_from_depositors, save_deposit, save_depositors,
@@ -10,6 +13,7 @@ use crate::vaults;
 use crate::vaults::{Currency, UserVault};
 use num_integer::div_floor;
 use soroban_sdk::{contractimpl, panic_with_error, token, vec, Address, BytesN, Env, Symbol, Vec};
+use token::Client as TokenClient;
 
 pub const CONTRACT_DESCRIPTION: Symbol = Symbol::short("SafetyP");
 pub const CONTRACT_VERSION: Symbol = Symbol::short("0_3_0");
@@ -26,6 +30,7 @@ pub trait SafetyPoolContractTrait {
         min_deposit: u128,
         treasury_share: Vec<u32>,
         liquidator_share: Vec<u32>,
+        governance_token: Address,
     );
 
     fn get_core_state(env: Env) -> CoreState;
@@ -55,6 +60,10 @@ pub trait SafetyPoolContractTrait {
     fn withdraw(env: Env, caller: Address);
 
     fn liquidate(env: Env, liquidator: Address);
+
+    fn last_gov_distribution_time(env: Env) -> u64;
+
+    fn distribute_governance_token(env: Env, address: Address);
 }
 
 pub struct SafetyPoolContract;
@@ -73,6 +82,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         min_deposit: u128,
         treasury_share: Vec<u32>,
         liquidator_share: Vec<u32>,
+        governance_token: Address,
     ) {
         can_init_contract(&env);
         set_core_state(
@@ -87,6 +97,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
                 min_deposit,
                 treasury_share,
                 liquidator_share,
+                governance_token,
             },
         );
     }
@@ -304,5 +315,55 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
             &core_state.treasury_contract,
             &treasury_share,
         );
+    }
+
+    fn last_gov_distribution_time(env: Env) -> u64 {
+        get_last_governance_token_distribution_time(&env)
+    }
+
+    fn distribute_governance_token(env: Env, caller: Address) {
+        caller.require_auth();
+        let daily_distribution: u128 = 8219_0000000;
+        let core_state: CoreState = get_core_state(&env);
+
+        let last_distribution = get_last_governance_token_distribution_time(&env);
+
+        if env.ledger().timestamp() < last_distribution + (3600 * 24) {
+            panic_with_error!(&env, &SCErrors::RecentDistribution);
+        }
+
+        let depositors = get_depositors(&env);
+        let mut approved_users: Vec<Deposit> = vec![&env] as Vec<Deposit>;
+        let mut total_approved_users_deposit: u128 = 0;
+        // Min deposit must be 48 hrs before this moment
+        let max_deposit_time: u64 = env.ledger().timestamp() - (3600 * 48);
+        let governance_token: TokenClient = TokenClient::new(&env, &core_state.governance_token);
+
+        for item in depositors.iter() {
+            let depositor: Address = item.unwrap();
+            let deposit: Deposit = get_deposit(&env, &depositor);
+
+            if deposit.deposit_time < max_deposit_time && governance_token.authorized(&depositor) {
+                total_approved_users_deposit = total_approved_users_deposit + deposit.amount;
+                approved_users.push_front(deposit);
+            }
+        }
+
+        for item in approved_users.iter() {
+            let deposit: Deposit = item.unwrap();
+            let deposit_percentage =
+                div_floor(deposit.amount * 1_0000000, total_approved_users_deposit);
+
+            let amount_to_send: u128 =
+                div_floor(deposit_percentage * daily_distribution, 1_0000000);
+
+            TokenClient::new(&env, &core_state.governance_token).transfer(
+                &env.current_contract_address(),
+                &deposit.depositor,
+                &(amount_to_send as i128),
+            );
+        }
+
+        set_last_governance_token_distribution_time(&env);
     }
 }
