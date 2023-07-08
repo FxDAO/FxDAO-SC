@@ -33,6 +33,8 @@ pub struct CurrencyVaultsConditions {
 pub enum DataKeys {
     CoreState,
     Admin,
+    OracleAdmin,
+    ProtocolManager,
     Currency(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
     CurrencyStats(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
     CurrencyVaultConditions(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"

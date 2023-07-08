@@ -18,6 +18,9 @@ fn test_simple_liquidations_flow() {
     // Shared variables
     let treasury_contract: Address = Address::random(&env);
 
+    let governance_token_admin: Address = Address::random(&env);
+    let governance_token_client = create_token_contract(&env, &governance_token_admin);
+
     let currency_price: i128 = 0_0958840;
     let collateral_token_admin: Address = Address::random(&env);
     let collateral_token_client = create_token_contract(&env, &collateral_token_admin);
@@ -51,6 +54,8 @@ fn test_simple_liquidations_flow() {
     let opening_collateral_rate: i128 = 1_1500000;
 
     vaults_contract_client.init(
+        &vaults_contract_admin,
+        &vaults_contract_admin,
         &vaults_contract_admin,
         &collateral_token_client.address,
         &stable_token_admin,
@@ -97,6 +102,7 @@ fn test_simple_liquidations_flow() {
         &min_pool_deposit,
         &profit_share,
         &liquidator_share,
+        &governance_token_client.address,
     );
 
     // We create the initial vaults, a total of 6 vaults will be created where two of them

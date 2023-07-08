@@ -2,6 +2,7 @@
 resolver = "2"
 
 members = [
+    "governance",
     "safety-pool",
     "vaults",
 ]

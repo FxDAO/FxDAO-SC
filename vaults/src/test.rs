@@ -16,6 +16,8 @@ fn test_set_and_get_core_state() {
 
     data.contract_client.init(
         &data.contract_admin,
+        &data.oracle_admin,
+        &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
     );
@@ -35,12 +37,16 @@ fn test_init_panic() {
 
     data.contract_client.init(
         &data.contract_admin,
+        &data.oracle_admin,
+        &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
     );
 
     data.contract_client.init(
         &data.contract_admin,
+        &data.oracle_admin,
+        &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
     );
@@ -54,6 +60,8 @@ fn test_set_and_get_currency_vault_conditions() {
 
     data.contract_client.init(
         &data.contract_admin,
+        &data.oracle_admin,
+        &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
     );
@@ -122,7 +130,7 @@ fn test_set_and_get_rate() {
         env.auths(),
         [(
             // Address for which auth is performed
-            data.contract_admin.clone(),
+            data.oracle_admin.clone(),
             // Identifier of the called contract
             data.contract_client.address.clone(),
             // Name of the called function
@@ -163,4 +171,42 @@ fn test_set_and_get_rate() {
     //   network_id: Default::default(),
     //   base_reserve: 10,
     // });
+}
+
+#[test]
+fn test_create_new_currency() {
+    let env = Env::default();
+    let data: TestData = create_base_data(&env);
+
+    data.contract_client.init(
+        &data.contract_admin,
+        &data.oracle_admin,
+        &data.protocol_manager,
+        &data.collateral_token_client.address,
+        &data.stable_token_issuer,
+    );
+
+    data.contract_client.create_currency(
+        &data.stable_token_denomination,
+        &data.stable_token_client.address,
+    );
+
+    // Check the function is requiring the protocol manager approved this operation
+    assert_eq!(
+        env.auths(),
+        [(
+            // Address for which auth is performed
+            data.protocol_manager.clone(),
+            // Identifier of the called contract
+            data.contract_client.address.clone(),
+            // Name of the called function
+            Symbol::new(&env, "create_currency"),
+            // Arguments used (converted to the env-managed vector via `into_val`)
+            (
+                data.stable_token_denomination.clone(),
+                data.stable_token_client.address.clone()
+            )
+                .into_val(&env.clone())
+        )]
+    );
 }

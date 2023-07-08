@@ -4,14 +4,29 @@ use crate::utils::*;
 use num_integer::div_floor;
 
 use crate::utils::indexes::get_vaults_data_type_with_index;
-use soroban_sdk::{contractimpl, panic_with_error, token, vec, Address, Env, Symbol, Vec};
+use soroban_sdk::{contractimpl, panic_with_error, token, vec, Address, BytesN, Env, Symbol, Vec};
+
+pub const CONTRACT_DESCRIPTION: Symbol = Symbol::short("Vaults");
+pub const CONTRACT_VERSION: Symbol = Symbol::short("0_3_0");
 
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
     /// Set up and management
-    fn init(env: Env, admin: Address, col_token: Address, stable_issuer: Address);
+    fn init(
+        env: Env,
+        admin: Address,
+        oracle_admin: Address,
+        protocol_manager: Address,
+        col_token: Address,
+        stable_issuer: Address,
+    );
+
+    fn set_admin(env: Env, address: Address);
+    fn set_protocol_manager(env: Env, address: Address);
     fn get_admin(env: Env) -> Address;
     fn get_core_state(env: Env) -> CoreState;
+    fn upgrade(env: Env, new_wasm_hash: BytesN<32>);
+    fn version(env: Env) -> (Symbol, Symbol);
 
     /// Currency vaults conditions
     fn set_vault_conditions(
@@ -50,7 +65,6 @@ pub trait VaultsContractTrait {
 
     /// Liquidation
     fn liquidate(env: Env, caller: Address, denomination: Symbol, owners: Vec<Address>);
-    // TODO: Create test which we verify this function works correctly in multi currencies cases
     fn vaults_to_liquidate(env: Env, denomination: Symbol) -> Vec<UserVault>;
 }
 
@@ -59,7 +73,14 @@ pub struct VaultsContract;
 // TODO: Add events for each function
 #[contractimpl]
 impl VaultsContractTrait for VaultsContract {
-    fn init(env: Env, admin: Address, col_token: Address, stable_issuer: Address) {
+    fn init(
+        env: Env,
+        admin: Address,
+        oracle_admin: Address,
+        protocol_manager: Address,
+        col_token: Address,
+        stable_issuer: Address,
+    ) {
         if env.storage().has(&DataKeys::CoreState) {
             panic_with_error!(&env, SCErrors::AlreadyInit);
         }
@@ -72,6 +93,21 @@ impl VaultsContractTrait for VaultsContract {
             },
         );
         env.storage().set(&DataKeys::Admin, &admin);
+        env.storage().set(&DataKeys::OracleAdmin, &oracle_admin);
+        env.storage()
+            .set(&DataKeys::ProtocolManager, &protocol_manager);
+    }
+
+    // TODO: Test this
+    fn set_admin(env: Env, address: Address) {
+        check_admin(&env);
+        env.storage().set(&DataKeys::Admin, &address);
+    }
+
+    // TODO: Test this
+    fn set_protocol_manager(env: Env, address: Address) {
+        check_protocol_manager(&env);
+        env.storage().set(&DataKeys::ProtocolManager, &address);
     }
 
     fn get_admin(env: Env) -> Address {
@@ -80,6 +116,15 @@ impl VaultsContractTrait for VaultsContract {
 
     fn get_core_state(env: Env) -> CoreState {
         get_core_state(&env)
+    }
+
+    fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        check_admin(&env);
+        env.update_current_contract_wasm(&new_wasm_hash);
+    }
+
+    fn version(env: Env) -> (Symbol, Symbol) {
+        (CONTRACT_DESCRIPTION, CONTRACT_VERSION)
     }
 
     fn set_vault_conditions(
@@ -107,7 +152,7 @@ impl VaultsContractTrait for VaultsContract {
     }
 
     fn create_currency(env: Env, denomination: Symbol, contract: Address) {
-        check_admin(&env);
+        check_protocol_manager(&env);
 
         if env.storage().has(&DataKeys::Currency(denomination.clone())) {
             panic_with_error!(&env, &SCErrors::CurrencyAlreadyAdded);
@@ -137,7 +182,7 @@ impl VaultsContractTrait for VaultsContract {
 
     fn set_currency_rate(env: Env, denomination: Symbol, rate: i128) {
         // TODO: this method should be updated in the future once there are oracles in the network
-        check_admin(&env);
+        check_oracle_admin(&env);
         validate_currency(&env, &denomination);
         check_positive(&env, &rate);
 

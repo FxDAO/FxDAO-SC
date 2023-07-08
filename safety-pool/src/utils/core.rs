@@ -18,3 +18,17 @@ pub fn get_core_state(env: &Env) -> CoreState {
         .unwrap()
         .unwrap()
 }
+
+pub fn set_last_governance_token_distribution_time(env: &Env) {
+    env.storage().set(
+        &CoreStorageKeys::LastGovernanceTokenDistribution,
+        &env.ledger().timestamp(),
+    )
+}
+
+pub fn get_last_governance_token_distribution_time(env: &Env) -> u64 {
+    env.storage()
+        .get(&CoreStorageKeys::LastGovernanceTokenDistribution)
+        .unwrap_or(Ok(0))
+        .unwrap()
+}

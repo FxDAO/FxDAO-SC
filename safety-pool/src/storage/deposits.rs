@@ -1,6 +1,7 @@
 use soroban_sdk::{contracttype, Address};
 
 #[contracttype]
+#[derive(Clone)]
 pub struct Deposit {
     pub depositor: Address,
     pub amount: u128,
@@ -9,6 +10,6 @@ pub struct Deposit {
 
 #[contracttype]
 pub enum DepositsDataKeys {
-    Deposit(Address),
-    Depositors, // Vec<Address>
+    Deposit(Address), // Deposit
+    Depositors,       // Vec<Address>
 }

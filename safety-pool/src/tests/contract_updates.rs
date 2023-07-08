@@ -26,7 +26,8 @@ fn update_contract_core_state() {
             denomination_asset: target_core_state.clone().denomination_asset,
             min_deposit: target_core_state.clone().min_deposit,
             treasury_share: target_core_state.clone().treasury_share,
-            liquidator_share: target_core_state.clone().liquidator_share
+            liquidator_share: target_core_state.clone().liquidator_share,
+            governance_token: target_core_state.clone().governance_token,
         }
     );
 
