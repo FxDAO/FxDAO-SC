@@ -181,6 +181,7 @@ fn setup_contracts(env: &Env, test_data: &TestData) {
         &test_data.min_deposit_usd_safety_pool,
         &vec![&env, 1u32, 2u32],
         &vec![&env, 1u32, 2u32],
+        &test_data.governance_token_client.address,
     );
 
     test_data.governance_contract_client.init(

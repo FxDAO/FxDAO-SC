@@ -357,7 +357,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
             let amount_to_send: u128 =
                 div_floor(deposit_percentage * daily_distribution, 1_0000000);
 
-            TokenClient::new(&env, &core_state.governance_token).transfer(
+            governance_token.transfer(
                 &env.current_contract_address(),
                 &deposit.depositor,
                 &(amount_to_send as i128),

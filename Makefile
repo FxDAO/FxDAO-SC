@@ -12,6 +12,7 @@ build:
 	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package vaults
 	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package safety-pool
 	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package governance
+	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package stable-liquidity-pool
 	cd target/wasm32-unknown-unknown/release/ && \
 		for i in *.wasm ; do \
 			ls -l "$$i"; \
@@ -20,6 +21,8 @@ build:
 build-optimized:
 	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p vaults
 	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p safety-pool
+	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p governance
+	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p stable-liquidity-pool
 	cd target/wasm32-unknown-unknown/release/ && \
 		for i in *.wasm ; do \
 			wasm-opt -Oz "$$i" -o "$$i.tmp" && mv "$$i.tmp" "$$i"; \
