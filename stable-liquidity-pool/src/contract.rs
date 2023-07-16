@@ -6,17 +6,19 @@ use crate::utils::core::{
     set_last_governance_token_distribution_time,
 };
 use crate::utils::deposits::{
-    calculate_depositor_withdrawal, get_deposit, get_depositors, is_depositor_listed, make_deposit,
-    make_withdrawal, remove_deposit, remove_depositor_from_depositors, save_deposit,
-    save_depositors, validate_deposit_asset,
+    get_deposit, get_depositors, is_depositor_listed, make_deposit, make_withdrawal,
+    remove_deposit, remove_depositor_from_depositors, save_deposit, save_depositors,
+    validate_deposit_asset,
 };
 use num_integer::div_floor;
-use soroban_sdk::{contractimpl, panic_with_error, token, vec, Address, BytesN, Env, Symbol, Vec};
+use soroban_sdk::{
+    contractimpl, panic_with_error, token, vec, Address, BytesN, Env, Map, Symbol, Vec,
+};
 
 pub const CONTRACT_DESCRIPTION: Symbol = Symbol::short("StableLP");
 pub const CONTRACT_VERSION: Symbol = Symbol::short("0_3_0");
 
-pub trait StableLiquidityPoolTrait {
+pub trait StableLiquidityPoolContractTrait {
     fn init(
         env: Env,
         admin: Address,
@@ -35,21 +37,28 @@ pub trait StableLiquidityPoolTrait {
 
     fn deposit(env: Env, caller: Address, asset: Address, amount: u128);
 
-    fn withdraw(env: Env, caller: Address, asset: Address);
+    fn withdraw(
+        env: Env,
+        caller: Address,
+        shares_to_redeem: u128,
+        assets_orders: Map<Address, u128>,
+    );
 
     fn get_deposit(env: Env, caller: Address) -> Deposit;
+
+    fn get_depositors(env: Env) -> Vec<Address>;
 
     fn swap(env: Env, caller: Address, from_asset: Address, to_asset: Address, amount: u128);
 
     fn last_gov_distribution_time(env: Env) -> u64;
 
-    fn distribute_governance_token(env: Env, caller: Address);
+    fn distribute_governance_token(env: Env);
 }
 
-pub struct StableLiquidityPool;
+pub struct StableLiquidityPoolContract;
 
 #[contractimpl]
-impl StableLiquidityPoolTrait for StableLiquidityPool {
+impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
     fn init(
         env: Env,
         admin: Address,
@@ -69,6 +78,8 @@ impl StableLiquidityPoolTrait for StableLiquidityPool {
                 accepted_assets,
                 fee_percentage,
                 total_deposited: 0,
+                share_price: 1_0000000,
+                total_shares: 0,
                 treasury,
             },
         );
@@ -87,7 +98,7 @@ impl StableLiquidityPoolTrait for StableLiquidityPool {
         (CONTRACT_DESCRIPTION, CONTRACT_VERSION)
     }
 
-    fn deposit(env: Env, caller: Address, asset: Address, amount: u128) {
+    fn deposit(env: Env, caller: Address, asset: Address, amount_deposit: u128) {
         caller.require_auth();
         let mut core_state: CoreState = get_core_state(&env);
 
@@ -95,11 +106,12 @@ impl StableLiquidityPoolTrait for StableLiquidityPool {
             panic_with_error!(&env, SCErrors::InvalidAsset);
         }
 
-        make_deposit(&env, &caller, &asset, &amount);
+        make_deposit(&env, &caller, &asset, &amount_deposit);
 
+        let shares_to_issue: u128 = div_floor(amount_deposit * 1_0000000, core_state.share_price);
         let mut deposit: Deposit = get_deposit(&env, &caller);
         deposit.last_deposit = env.ledger().timestamp();
-        deposit.amount = deposit.amount + amount;
+        deposit.shares = deposit.shares + shares_to_issue;
 
         save_deposit(&env, &deposit);
 
@@ -109,39 +121,70 @@ impl StableLiquidityPoolTrait for StableLiquidityPool {
             save_depositors(&env, &depositors)
         }
 
-        core_state.total_deposited = core_state.total_deposited + amount;
+        core_state.total_deposited = core_state.total_deposited + amount_deposit;
+        core_state.total_shares = core_state.total_shares + shares_to_issue;
         set_core_state(&env, &core_state);
     }
 
-    fn withdraw(env: Env, caller: Address, asset: Address) {
+    fn withdraw(
+        env: Env,
+        caller: Address,
+        shares_to_redeem: u128,
+        assets_orders: Map<Address, u128>,
+    ) {
         caller.require_auth();
         let mut core_state: CoreState = get_core_state(&env);
+        let calculated_amount_to_withdraw: u128 = div_floor(
+            shares_to_redeem * core_state.total_deposited,
+            core_state.total_shares,
+        );
 
-        let deposit: Deposit = get_deposit(&env, &caller);
-        if deposit.amount == 0 {
+        let mut deposit: Deposit = get_deposit(&env, &caller);
+        if deposit.shares == 0 {
             panic_with_error!(&env, SCErrors::NothingToWithdraw);
         }
 
-        let min_amount: u64 = deposit.last_deposit + (3600 * 48);
+        if &deposit.shares < &shares_to_redeem {
+            panic_with_error!(&env, SCErrors::NotEnoughSharesToWithdraw);
+        }
 
-        if env.ledger().timestamp() < min_amount {
+        let min_timestamp: u64 = deposit.last_deposit + (3600 * 48);
+
+        if env.ledger().timestamp() < min_timestamp {
             panic_with_error!(&env, SCErrors::LockedPeriodUncompleted);
         }
 
-        let asset_balance: i128 =
-            token::Client::new(&env, &asset).balance(&env.current_contract_address());
+        let mut withdraw_amount: u128 = 0;
 
-        let amount_to_withdraw: u128 =
-            calculate_depositor_withdrawal(&deposit, &core_state.total_deposited, &asset_balance);
+        for item in core_state.accepted_assets.iter() {
+            let token: Address = item.unwrap();
+            withdraw_amount = withdraw_amount + assets_orders.get(token.clone()).unwrap().unwrap();
+        }
 
-        make_withdrawal(&env, &deposit.depositor, &asset, &amount_to_withdraw);
-        remove_deposit(&env, &caller);
+        if calculated_amount_to_withdraw != withdraw_amount {
+            panic_with_error!(&env, SCErrors::InvalidWithdraw);
+        }
 
-        let mut depositors: Vec<Address> = get_depositors(&env);
-        depositors = remove_depositor_from_depositors(&depositors, &caller);
-        save_depositors(&env, &depositors);
+        for item in assets_orders.iter() {
+            let (asset, amount) = item.unwrap();
+            make_withdrawal(&env, &deposit.depositor, &asset, &amount);
+        }
 
-        core_state.total_deposited = core_state.total_deposited - deposit.amount;
+        if shares_to_redeem < deposit.shares {
+            deposit.shares = deposit.shares - shares_to_redeem;
+            save_deposit(&env, &deposit);
+        } else {
+            remove_deposit(&env, &caller);
+            let mut depositors: Vec<Address> = get_depositors(&env);
+            depositors = remove_depositor_from_depositors(&depositors, &caller);
+            save_depositors(&env, &depositors);
+        }
+
+        core_state.total_deposited = core_state.total_deposited - withdraw_amount;
+        core_state.total_shares = core_state.total_shares - shares_to_redeem;
+        if core_state.total_deposited == 0 && core_state.total_shares == 0 {
+            core_state.share_price = 1_0000000;
+        }
         set_core_state(&env, &core_state);
     }
 
@@ -149,10 +192,14 @@ impl StableLiquidityPoolTrait for StableLiquidityPool {
         get_deposit(&env, &caller)
     }
 
+    fn get_depositors(env: Env) -> Vec<Address> {
+        get_depositors(&env)
+    }
+
     fn swap(env: Env, caller: Address, from_asset: Address, to_asset: Address, amount: u128) {
         caller.require_auth();
 
-        let core_state: CoreState = get_core_state(&env);
+        let mut core_state: CoreState = get_core_state(&env);
 
         if !validate_deposit_asset(&env, &core_state.accepted_assets, &from_asset) {
             panic_with_error!(&env, SCErrors::InvalidAsset);
@@ -166,22 +213,33 @@ impl StableLiquidityPoolTrait for StableLiquidityPool {
         let protocol_share: u128 = div_floor(fee, 2);
         let amount_to_exchange: u128 = amount - fee;
 
-        make_deposit(&env, &caller, &from_asset, &amount_to_exchange);
+        make_deposit(&env, &caller, &from_asset, &amount);
         make_withdrawal(&env, &caller, &to_asset, &amount_to_exchange);
 
         token::Client::new(&env, &from_asset).transfer(
-            &caller,
+            &env.current_contract_address(),
             &core_state.treasury,
             &(protocol_share.clone() as i128),
         );
+
+        let pool_profit: u128 = fee - protocol_share;
+        let new_total_deposited: u128 = core_state.total_deposited + pool_profit;
+        let new_share_price: u128 = div_floor(
+            new_total_deposited * core_state.share_price,
+            core_state.total_deposited,
+        );
+
+        core_state.share_price = new_share_price;
+        core_state.total_deposited = new_total_deposited;
+
+        set_core_state(&env, &core_state);
     }
 
     fn last_gov_distribution_time(env: Env) -> u64 {
         get_last_governance_token_distribution_time(&env)
     }
 
-    fn distribute_governance_token(env: Env, caller: Address) {
-        caller.require_auth();
+    fn distribute_governance_token(env: Env) {
         let daily_distribution: u128 = 16438_0000000;
         let core_state: CoreState = get_core_state(&env);
 
@@ -197,7 +255,7 @@ impl StableLiquidityPoolTrait for StableLiquidityPool {
         for item in depositors.iter() {
             let deposit: Deposit = get_deposit(&env, &item.unwrap());
             let deposit_percentage =
-                div_floor(deposit.amount * 1_0000000, core_state.total_deposited);
+                div_floor(deposit.shares * 1_0000000, core_state.total_deposited);
 
             let amount_to_send: u128 =
                 div_floor(deposit_percentage * daily_distribution, 1_0000000);

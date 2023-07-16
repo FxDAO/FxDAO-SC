@@ -12,6 +12,8 @@ pub enum SCErrors {
     // Withdraws
     NothingToWithdraw = 30001,
     LockedPeriodUncompleted = 30002,
+    NotEnoughSharesToWithdraw = 30003,
+    InvalidWithdraw = 30004,
 
     // Distributions
     RecentDistribution = 40001,

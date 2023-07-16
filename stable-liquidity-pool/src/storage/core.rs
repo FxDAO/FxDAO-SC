@@ -8,6 +8,8 @@ pub struct CoreState {
     pub accepted_assets: Vec<Address>,
     pub fee_percentage: u128, // For example 0.3% = 0.003 = 30000
     pub total_deposited: u128,
+    pub share_price: u128,
+    pub total_shares: u128,
     pub treasury: Address,
 }
 
