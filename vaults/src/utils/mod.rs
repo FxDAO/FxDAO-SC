@@ -4,27 +4,34 @@ pub mod vaults;
 use crate::storage_types::*;
 use soroban_sdk::{panic_with_error, token, Address, Env, Symbol};
 
-pub fn check_admin(env: &Env) {
-    let admin: Address = env.storage().get(&DataKeys::Admin).unwrap().unwrap();
+pub fn check_admin(env: &Env) -> Address {
+    let admin: Address = env.storage().instance().get(&DataKeys::Admin).unwrap();
     admin.require_auth();
+    admin
 }
 
-pub fn check_oracle_admin(env: &Env) {
-    let admin: Address = env.storage().get(&DataKeys::OracleAdmin).unwrap().unwrap();
-    admin.require_auth();
-}
-
-pub fn check_protocol_manager(env: &Env) {
-    let admin: Address = env
+pub fn check_oracle_admin(env: &Env) -> Address {
+    let oracle_admin: Address = env
         .storage()
-        .get(&DataKeys::ProtocolManager)
-        .unwrap()
+        .instance()
+        .get(&DataKeys::OracleAdmin)
         .unwrap();
-    admin.require_auth();
+    oracle_admin.require_auth();
+    oracle_admin
+}
+
+pub fn check_protocol_manager(env: &Env) -> Address {
+    let protocol_manager: Address = env
+        .storage()
+        .instance()
+        .get(&DataKeys::ProtocolManager)
+        .unwrap();
+    protocol_manager.require_auth();
+    protocol_manager
 }
 
 pub fn get_core_state(env: &Env) -> CoreState {
-    env.storage().get(&DataKeys::CoreState).unwrap().unwrap()
+    env.storage().instance().get(&DataKeys::CoreState).unwrap()
 }
 
 pub fn valid_initial_debt(
@@ -47,6 +54,7 @@ pub fn check_positive(env: &Env, value: &i128) {
 pub fn validate_user_vault(env: &Env, user: &Address, denomination: &Symbol) {
     if !env
         .storage()
+        .persistent()
         .has(&VaultsDataKeys::UserVault(UserVaultDataType {
             user: user.clone(),
             denomination: denomination.clone(),
@@ -59,6 +67,7 @@ pub fn validate_user_vault(env: &Env, user: &Address, denomination: &Symbol) {
 pub fn vault_spot_available(env: &Env, user: Address, denomination: &Symbol) {
     if env
         .storage()
+        .persistent()
         .has(&VaultsDataKeys::UserVault(UserVaultDataType {
             user,
             denomination: denomination.clone(),
@@ -70,7 +79,11 @@ pub fn vault_spot_available(env: &Env, user: Address, denomination: &Symbol) {
 
 /// Currency utils
 pub fn validate_currency(env: &Env, denomination: &Symbol) {
-    if !env.storage().has(&DataKeys::Currency(denomination.clone())) {
+    if !env
+        .storage()
+        .instance()
+        .has(&DataKeys::Currency(denomination.clone()))
+    {
         panic_with_error!(&env, SCErrors::CurrencyDoesntExist);
     }
 }
@@ -78,8 +91,8 @@ pub fn validate_currency(env: &Env, denomination: &Symbol) {
 pub fn is_currency_active(env: &Env, denomination: &Symbol) {
     let currency: Currency = env
         .storage()
+        .instance()
         .get(&DataKeys::Currency(denomination.clone()))
-        .unwrap()
         .unwrap();
 
     if !currency.active {
@@ -89,21 +102,22 @@ pub fn is_currency_active(env: &Env, denomination: &Symbol) {
 
 pub fn save_currency(env: &Env, currency: &Currency) {
     env.storage()
+        .instance()
         .set(&DataKeys::Currency(currency.denomination.clone()), currency);
 }
 
 pub fn get_currency(env: &Env, denomination: &Symbol) -> Currency {
     env.storage()
+        .instance()
         .get(&DataKeys::Currency(denomination.clone()))
-        .unwrap()
         .unwrap()
 }
 
 /// Currency Vault conditions
 pub fn get_currency_vault_conditions(env: &Env, denomination: &Symbol) -> CurrencyVaultsConditions {
     env.storage()
-        .get(&DataKeys::CurrencyVaultConditions(denomination.clone()))
-        .unwrap()
+        .instance()
+        .get(&DataKeys::CurrencyVaultsConditions(denomination.clone()))
         .unwrap()
 }
 
@@ -114,8 +128,8 @@ pub fn set_currency_vault_conditions(
     opening_col_rate: &i128,
     denomination: &Symbol,
 ) {
-    env.storage().set(
-        &DataKeys::CurrencyVaultConditions(denomination.clone()),
+    env.storage().instance().set(
+        &DataKeys::CurrencyVaultsConditions(denomination.clone()),
         &CurrencyVaultsConditions {
             min_col_rate: min_col_rate.clone(),
             min_debt_creation: min_debt_creation.clone(),
@@ -127,17 +141,17 @@ pub fn set_currency_vault_conditions(
 /// Currency Stats Utils
 pub fn get_currency_stats(env: &Env, denomination: &Symbol) -> CurrencyStats {
     env.storage()
+        .instance()
         .get(&DataKeys::CurrencyStats(denomination.clone()))
-        .unwrap_or(Ok(CurrencyStats {
+        .unwrap_or(CurrencyStats {
             total_vaults: 0,
             total_debt: 0,
             total_col: 0,
-        }))
-        .unwrap()
+        })
 }
 
 pub fn set_currency_stats(env: &Env, denomination: &Symbol, currency_stats: &CurrencyStats) {
-    env.storage().set(
+    env.storage().instance().set(
         &DataKeys::CurrencyStats(denomination.clone()),
         currency_stats,
     );
@@ -153,8 +167,7 @@ pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Addres
 }
 
 pub fn deposit_collateral(env: &Env, core_state: &CoreState, depositor: &Address, amount: &i128) {
-    token::Client::new(&env, &core_state.col_token).transfer_from(
-        &env.current_contract_address(),
+    token::Client::new(&env, &core_state.col_token).transfer(
         &depositor,
         &env.current_contract_address(),
         &amount,
@@ -183,8 +196,7 @@ pub fn deposit_stablecoin(
     depositor: &Address,
     amount: &i128,
 ) {
-    token::Client::new(&env, &currency.contract).transfer_from(
-        &env.current_contract_address(),
+    token::Client::new(&env, &currency.contract).transfer(
         &depositor,
         &core_state.stable_issuer,
         &amount,

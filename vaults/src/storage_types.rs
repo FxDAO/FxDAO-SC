@@ -37,7 +37,7 @@ pub enum DataKeys {
     ProtocolManager,
     Currency(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
     CurrencyStats(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
-    CurrencyVaultConditions(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
+    CurrencyVaultsConditions(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
     PanicMode,
 }
 

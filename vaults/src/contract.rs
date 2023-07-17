@@ -4,10 +4,13 @@ use crate::utils::*;
 use num_integer::div_floor;
 
 use crate::utils::indexes::get_vaults_data_type_with_index;
-use soroban_sdk::{contractimpl, panic_with_error, token, vec, Address, BytesN, Env, Symbol, Vec};
+use soroban_sdk::{
+    contract, contractimpl, panic_with_error, symbol_short, token, vec, Address, BytesN, Env,
+    Symbol, Vec,
+};
 
-pub const CONTRACT_DESCRIPTION: Symbol = Symbol::short("Vaults");
-pub const CONTRACT_VERSION: Symbol = Symbol::short("0_3_0");
+pub const CONTRACT_DESCRIPTION: Symbol = symbol_short!("Vaults");
+pub const CONTRACT_VERSION: Symbol = symbol_short!("0_3_0");
 
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
@@ -68,6 +71,7 @@ pub trait VaultsContractTrait {
     fn vaults_to_liquidate(env: Env, denomination: Symbol) -> Vec<UserVault>;
 }
 
+#[contract]
 pub struct VaultsContract;
 
 // TODO: Add events for each function
@@ -81,37 +85,42 @@ impl VaultsContractTrait for VaultsContract {
         col_token: Address,
         stable_issuer: Address,
     ) {
-        if env.storage().has(&DataKeys::CoreState) {
+        if env.storage().instance().has(&DataKeys::CoreState) {
             panic_with_error!(&env, SCErrors::AlreadyInit);
         }
 
-        env.storage().set(
+        env.storage().instance().set(
             &DataKeys::CoreState,
             &CoreState {
                 col_token,
                 stable_issuer,
             },
         );
-        env.storage().set(&DataKeys::Admin, &admin);
-        env.storage().set(&DataKeys::OracleAdmin, &oracle_admin);
+        env.storage().instance().set(&DataKeys::Admin, &admin);
         env.storage()
+            .instance()
+            .set(&DataKeys::OracleAdmin, &oracle_admin);
+        env.storage()
+            .instance()
             .set(&DataKeys::ProtocolManager, &protocol_manager);
     }
 
     // TODO: Test this
     fn set_admin(env: Env, address: Address) {
         check_admin(&env);
-        env.storage().set(&DataKeys::Admin, &address);
+        env.storage().instance().set(&DataKeys::Admin, &address);
     }
 
     // TODO: Test this
     fn set_protocol_manager(env: Env, address: Address) {
         check_protocol_manager(&env);
-        env.storage().set(&DataKeys::ProtocolManager, &address);
+        env.storage()
+            .instance()
+            .set(&DataKeys::ProtocolManager, &address);
     }
 
     fn get_admin(env: Env) -> Address {
-        env.storage().get(&DataKeys::Admin).unwrap().unwrap()
+        env.storage().instance().get(&DataKeys::Admin).unwrap()
     }
 
     fn get_core_state(env: Env) -> CoreState {
@@ -120,7 +129,7 @@ impl VaultsContractTrait for VaultsContract {
 
     fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
         check_admin(&env);
-        env.update_current_contract_wasm(&new_wasm_hash);
+        env.deployer().update_current_contract_wasm(new_wasm_hash);
     }
 
     fn version(env: Env) -> (Symbol, Symbol) {
@@ -154,7 +163,11 @@ impl VaultsContractTrait for VaultsContract {
     fn create_currency(env: Env, denomination: Symbol, contract: Address) {
         check_protocol_manager(&env);
 
-        if env.storage().has(&DataKeys::Currency(denomination.clone())) {
+        if env
+            .storage()
+            .instance()
+            .has(&DataKeys::Currency(denomination.clone()))
+        {
             panic_with_error!(&env, &SCErrors::CurrencyAlreadyAdded);
         }
 
@@ -315,7 +328,7 @@ impl VaultsContractTrait for VaultsContract {
         // TODO: check if we are in panic mode once is implemented
         // TODO: check if collateral price has been updated lately
 
-        let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
+        let core_state: CoreState = get_core_state(&env);
 
         let currency: Currency = get_currency(&env, &denomination);
 
@@ -372,7 +385,7 @@ impl VaultsContractTrait for VaultsContract {
             panic_with_error!(&env, SCErrors::DepositAmountIsMoreThanTotalDebt);
         }
 
-        let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
+        let core_state: CoreState = get_core_state(&env);
 
         deposit_stablecoin(&env, &core_state, &currency, &caller, &deposit_amount);
 
@@ -419,8 +432,7 @@ impl VaultsContractTrait for VaultsContract {
             get_vaults_data_type_with_index(&env, &denomination, &index);
         let mut vaults: Vec<UserVault> = vec![&env] as Vec<UserVault>;
 
-        for result in data_keys.iter() {
-            let data_key: UserVaultDataType = result.unwrap();
+        for data_key in data_keys.iter() {
             let vault: UserVault = get_user_vault(&env, &data_key.user, &data_key.denomination);
             vaults.push_back(vault);
         }
@@ -451,9 +463,7 @@ impl VaultsContractTrait for VaultsContract {
         let mut amount_redeemed: i128 = 0;
         let mut collateral_to_withdraw: i128 = 0;
 
-        for redeemable_vault in redeemable_vaults.iter() {
-            let user_vault: UserVault = redeemable_vault.unwrap();
-
+        for user_vault in redeemable_vaults.iter() {
             if (amount_redeemed + user_vault.total_debt) > amount_to_redeem {
                 let mut updated_vault: UserVault = user_vault.clone();
                 let missing_amount: i128 = amount_to_redeem - amount_redeemed;
@@ -516,12 +526,11 @@ impl VaultsContractTrait for VaultsContract {
         let mut collateral_to_withdraw: i128 = 0;
         let mut amount_to_deposit: i128 = 0;
 
-        for item in owners.iter() {
-            let owner: Address = item.unwrap();
+        for owner in owners.iter() {
             let user_vault: UserVault = get_user_vault(&env, &owner, &denomination);
 
             if !can_be_liquidated(&user_vault, &currency, &currency_vault_conditions) {
-                panic_with_error!(&env, &SCErrors::UserVaultCantBeLiquidated);
+                panic_with_error!(&env, SCErrors::UserVaultCantBeLiquidated);
             }
 
             collateral_to_withdraw = collateral_to_withdraw + user_vault.total_col;
@@ -554,14 +563,11 @@ impl VaultsContractTrait for VaultsContract {
         let currency_vaults_conditions: CurrencyVaultsConditions =
             get_currency_vault_conditions(&env, &denomination);
 
-        for result in indexes.iter() {
-            let index: i128 = result.unwrap();
+        for index in indexes.iter() {
             let vaults_data_types: Vec<UserVaultDataType> =
                 get_vaults_data_type_with_index(&env, &denomination, &index);
 
-            for result2 in vaults_data_types.iter() {
-                let vault_data_type: UserVaultDataType = result2.unwrap();
-
+            for vault_data_type in vaults_data_types.iter() {
                 let user_vault: UserVault =
                     get_user_vault(&env, &vault_data_type.user, &vault_data_type.denomination);
 
