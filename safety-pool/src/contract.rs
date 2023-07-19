@@ -12,11 +12,14 @@ use crate::utils::deposits::{
 use crate::vaults;
 use crate::vaults::{Currency, UserVault};
 use num_integer::div_floor;
-use soroban_sdk::{contractimpl, panic_with_error, token, vec, Address, BytesN, Env, Symbol, Vec};
+use soroban_sdk::{
+    contract, contractimpl, panic_with_error, symbol_short, token, vec, Address, BytesN, Env,
+    Symbol, Vec,
+};
 use token::Client as TokenClient;
 
-pub const CONTRACT_DESCRIPTION: Symbol = Symbol::short("SafetyP");
-pub const CONTRACT_VERSION: Symbol = Symbol::short("0_3_0");
+pub const CONTRACT_DESCRIPTION: Symbol = symbol_short!("SafetyP");
+pub const CONTRACT_VERSION: Symbol = symbol_short!("0_3_0");
 
 pub trait SafetyPoolContractTrait {
     fn init(
@@ -66,6 +69,7 @@ pub trait SafetyPoolContractTrait {
     fn distribute_governance_token(env: Env, address: Address);
 }
 
+#[contract]
 pub struct SafetyPoolContract;
 
 // TODO: Add events for each function
@@ -109,10 +113,10 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
     fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
         let core_state: CoreState = get_core_state(&env);
         core_state.admin.require_auth();
-        env.update_current_contract_wasm(&new_wasm_hash);
+        env.deployer().update_current_contract_wasm(new_wasm_hash);
     }
 
-    fn version(env: Env) -> (Symbol, Symbol) {
+    fn version(_env: Env) -> (Symbol, Symbol) {
         (CONTRACT_DESCRIPTION, CONTRACT_VERSION)
     }
 
@@ -231,8 +235,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         let mut amount_covered: i128 = 0;
         let mut total_collateral: i128 = 0;
 
-        for result in vaults_to_liquidate.iter() {
-            let user_vault: UserVault = result.unwrap();
+        for user_vault in vaults_to_liquidate.iter() {
             if amount_covered + user_vault.total_debt <= stablecoin_balance {
                 target_users.push_back(user_vault.id);
                 amount_covered += user_vault.total_debt;
@@ -248,12 +251,6 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
 
         let depositors: Vec<Address> = get_depositors(&env);
 
-        token::Client::new(&env, &core_state.deposit_asset).increase_allowance(
-            &env.current_contract_address(),
-            &core_state.vaults_contract,
-            &amount_covered,
-        );
-
         vaults::Client::new(&env, &core_state.vaults_contract).liquidate(
             &env.current_contract_address(),
             &core_state.denomination_asset,
@@ -266,14 +263,13 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         let profit_from_liquidation: i128 = total_collateral - collateral_amount_paid;
 
         let share_of_profit = div_floor(
-            profit_from_liquidation * core_state.treasury_share.get(0).unwrap().unwrap() as i128,
-            core_state.treasury_share.get(1).unwrap().unwrap() as i128,
+            profit_from_liquidation * core_state.treasury_share.get(0).unwrap() as i128,
+            core_state.treasury_share.get(1).unwrap() as i128,
         );
 
         let amount_to_distribute: i128 = collateral_amount_paid + share_of_profit;
 
-        for result in depositors.iter() {
-            let depositor: Address = result.unwrap();
+        for depositor in depositors.iter() {
             let mut deposit: Deposit = get_deposit(&env, &depositor);
             let deposit_percentage: i128 =
                 div_floor(deposit.amount as i128 * 10000000, stablecoin_balance);
@@ -298,8 +294,8 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
             .balance(&env.current_contract_address());
 
         let liquidator_share: i128 = div_floor(
-            collateral_left * core_state.liquidator_share.get(0).unwrap().unwrap() as i128,
-            core_state.liquidator_share.get(1).unwrap().unwrap() as i128,
+            collateral_left * core_state.liquidator_share.get(0).unwrap() as i128,
+            core_state.liquidator_share.get(1).unwrap() as i128,
         );
 
         token::Client::new(&env, &core_state.collateral_asset).transfer(
@@ -339,8 +335,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         let max_deposit_time: u64 = env.ledger().timestamp() - (3600 * 48);
         let governance_token: TokenClient = TokenClient::new(&env, &core_state.governance_token);
 
-        for item in depositors.iter() {
-            let depositor: Address = item.unwrap();
+        for depositor in depositors.iter() {
             let deposit: Deposit = get_deposit(&env, &depositor);
 
             if deposit.deposit_time < max_deposit_time && governance_token.authorized(&depositor) {
@@ -349,8 +344,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
             }
         }
 
-        for item in approved_users.iter() {
-            let deposit: Deposit = item.unwrap();
+        for deposit in approved_users.iter() {
             let deposit_percentage =
                 div_floor(deposit.amount * 1_0000000, total_approved_users_deposit);
 

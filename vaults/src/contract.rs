@@ -132,7 +132,7 @@ impl VaultsContractTrait for VaultsContract {
         env.deployer().update_current_contract_wasm(new_wasm_hash);
     }
 
-    fn version(env: Env) -> (Symbol, Symbol) {
+    fn version(_env: Env) -> (Symbol, Symbol) {
         (CONTRACT_DESCRIPTION, CONTRACT_VERSION)
     }
 

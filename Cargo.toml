@@ -2,10 +2,8 @@
 resolver = "2"
 
 members = [
-    "governance",
     "safety-pool",
     "vaults",
-    "stable-liquidity-pool",
 ]
 
 [profile.release-with-logs]

@@ -1,11 +1,19 @@
 #![cfg(test)]
 use crate::contract::{SafetyPoolContract, SafetyPoolContractClient};
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{token, vec, Address, Env, Symbol, Vec};
+use soroban_sdk::{symbol_short, token, vec, Address, Env, Symbol, Vec};
+use token::AdminClient as TokenAdminClient;
 use token::Client as TokenClient;
 
-pub fn create_token_contract<'a>(e: &Env, admin: &Address) -> TokenClient<'a> {
-    token::Client::new(&e, &e.register_stellar_asset_contract(admin.clone()))
+pub fn create_token_contract<'a>(
+    e: &Env,
+    admin: &Address,
+) -> (TokenClient<'a>, TokenAdminClient<'a>) {
+    let contract_address = e.register_stellar_asset_contract(admin.clone());
+    (
+        TokenClient::new(&e, &contract_address),
+        TokenAdminClient::new(&e, &contract_address),
+    )
 }
 
 pub struct TestData<'a> {
@@ -13,15 +21,18 @@ pub struct TestData<'a> {
     pub vaults_contract: Address,
     pub treasury_contract: Address,
     pub deposit_asset_admin: Address,
-    pub deposit_asset: TokenClient<'a>,
+    pub deposit_asset_client: TokenClient<'a>,
+    pub deposit_asset_client_admin: TokenAdminClient<'a>,
     pub collateral_asset_admin: Address,
-    pub collateral_asset: TokenClient<'a>,
+    pub collateral_asset_client: TokenClient<'a>,
+    pub collateral_asset_client_admin: TokenAdminClient<'a>,
     pub denomination_asset: Symbol,
     pub min_deposit: u128,
     pub contract_client: SafetyPoolContractClient<'a>,
     pub profit_share: Vec<u32>,
     pub liquidator_share: Vec<u32>,
-    pub governance_asset: TokenClient<'a>,
+    pub governance_asset_client: TokenClient<'a>,
+    pub governance_asset_client_admin: TokenAdminClient<'a>,
 }
 
 pub fn create_test_data(env: &Env) -> TestData {
@@ -30,13 +41,16 @@ pub fn create_test_data(env: &Env) -> TestData {
     let treasury_contract: Address = Address::random(&env);
 
     let deposit_asset_admin = Address::random(&env);
-    let deposit_asset = create_token_contract(&env, &deposit_asset_admin);
+    let (deposit_asset_client, deposit_asset_client_admin) =
+        create_token_contract(&env, &deposit_asset_admin);
 
     let collateral_asset_admin = Address::random(&env);
-    let collateral_asset = create_token_contract(&env, &deposit_asset_admin);
+    let (collateral_asset_client, collateral_asset_client_admin) =
+        create_token_contract(&env, &deposit_asset_admin);
 
     let governance_asset_admin = Address::random(&env);
-    let governance_asset = create_token_contract(&env, &governance_asset_admin);
+    let (governance_asset_client, governance_asset_client_admin) =
+        create_token_contract(&env, &governance_asset_admin);
 
     let min_deposit: u128 = 1000000000;
 
@@ -48,15 +62,18 @@ pub fn create_test_data(env: &Env) -> TestData {
         vaults_contract,
         treasury_contract,
         deposit_asset_admin,
-        deposit_asset,
+        deposit_asset_client,
+        deposit_asset_client_admin,
         collateral_asset_admin,
-        collateral_asset,
-        denomination_asset: Symbol::short("usd"),
+        collateral_asset_client,
+        collateral_asset_client_admin,
+        denomination_asset: symbol_short!("usd"),
         min_deposit,
         contract_client,
         profit_share: vec![&env, 1u32, 2u32] as Vec<u32>,
         liquidator_share: vec![&env, 1u32, 2u32] as Vec<u32>,
-        governance_asset,
+        governance_asset_client,
+        governance_asset_client_admin,
     }
 }
 
@@ -65,23 +82,23 @@ pub fn init_contract(test_data: &TestData) {
         &test_data.contract_admin,
         &test_data.vaults_contract,
         &test_data.treasury_contract,
-        &test_data.collateral_asset.address,
-        &test_data.deposit_asset.address,
+        &test_data.collateral_asset_client.address,
+        &test_data.deposit_asset_client.address,
         &test_data.denomination_asset,
         &test_data.min_deposit,
         &test_data.profit_share,
         &test_data.liquidator_share,
-        &test_data.governance_asset.address,
+        &test_data.governance_asset_client.address,
     );
 }
 
 pub fn set_allowance(env: &Env, assets: &Vec<Address>, contract: &Address, depositor: &Address) {
-    for item in assets.iter() {
-        let asset = item.unwrap();
-        token::Client::new(&env, &asset).increase_allowance(
+    for asset in assets.iter() {
+        token::Client::new(&env, &asset).approve(
             &depositor,
             &contract,
             &9000000000000000,
+            &200_000,
         );
     }
 }
