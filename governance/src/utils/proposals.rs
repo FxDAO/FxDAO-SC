@@ -13,7 +13,7 @@ use soroban_sdk::{panic_with_error, token, vec, Address, BytesN, Env, Map, Symbo
 
 pub fn authenticate_proposers(proposers_ids: Vec<Address>) {
     for proposers_id in proposers_ids.iter() {
-        proposers_id.unwrap().require_auth();
+        proposers_id.require_auth();
     }
 }
 
@@ -21,7 +21,7 @@ pub fn authenticate_proposers(proposers_ids: Vec<Address>) {
 pub fn validate_proposers_payment(proposal_fee: &u128, proposers: &Vec<ProposerStat>) -> bool {
     let mut sum: u128 = 0;
     for proposer in proposers.iter() {
-        sum = sum + proposer.unwrap().amount;
+        sum = sum + proposer.amount;
     }
 
     proposal_fee == &sum
@@ -47,6 +47,7 @@ pub fn calculate_proposal_vote_price(
 pub fn validate_can_vote(env: &Env, voter_id: &Address, proposal: &Proposal) -> bool {
     if env
         .storage()
+        .persistent()
         .has(&ProposalsStorageKeys::ProposalVote(ProposalVoteIndex {
             voter_id: voter_id.clone(),
             proposal_id: proposal.id.clone(),
@@ -60,11 +61,11 @@ pub fn validate_can_vote(env: &Env, voter_id: &Address, proposal: &Proposal) -> 
 
 pub fn get_proposal_vote(env: &Env, voter_id: &Address, proposal_id: BytesN<32>) -> ProposalVote {
     env.storage()
+        .persistent()
         .get(&ProposalsStorageKeys::ProposalVote(ProposalVoteIndex {
             voter_id: voter_id.clone(),
             proposal_id: proposal_id.clone(),
         }))
-        .unwrap()
         .unwrap()
 }
 
@@ -73,8 +74,8 @@ pub fn get_proposal_vote(env: &Env, voter_id: &Address, proposal_id: BytesN<32>)
 pub fn get_proposals_fee(env: &Env) -> u128 {
     let core_state: CoreState = env
         .storage()
+        .instance()
         .get(&CoreStorageKeys::CoreState)
-        .unwrap()
         .unwrap();
 
     if core_state.proposals_fee == 0 {
@@ -90,7 +91,7 @@ pub fn charge_proposers(env: &Env, proposers: &Vec<ProposerStat>) {
     let (_, token) = get_governance_token(&env);
 
     for proposer_result in proposers.iter() {
-        let proposer = proposer_result.unwrap();
+        let proposer = proposer_result;
         token.transfer(
             &proposer.id,
             &env.current_contract_address(),
@@ -102,20 +103,22 @@ pub fn charge_proposers(env: &Env, proposers: &Vec<ProposerStat>) {
 pub fn get_proposal(env: &Env, proposal_id: &BytesN<32>) -> Proposal {
     if !env
         .storage()
+        .persistent()
         .has(&ProposalsStorageKeys::Proposal(proposal_id.clone()))
     {
         panic_with_error!(&env, SCErrors::ProposalDoesntExist);
     }
 
     env.storage()
+        .persistent()
         .get(&ProposalsStorageKeys::Proposal(proposal_id.clone()))
-        .unwrap()
         .unwrap()
 }
 
 pub fn validate_new_proposal_id(env: &Env, proposal_id: &BytesN<32>) {
     if env
         .storage()
+        .persistent()
         .has(&ProposalsStorageKeys::Proposal(proposal_id.clone()))
     {
         panic_with_error!(&env, SCErrors::ProposalIdAlreadyInUse);
@@ -175,27 +178,28 @@ pub fn new_proposal(
 
 pub fn get_proposals_ids(env: &Env) -> Vec<BytesN<32>> {
     env.storage()
+        .persistent()
         .get(&ProposalsStorageKeys::ProposalsIds)
-        .unwrap_or(Ok(vec![&env] as Vec<BytesN<32>>))
-        .unwrap()
+        .unwrap_or(vec![&env] as Vec<BytesN<32>>)
 }
 
 pub fn get_proposal_votes(env: &Env, proposal_id: &BytesN<32>) -> Vec<ProposalVoteIndex> {
     env.storage()
+        .persistent()
         .get(&ProposalsStorageKeys::ProposalVotes(proposal_id.clone()))
-        .unwrap_or(Ok(vec![&env] as Vec<ProposalVoteIndex>))
-        .unwrap()
+        .unwrap_or(vec![&env] as Vec<ProposalVoteIndex>)
 }
 
 pub fn save_new_proposal_id(env: &Env, proposal_id: &BytesN<32>) {
     let mut current_values: Vec<BytesN<32>> = get_proposals_ids(&env);
     current_values.push_front(proposal_id.clone());
     env.storage()
+        .persistent()
         .set(&ProposalsStorageKeys::ProposalsIds, &current_values);
 }
 
 pub fn save_proposal(env: &Env, proposal: &Proposal) {
-    env.storage().set(
+    env.storage().persistent().set(
         &ProposalsStorageKeys::Proposal(proposal.id.clone()),
         proposal,
     );
@@ -212,7 +216,7 @@ pub fn charge_proposal_vote(env: &Env, voter: &Address, vote_price: &u128) {
 }
 
 pub fn save_proposal_votes(env: &Env, proposal_id: &BytesN<32>, votes: &Vec<ProposalVoteIndex>) {
-    env.storage().set(
+    env.storage().persistent().set(
         &ProposalsStorageKeys::ProposalVotes(proposal_id.clone()),
         votes,
     );
@@ -235,14 +239,12 @@ pub fn are_update_contract_params_valid(
     let mut valid: bool = false;
 
     if let UpdateContractProposalOption::Some(data) = &params.update_contract {
-        for managing_contract in managing_contracts.iter() {
-            let address = managing_contract.unwrap();
+        for address in managing_contracts.iter() {
             if &address == &data.contract_id {
                 let allowed_functions = allowed_contracts_functions.get(address).unwrap();
 
-                for allowed_function in allowed_functions.unwrap().iter() {
-                    let result = allowed_function.unwrap();
-                    if result == data.function_name {
+                for allowed_function in allowed_functions.iter() {
+                    if allowed_function == data.function_name {
                         valid = true;
                     }
                 }
@@ -261,7 +263,7 @@ pub fn is_contract_to_upgrade_valid(
 
     if let UpgradeContractProposalOption::Some(data) = &params.upgrade_contract {
         for managing_contract in managing_contracts.iter() {
-            if managing_contract.unwrap() == data.contract_id {
+            if managing_contract == data.contract_id {
                 valid = true;
             }
         }

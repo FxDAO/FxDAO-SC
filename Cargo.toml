@@ -5,6 +5,7 @@ members = [
     "safety-pool",
     "stable-liquidity-pool",
     "vaults",
+    "governance",
 ]
 
 [profile.release-with-logs]

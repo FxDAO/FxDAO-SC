@@ -1,23 +1,32 @@
 #![cfg(test)]
 use crate::contract::{GovernanceContract, GovernanceContractClient};
 use crate::storage::proposals::{
-    ProposalExecutionParams, TreasuryPaymentProposalOption, TreasuryPaymentProposalParams,
-    UpdateContractProposalOption, UpgradeContractProposalOption,
+    ProposalExecutionParams, TreasuryPaymentProposalOption, UpdateContractProposalOption,
+    UpgradeContractProposalOption,
 };
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{map, token, vec, Address, Env, Map, Symbol, Vec};
+use token::AdminClient as TokenAdminClient;
 use token::Client as TokenClient;
 
 pub const TEST_PROPOSAL_FEE: u128 = 12_00_000_0000000;
 pub const TEST_VOTING_CREDIT_PRICE: u128 = 1_0000000;
 
-pub fn create_token_contract<'a>(e: &Env, admin: &Address) -> TokenClient<'a> {
-    token::Client::new(&e, &e.register_stellar_asset_contract(admin.clone()))
+pub fn create_token_contract<'a>(
+    e: &Env,
+    admin: &Address,
+) -> (TokenClient<'a>, TokenAdminClient<'a>) {
+    let contract_address = e.register_stellar_asset_contract(admin.clone());
+    (
+        TokenClient::new(e, &contract_address),
+        TokenAdminClient::new(e, &contract_address),
+    )
 }
 
 pub struct TestData<'a> {
     pub governance_token_admin: Address,
-    pub governance_token: TokenClient<'a>,
+    pub governance_token_client: TokenClient<'a>,
+    pub governance_token_admin_client: TokenAdminClient<'a>,
     pub contract_admin: Address,
     pub contract_client: GovernanceContractClient<'a>,
     pub cooldown_period: u64,
@@ -28,7 +37,8 @@ pub struct TestData<'a> {
 
 pub fn create_test_data(env: &Env) -> TestData {
     let governance_token_admin = Address::random(&env);
-    let governance_token = create_token_contract(&env, &governance_token_admin);
+    let (governance_token_client, governance_token_admin_client) =
+        create_token_contract(&env, &governance_token_admin);
 
     let contract_admin: Address = Address::random(&env);
     let contract_client =
@@ -36,7 +46,8 @@ pub fn create_test_data(env: &Env) -> TestData {
 
     TestData {
         governance_token_admin,
-        governance_token,
+        governance_token_client,
+        governance_token_admin_client,
         contract_admin,
         contract_client,
         cooldown_period: 3600 * 24, // TODO: Implement this at the create proposal level IE proposers cooldown checks
@@ -52,7 +63,7 @@ pub fn create_test_data(env: &Env) -> TestData {
 
 pub fn init_contract(test_data: &TestData) {
     test_data.contract_client.init(
-        &test_data.governance_token.address,
+        &test_data.governance_token_client.address,
         &TEST_PROPOSAL_FEE,
         &TEST_VOTING_CREDIT_PRICE,
         &test_data.contract_admin,
