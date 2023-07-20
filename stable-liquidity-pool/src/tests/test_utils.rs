@@ -1,9 +1,18 @@
 #![cfg(test)]
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{token, vec, Address, Env, Vec};
+use token::AdminClient as TokenAdminClient;
 use token::Client as TokenClient;
 
 use crate::contract::{StableLiquidityPoolContract, StableLiquidityPoolContractClient};
+
+fn create_token_contract<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, TokenAdminClient<'a>) {
+    let contract_address = e.register_stellar_asset_contract(admin.clone());
+    (
+        TokenClient::new(e, &contract_address),
+        TokenAdminClient::new(e, &contract_address),
+    )
+}
 
 pub struct TestData<'a> {
     pub stable_liquidity_pool_contract_client: StableLiquidityPoolContractClient<'a>,
@@ -14,12 +23,15 @@ pub struct TestData<'a> {
 
     pub usdc_token_admin: Address,
     pub usdc_token_client: TokenClient<'a>,
+    pub usdc_token_admin_client: TokenAdminClient<'a>,
 
     pub usdt_token_admin: Address,
     pub usdt_token_client: TokenClient<'a>,
+    pub usdt_token_admin_client: TokenAdminClient<'a>,
 
     pub usdx_token_admin: Address,
     pub usdx_token_client: TokenClient<'a>,
+    pub usdx_token_admin_client: TokenAdminClient<'a>,
 
     pub fee_percentage: u128,
     pub treasury: Address,
@@ -32,22 +44,16 @@ pub fn create_test_data(env: &Env) -> TestData {
     let governance_token = Address::random(&env);
 
     let usdc_token_admin = Address::random(&env);
-    let usdc_token_client = TokenClient::new(
-        &env,
-        &env.register_stellar_asset_contract(usdc_token_admin.clone()),
-    );
+    let (usdc_token_client, usdc_token_admin_client) =
+        create_token_contract(&env, &usdc_token_admin);
 
     let usdt_token_admin = Address::random(&env);
-    let usdt_token_client = TokenClient::new(
-        &env,
-        &env.register_stellar_asset_contract(usdt_token_admin.clone()),
-    );
+    let (usdt_token_client, usdt_token_admin_client) =
+        create_token_contract(&env, &usdt_token_admin);
 
     let usdx_token_admin = Address::random(&env);
-    let usdx_token_client = TokenClient::new(
-        &env,
-        &env.register_stellar_asset_contract(usdx_token_admin.clone()),
-    );
+    let (usdx_token_client, usdx_token_admin_client) =
+        create_token_contract(&env, &usdx_token_admin);
 
     let fee_percentage = 30000;
     let treasury = Address::random(&env);
@@ -62,10 +68,13 @@ pub fn create_test_data(env: &Env) -> TestData {
         governance_token,
         usdc_token_admin,
         usdc_token_client,
+        usdc_token_admin_client,
         usdt_token_admin,
         usdt_token_client,
+        usdt_token_admin_client,
         usdx_token_admin,
         usdx_token_client,
+        usdx_token_admin_client,
         fee_percentage,
         treasury,
         minted_asset_amount: 10_000_0000000,
@@ -89,16 +98,15 @@ pub fn init_contract(env: &Env, test_data: &TestData) {
 }
 
 pub fn prepare_test_accounts(test_data: &TestData, accounts: &Vec<Address>) {
-    for item in accounts.iter() {
-        let account = item.unwrap();
+    for account in accounts.iter() {
         test_data
-            .usdc_token_client
+            .usdc_token_admin_client
             .mint(&account, &(test_data.minted_asset_amount as i128));
         test_data
-            .usdt_token_client
+            .usdt_token_admin_client
             .mint(&account, &(test_data.minted_asset_amount as i128));
         test_data
-            .usdx_token_client
+            .usdx_token_admin_client
             .mint(&account, &(test_data.minted_asset_amount as i128));
     }
 }
