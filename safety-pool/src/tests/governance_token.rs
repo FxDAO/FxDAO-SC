@@ -13,7 +13,7 @@ fn distribute_governance_token() {
     let test_data: TestData = create_test_data(&env);
     init_contract(&test_data);
     test_data
-        .governance_asset
+        .governance_asset_client_admin
         .mint(&test_data.contract_client.address, &1_000_000_0000000);
 
     let mint_amount: i128 = 1000_0000000;
@@ -28,10 +28,15 @@ fn distribute_governance_token() {
         sequence_number: 10,
         network_id: Default::default(),
         base_reserve: 10,
+        min_temp_entry_expiration: 0,
+        min_persistent_entry_expiration: 0,
+        max_entry_expiration: 0,
     });
 
     for depositor in [&depositor_1, &depositor_2] {
-        test_data.deposit_asset.mint(&depositor, &mint_amount);
+        test_data
+            .deposit_asset_client_admin
+            .mint(&depositor, &mint_amount);
 
         test_data
             .contract_client
@@ -50,6 +55,9 @@ fn distribute_governance_token() {
         sequence_number: 10,
         network_id: Default::default(),
         base_reserve: 10,
+        min_temp_entry_expiration: 0,
+        min_persistent_entry_expiration: 0,
+        max_entry_expiration: 0,
     });
 
     assert_eq!(
@@ -57,7 +65,9 @@ fn distribute_governance_token() {
         3601 * 48
     );
 
-    test_data.deposit_asset.mint(&depositor_3, &mint_amount);
+    test_data
+        .deposit_asset_client_admin
+        .mint(&depositor_3, &mint_amount);
 
     test_data
         .contract_client
@@ -70,7 +80,10 @@ fn distribute_governance_token() {
     // We check that the first two depositors received their rewards while third one didn't
     // The first two should receive 4109_5000000 each because they are the only ones and both deposited the same amount
     for depositor in [&depositor_1, &depositor_2] {
-        assert_eq!(test_data.governance_asset.balance(&depositor), 4109_5000000);
+        assert_eq!(
+            test_data.governance_asset_client.balance(&depositor),
+            4109_5000000
+        );
     }
 
     env.ledger().set(LedgerInfo {
@@ -79,6 +92,9 @@ fn distribute_governance_token() {
         sequence_number: 10,
         network_id: Default::default(),
         base_reserve: 10,
+        min_temp_entry_expiration: 0,
+        min_persistent_entry_expiration: 0,
+        max_entry_expiration: 0,
     });
 
     test_data
@@ -87,7 +103,7 @@ fn distribute_governance_token() {
 
     assert_eq!(
         test_data
-            .governance_asset
+            .governance_asset_client
             .balance(&test_data.contract_client.address),
         1_000_000_0000000 - (8219_0000000 * 2)
     );
@@ -97,12 +113,12 @@ fn distribute_governance_token() {
     // Depositor 3 should receive 1643_8000000
     for depositor in [&depositor_1, &depositor_2] {
         assert_eq!(
-            test_data.governance_asset.balance(&depositor),
+            test_data.governance_asset_client.balance(&depositor),
             4109_5000000 + 3287_6000000
         );
     }
     assert_eq!(
-        test_data.governance_asset.balance(&depositor_3),
+        test_data.governance_asset_client.balance(&depositor_3),
         1643_8000000,
     );
 }

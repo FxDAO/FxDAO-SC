@@ -18,11 +18,12 @@ use crate::utils::proposals::{
     validate_proposers_payment,
 };
 use soroban_sdk::{
-    contractimpl, panic_with_error, vec, Address, BytesN, Env, Map, RawVal, Symbol, Vec,
+    contract, contractimpl, panic_with_error, symbol_short, vec, Address, BytesN, Env, Map, Symbol,
+    Val, Vec,
 };
 
-pub const CONTRACT_DESCRIPTION: Symbol = Symbol::short("Gov");
-pub const CONTRACT_VERSION: Symbol = Symbol::short("0_3_0");
+pub const CONTRACT_DESCRIPTION: Symbol = symbol_short!("Gov");
+pub const CONTRACT_VERSION: Symbol = symbol_short!("0_3_0");
 
 pub trait GovernanceContractTrait {
     fn init(
@@ -66,6 +67,7 @@ pub trait GovernanceContractTrait {
     fn execute_proposal_result(env: Env, proposal_id: BytesN<32>);
 }
 
+#[contract]
 pub struct GovernanceContract;
 
 // TODO: Add events for each function
@@ -99,7 +101,7 @@ impl GovernanceContractTrait for GovernanceContract {
     fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
         let core_state: CoreState = get_core_state(&env);
         core_state.contract_admin.require_auth();
-        env.update_current_contract_wasm(&new_wasm_hash);
+        env.deployer().update_current_contract_wasm(new_wasm_hash);
     }
 
     fn version(env: Env) -> (Symbol, Symbol) {
@@ -120,11 +122,10 @@ impl GovernanceContractTrait for GovernanceContract {
         let mut admin_upgrade = false;
         let core_state = get_core_state(&env);
 
-        for item in proposers.iter() {
-            let proposer: ProposerStat = item.unwrap();
-            proposer.id.require_auth();
+        for proposer_stat in proposers.iter() {
+            proposer_stat.id.require_auth();
             if proposal_type == ProposalType::UpgradeContract
-                && core_state.contract_admin == proposer.id
+                && core_state.contract_admin == proposer_stat.id
             {
                 admin_upgrade = true;
             }
@@ -286,10 +287,10 @@ impl GovernanceContractTrait for GovernanceContract {
                     panic_with_error!(&env, SCErrors::ExecutionParamsAreInvalid);
                 }
                 UpgradeContractProposalOption::Some(data) => {
-                    env.invoke_contract::<RawVal>(
+                    env.invoke_contract::<Val>(
                         &data.contract_id.clone(),
-                        &Symbol::short("upgrade"),
-                        vec![&env, data.new_contract_hash.to_raw()] as Vec<RawVal>,
+                        &symbol_short!("upgrade"),
+                        vec![&env, data.new_contract_hash.to_val()] as Vec<Val>,
                     );
                 }
             },
@@ -298,7 +299,7 @@ impl GovernanceContractTrait for GovernanceContract {
                     panic_with_error!(&env, SCErrors::ExecutionParamsAreInvalid);
                 }
                 UpdateContractProposalOption::Some(data) => {
-                    env.invoke_contract::<RawVal>(
+                    env.invoke_contract::<Val>(
                         &data.contract_id,
                         &data.function_name,
                         data.params.clone(),

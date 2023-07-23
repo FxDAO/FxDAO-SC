@@ -10,11 +10,11 @@ use soroban_sdk::{panic_with_error, vec, Address, Env, Symbol, Vec};
 
 pub fn get_user_vault(env: &Env, user: &Address, denomination: &Symbol) -> UserVault {
     env.storage()
+        .persistent()
         .get(&VaultsDataKeys::UserVault(UserVaultDataType {
             user: user.clone(),
             denomination: denomination.clone(),
         }))
-        .unwrap()
         .unwrap()
 }
 
@@ -46,7 +46,7 @@ pub fn save_new_user_vault(
     let mut indexes_list = get_sorted_indexes_list(env, denomination);
     indexes_list = add_new_index_into_indexes_list(&indexes_list.clone(), user_vault.index.clone());
 
-    env.storage().set(
+    env.storage().persistent().set(
         &VaultsDataKeys::Indexes(denomination.clone()),
         &indexes_list,
     );
@@ -114,7 +114,7 @@ pub fn update_user_vault(
 
     indexes_list = add_new_index_into_indexes_list(&indexes_list, new_user_vault.index);
 
-    env.storage().set(
+    env.storage().persistent().set(
         &VaultsDataKeys::Indexes(denomination.clone()),
         &indexes_list,
     );
@@ -131,6 +131,7 @@ pub fn update_user_vault(
 /// 3.2 - It gets the indexes list and remove the index from it
 pub fn remove_user_vault(env: &Env, user: &Address, denomination: &Symbol, user_vault: &UserVault) {
     env.storage()
+        .persistent()
         .remove(&VaultsDataKeys::UserVault(UserVaultDataType {
             user: user.clone(),
             denomination: denomination.clone(),
@@ -156,7 +157,7 @@ pub fn remove_user_vault(env: &Env, user: &Address, denomination: &Symbol, user_
     if vaults_with_index_record.len() == 0 {
         let mut indexes_list = get_sorted_indexes_list(env, denomination);
         indexes_list = remove_index_from_indexes_list(&indexes_list, user_vault.index);
-        env.storage().set(
+        env.storage().persistent().set(
             &VaultsDataKeys::Indexes(denomination.clone()),
             &indexes_list,
         );
@@ -164,7 +165,7 @@ pub fn remove_user_vault(env: &Env, user: &Address, denomination: &Symbol, user_
 }
 
 pub fn set_user_vault(env: &Env, user: &Address, denomination: &Symbol, user_vault: &UserVault) {
-    env.storage().set(
+    env.storage().persistent().set(
         &VaultsDataKeys::UserVault(UserVaultDataType {
             user: user.clone(),
             denomination: denomination.clone(),
@@ -175,9 +176,9 @@ pub fn set_user_vault(env: &Env, user: &Address, denomination: &Symbol, user_vau
 
 pub fn get_sorted_indexes_list(env: &Env, denomination: &Symbol) -> Vec<i128> {
     env.storage()
+        .persistent()
         .get(&VaultsDataKeys::Indexes(denomination.clone()))
-        .unwrap_or(Ok(vec![env] as Vec<i128>))
-        .unwrap()
+        .unwrap_or(vec![env] as Vec<i128>)
 }
 
 pub fn get_redeemable_vaults(env: &Env, amount: &i128, currency: &Currency) -> Vec<UserVault> {
@@ -187,13 +188,13 @@ pub fn get_redeemable_vaults(env: &Env, amount: &i128, currency: &Currency) -> V
 
     for item in sorted_indexes_list.iter() {
         let vaults_with_index: Vec<UserVaultDataType> =
-            get_vaults_data_type_with_index(env, &currency.denomination, &item.unwrap());
+            get_vaults_data_type_with_index(env, &currency.denomination, &item);
 
         for data_type in vaults_with_index.iter() {
             let user_vault: UserVault = env
                 .storage()
-                .get(&VaultsDataKeys::UserVault(data_type.unwrap()))
-                .unwrap()
+                .persistent()
+                .get(&VaultsDataKeys::UserVault(data_type))
                 .unwrap();
 
             covered_amount = covered_amount + user_vault.total_debt;
@@ -218,8 +219,7 @@ pub fn add_vault_to_vaults_with_index(
     let mut updated_record: Vec<UserVaultDataType> = record.clone();
     let mut saved: bool = false;
 
-    for item in updated_record.iter() {
-        let vault_data_key = item.unwrap();
+    for vault_data_key in updated_record.iter() {
         if user == &vault_data_key.user && denomination == &vault_data_key.denomination {
             saved = true;
         }
@@ -242,9 +242,7 @@ pub fn remove_vault_from_vaults_with_index(
 ) -> Vec<UserVaultDataType> {
     let mut updated_record = record.clone();
 
-    for (i, el) in updated_record.iter().enumerate() {
-        let vault_data_key = el.unwrap();
-
+    for (i, vault_data_key) in updated_record.iter().enumerate() {
         if &vault_data_key.user == user && &vault_data_key.denomination == denomination {
             updated_record.remove(i as u32);
         }
@@ -259,8 +257,8 @@ pub fn calculate_user_vault_index(total_debt: i128, total_col: i128) -> i128 {
 
 pub fn add_new_index_into_indexes_list(indexes_list: &Vec<i128>, index: i128) -> Vec<i128> {
     let mut updated_indexes_list: Vec<i128> = indexes_list.clone();
-    let first_value: i128 = updated_indexes_list.first().unwrap_or(Ok(0)).unwrap();
-    let last_value: i128 = updated_indexes_list.last().unwrap_or(Ok(0)).unwrap();
+    let first_value: i128 = updated_indexes_list.first().unwrap_or(0);
+    let last_value: i128 = updated_indexes_list.last().unwrap_or(0);
 
     if first_value > index {
         updated_indexes_list.push_front(index);
@@ -278,8 +276,8 @@ pub fn add_new_index_into_indexes_list(indexes_list: &Vec<i128>, index: i128) ->
 
 pub fn remove_index_from_indexes_list(indexes_list: &Vec<i128>, index: i128) -> Vec<i128> {
     let mut updated_indexes_list: Vec<i128> = indexes_list.clone();
-    let first_value: i128 = updated_indexes_list.first().unwrap_or(Ok(0)).unwrap();
-    let last_value: i128 = updated_indexes_list.last().unwrap_or(Ok(0)).unwrap();
+    let first_value: i128 = updated_indexes_list.first().unwrap_or(0);
+    let last_value: i128 = updated_indexes_list.last().unwrap_or(0);
 
     if first_value == index {
         updated_indexes_list.pop_front();

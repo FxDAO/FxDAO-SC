@@ -1,9 +1,13 @@
 #![cfg(test)]
+use crate::errors::SCErrors;
 use crate::storage::core::CoreState;
 use crate::storage::deposits::Deposit;
 use crate::tests::test_utils::{create_test_data, init_contract, prepare_test_accounts, TestData};
-use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo};
-use soroban_sdk::{map, vec, Address, Env, IntoVal, Status, Symbol, Vec};
+use soroban_sdk::arbitrary::std;
+use soroban_sdk::testutils::{
+    Address as _, AuthorizedFunction, AuthorizedInvocation, Ledger, LedgerInfo,
+};
+use soroban_sdk::{map, symbol_short, vec, Address, Env, IntoVal, Symbol, Vec};
 
 #[test]
 fn test_swaps_and_profit_retiring() {
@@ -49,7 +53,7 @@ fn test_swaps_and_profit_retiring() {
     let customer_1: Address = Address::random(&env);
 
     test_data
-        .usdc_token_client
+        .usdc_token_admin_client
         .mint(&customer_1, &(deposit_amount as i128));
 
     assert_eq!(
@@ -65,26 +69,42 @@ fn test_swaps_and_profit_retiring() {
     );
 
     assert_eq!(
-        [env.auths().first().unwrap()],
-        [&(
-            // Address for which auth is performed
+        env.auths().first().unwrap(),
+        &(
             customer_1.clone(),
-            // Identifier of the called contract
-            test_data
-                .stable_liquidity_pool_contract_client
-                .address
-                .clone(),
-            // Name of the called function
-            Symbol::short("swap"),
-            // Arguments used (converted to the env-managed vector via `into_val`)
-            (
-                customer_1.clone(),
-                test_data.usdc_token_client.address.clone(),
-                test_data.usdx_token_client.address.clone(),
-                deposit_amount.clone(),
-            )
-                .into_val(&env),
-        )]
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    test_data
+                        .stable_liquidity_pool_contract_client
+                        .address
+                        .clone(),
+                    symbol_short!("swap"),
+                    (
+                        customer_1.clone(),
+                        test_data.usdc_token_client.address.clone(),
+                        test_data.usdx_token_client.address.clone(),
+                        deposit_amount.clone(),
+                    )
+                        .into_val(&env),
+                )),
+                sub_invocations: std::vec![AuthorizedInvocation {
+                    function: AuthorizedFunction::Contract((
+                        test_data.usdc_token_client.address.clone(),
+                        symbol_short!("transfer"),
+                        (
+                            customer_1.clone(),
+                            test_data
+                                .stable_liquidity_pool_contract_client
+                                .address
+                                .clone(),
+                            (deposit_amount as i128).clone(),
+                        )
+                            .into_val(&env),
+                    )),
+                    sub_invocations: std::vec![],
+                }],
+            }
+        )
     );
 
     assert_eq!(&test_data.usdc_token_client.balance(&customer_1), &0);
@@ -116,7 +136,7 @@ fn test_swaps_and_profit_retiring() {
     let customer_2: Address = Address::random(&env);
 
     test_data
-        .usdt_token_client
+        .usdt_token_admin_client
         .mint(&customer_2, &(deposit_amount as i128));
 
     test_data.stable_liquidity_pool_contract_client.swap(
@@ -195,6 +215,9 @@ fn test_swaps_and_profit_retiring() {
         sequence_number: 10,
         network_id: Default::default(),
         base_reserve: 10,
+        min_temp_entry_expiration: 0,
+        min_persistent_entry_expiration: 0,
+        max_entry_expiration: 0,
     });
 
     test_data.stable_liquidity_pool_contract_client.withdraw(

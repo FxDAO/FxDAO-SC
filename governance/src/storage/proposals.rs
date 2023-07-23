@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, vec, Address, BytesN, RawVal, Symbol, Vec};
+use soroban_sdk::{contracttype, Address, BytesN, Symbol, Val, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
@@ -56,7 +56,7 @@ pub enum TreasuryPaymentProposalOption {
 pub struct UpdateContractProposalParams {
     pub contract_id: Address,
     pub function_name: Symbol,
-    pub params: Vec<RawVal>,
+    pub params: Vec<Val>,
 }
 
 #[contracttype]

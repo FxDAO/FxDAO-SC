@@ -12,11 +12,12 @@ use crate::utils::deposits::{
 };
 use num_integer::div_floor;
 use soroban_sdk::{
-    contractimpl, panic_with_error, token, vec, Address, BytesN, Env, Map, Symbol, Vec,
+    contract, contractimpl, panic_with_error, symbol_short, token, Address, BytesN, Env, Map,
+    Symbol, Vec,
 };
 
-pub const CONTRACT_DESCRIPTION: Symbol = Symbol::short("StableLP");
-pub const CONTRACT_VERSION: Symbol = Symbol::short("0_3_0");
+pub const CONTRACT_DESCRIPTION: Symbol = symbol_short!("StableLP");
+pub const CONTRACT_VERSION: Symbol = symbol_short!("0_3_0");
 
 pub trait StableLiquidityPoolContractTrait {
     fn init(
@@ -55,6 +56,7 @@ pub trait StableLiquidityPoolContractTrait {
     fn distribute_governance_token(env: Env);
 }
 
+#[contract]
 pub struct StableLiquidityPoolContract;
 
 #[contractimpl]
@@ -91,10 +93,10 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
 
     fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
         get_core_state(&env).admin.require_auth();
-        env.update_current_contract_wasm(&new_wasm_hash);
+        env.deployer().update_current_contract_wasm(new_wasm_hash);
     }
 
-    fn version(env: Env) -> (Symbol, Symbol) {
+    fn version(_env: Env) -> (Symbol, Symbol) {
         (CONTRACT_DESCRIPTION, CONTRACT_VERSION)
     }
 
@@ -102,7 +104,7 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         caller.require_auth();
         let mut core_state: CoreState = get_core_state(&env);
 
-        if !validate_deposit_asset(&env, &core_state.accepted_assets, &asset) {
+        if !validate_deposit_asset(&core_state.accepted_assets, &asset) {
             panic_with_error!(&env, SCErrors::InvalidAsset);
         }
 
@@ -156,17 +158,15 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
 
         let mut withdraw_amount: u128 = 0;
 
-        for item in core_state.accepted_assets.iter() {
-            let token: Address = item.unwrap();
-            withdraw_amount = withdraw_amount + assets_orders.get(token.clone()).unwrap().unwrap();
+        for token in core_state.accepted_assets.iter() {
+            withdraw_amount = withdraw_amount + assets_orders.get(token.clone()).unwrap();
         }
 
         if calculated_amount_to_withdraw != withdraw_amount {
             panic_with_error!(&env, SCErrors::InvalidWithdraw);
         }
 
-        for item in assets_orders.iter() {
-            let (asset, amount) = item.unwrap();
+        for (asset, amount) in assets_orders.iter() {
             make_withdrawal(&env, &deposit.depositor, &asset, &amount);
         }
 
@@ -201,11 +201,11 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
 
         let mut core_state: CoreState = get_core_state(&env);
 
-        if !validate_deposit_asset(&env, &core_state.accepted_assets, &from_asset) {
+        if !validate_deposit_asset(&core_state.accepted_assets, &from_asset) {
             panic_with_error!(&env, SCErrors::InvalidAsset);
         }
 
-        if !validate_deposit_asset(&env, &core_state.accepted_assets, &to_asset) {
+        if !validate_deposit_asset(&core_state.accepted_assets, &to_asset) {
             panic_with_error!(&env, SCErrors::InvalidAsset);
         }
 
@@ -252,8 +252,8 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         let depositors: Vec<Address> = get_depositors(&env);
         let governance_token = token::Client::new(&env, &core_state.governance_token);
 
-        for item in depositors.iter() {
-            let deposit: Deposit = get_deposit(&env, &item.unwrap());
+        for depositor in depositors.iter() {
+            let deposit: Deposit = get_deposit(&env, &depositor);
             let deposit_percentage =
                 div_floor(deposit.shares * 1_0000000, core_state.total_deposited);
 
