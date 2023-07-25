@@ -49,6 +49,8 @@ pub trait StableLiquidityPoolContractTrait {
 
     fn get_depositors(env: Env) -> Vec<Address>;
 
+    fn get_supported_assets(env: Env) -> Vec<Address>;
+
     fn swap(env: Env, caller: Address, from_asset: Address, to_asset: Address, amount: u128);
 
     fn last_gov_distribution_time(env: Env) -> u64;
@@ -194,6 +196,10 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
 
     fn get_depositors(env: Env) -> Vec<Address> {
         get_depositors(&env)
+    }
+
+    fn get_supported_assets(env: Env) -> Vec<Address> {
+        get_core_state(&env).accepted_assets
     }
 
     fn swap(env: Env, caller: Address, from_asset: Address, to_asset: Address, amount: u128) {
