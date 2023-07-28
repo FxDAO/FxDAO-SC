@@ -5,7 +5,7 @@ use crate::storage_types::{CurrencyStats, SCErrors, UserVault};
 use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
 };
-use crate::utils::vaults::calculate_user_vault_index;
+use crate::utils::indexes::calculate_user_vault_index;
 use soroban_sdk::testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation};
 use soroban_sdk::{symbol_short, token, vec, Address, Env, Error, IntoVal, Symbol, Vec};
 

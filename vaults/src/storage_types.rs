@@ -76,10 +76,10 @@ pub enum VaultsDataKeys {
     /// This key host a Vec of i128 which is the index of the vaults, this Vec must be updated every time a Vault is updated
     /// The Vec is sorted by the collateral ratio of the deposit IE the lower go first
     /// The Symbol value is the denomination of the currency
-    Indexes(Symbol),
+    VaultsIndexes(Symbol),
 
     /// The result is a Vec<UserVaultDataType>
-    VaultsWithIndex(VaultsWithIndexDataType),
+    VaultsDataTypesWithIndex(VaultsWithIndexDataType),
 }
 
 #[contracterror]
