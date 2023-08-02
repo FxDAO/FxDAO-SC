@@ -1,6 +1,13 @@
 use crate::errors::SCErrors;
 use crate::storage::core::{CoreState, CoreStorageKeys};
 use soroban_sdk::{panic_with_error, Env};
+pub const INSTANCE_BUMP_CONSTANT: u32 = 507904;
+
+pub fn bump_instance(env: &Env) {
+    env.storage()
+        .instance()
+        .bump(env.ledger().sequence() + INSTANCE_BUMP_CONSTANT)
+}
 
 pub fn can_init_contract(env: &Env) {
     if env.storage().instance().has(&CoreStorageKeys::CoreState) {

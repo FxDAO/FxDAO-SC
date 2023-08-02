@@ -1,7 +1,5 @@
-use crate::storage_types::{
-    Currency, CurrencyVaultsConditions, SCErrors, UserVault, UserVaultDataType, VaultsDataKeys,
-    VaultsWithIndexDataType,
-};
+use crate::storage::storage_types::*;
+use crate::storage::vaults::*;
 use crate::utils::indexes::{
     add_new_index_into_indexes_list, get_vaults_data_type_with_index, get_vaults_indexes_list,
     remove_index_from_indexes_list, remove_vaults_data_type_with_index, save_vaults_indexes_list,

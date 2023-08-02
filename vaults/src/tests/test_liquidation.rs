@@ -1,7 +1,8 @@
 #![cfg(test)]
 extern crate std;
 
-use crate::storage_types::{CurrencyStats, SCErrors, UserVault};
+use crate::storage::storage_types::*;
+use crate::storage::vaults::*;
 use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
 };

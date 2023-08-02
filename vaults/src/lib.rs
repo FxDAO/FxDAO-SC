@@ -1,7 +1,7 @@
 #![no_std]
 
 mod contract;
-mod storage_types;
+mod storage;
 mod utils;
 
 mod test;

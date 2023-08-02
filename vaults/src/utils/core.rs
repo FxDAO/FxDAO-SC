@@ -1,6 +1,6 @@
 pub const INSTANCE_BUMP_CONSTANT: u32 = 507904;
 
-use crate::storage_types::{CoreState, DataKeys};
+use crate::storage::storage_types::*;
 use soroban_sdk::{Address, Env};
 
 pub fn bump_instance(env: &Env) {

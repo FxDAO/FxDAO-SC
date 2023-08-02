@@ -2,13 +2,13 @@ use crate::errors::SCErrors;
 use crate::storage::core::CoreState;
 use crate::storage::deposits::Deposit;
 use crate::utils::core::{
-    can_init_contract, get_core_state, get_last_governance_token_distribution_time, set_core_state,
-    set_last_governance_token_distribution_time,
+    bump_instance, can_init_contract, get_core_state, get_last_governance_token_distribution_time,
+    set_core_state, set_last_governance_token_distribution_time,
 };
 use crate::utils::deposits::{
-    get_deposit, get_depositors, is_depositor_listed, make_deposit, make_withdrawal,
-    remove_deposit, remove_depositor_from_depositors, save_deposit, save_depositors,
-    validate_deposit_asset,
+    bump_deposit, bump_depositors, get_deposit, get_depositors, is_depositor_listed, make_deposit,
+    make_withdrawal, remove_deposit, remove_depositor_from_depositors, save_deposit,
+    save_depositors, validate_deposit_asset,
 };
 use num_integer::div_floor;
 use soroban_sdk::{
@@ -87,22 +87,27 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
                 treasury,
             },
         );
+        bump_instance(&env);
     }
 
     fn get_core_state(env: Env) -> CoreState {
+        bump_instance(&env);
         get_core_state(&env)
     }
 
     fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        bump_instance(&env);
         get_core_state(&env).admin.require_auth();
         env.deployer().update_current_contract_wasm(new_wasm_hash);
     }
 
-    fn version(_env: Env) -> (Symbol, Symbol) {
+    fn version(env: Env) -> (Symbol, Symbol) {
+        bump_instance(&env);
         (CONTRACT_DESCRIPTION, CONTRACT_VERSION)
     }
 
     fn deposit(env: Env, caller: Address, asset: Address, amount_deposit: u128) {
+        bump_instance(&env);
         caller.require_auth();
         let mut core_state: CoreState = get_core_state(&env);
 
@@ -121,13 +126,16 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
 
         let mut depositors: Vec<Address> = get_depositors(&env);
         if !is_depositor_listed(&depositors, &caller) {
-            depositors.push_back(caller);
+            depositors.push_back(caller.clone());
             save_depositors(&env, &depositors)
         }
 
         core_state.total_deposited = core_state.total_deposited + amount_deposit;
         core_state.total_shares = core_state.total_shares + shares_to_issue;
         set_core_state(&env, &core_state);
+
+        bump_deposit(&env, caller);
+        bump_depositors(&env);
     }
 
     fn withdraw(
@@ -136,6 +144,7 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         shares_to_redeem: u128,
         assets_orders: Map<Address, u128>,
     ) {
+        bump_instance(&env);
         caller.require_auth();
         let mut core_state: CoreState = get_core_state(&env);
         let calculated_amount_to_withdraw: u128 = div_floor(
@@ -188,21 +197,34 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
             core_state.share_price = 1_0000000;
         }
         set_core_state(&env, &core_state);
+
+        bump_deposit(&env, caller);
+        bump_depositors(&env);
     }
 
     fn get_deposit(env: Env, caller: Address) -> Deposit {
+        bump_instance(&env);
+        bump_deposit(&env, caller.clone());
+        bump_depositors(&env);
+
         get_deposit(&env, &caller)
     }
 
     fn get_depositors(env: Env) -> Vec<Address> {
+        bump_instance(&env);
+        bump_depositors(&env);
+
         get_depositors(&env)
     }
 
     fn get_supported_assets(env: Env) -> Vec<Address> {
+        bump_instance(&env);
+        bump_depositors(&env);
         get_core_state(&env).accepted_assets
     }
 
     fn swap(env: Env, caller: Address, from_asset: Address, to_asset: Address, amount: u128) {
+        bump_instance(&env);
         caller.require_auth();
 
         let mut core_state: CoreState = get_core_state(&env);
@@ -242,10 +264,13 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
     }
 
     fn last_gov_distribution_time(env: Env) -> u64 {
+        bump_instance(&env);
+        bump_depositors(&env);
         get_last_governance_token_distribution_time(&env)
     }
 
     fn distribute_governance_token(env: Env) {
+        bump_instance(&env);
         let daily_distribution: u128 = 16438_0000000;
         let core_state: CoreState = get_core_state(&env);
 
@@ -274,5 +299,6 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         }
 
         set_last_governance_token_distribution_time(&env);
+        bump_depositors(&env);
     }
 }

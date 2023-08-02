@@ -1,4 +1,4 @@
-use crate::storage_types::{UserVaultDataType, VaultsDataKeys, VaultsWithIndexDataType};
+use crate::storage::vaults::*;
 use num_integer::div_floor;
 use soroban_sdk::{vec, Env, Symbol, Vec};
 pub const INDEXES_BUMP_CONSTANT: u32 = 120960;

@@ -1,4 +1,5 @@
-use crate::storage_types::*;
+use crate::storage::storage_types::*;
+use crate::storage::vaults::*;
 use soroban_sdk::{panic_with_error, token, Address, Env, Symbol};
 
 pub fn check_admin(env: &Env) -> Address {

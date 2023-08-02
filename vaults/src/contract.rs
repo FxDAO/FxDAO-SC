@@ -1,4 +1,5 @@
-use crate::storage_types::*;
+use crate::storage::storage_types::*;
+use crate::storage::vaults::*;
 use crate::utils::core::*;
 use crate::utils::indexes::*;
 use crate::utils::legacy_file::*;
