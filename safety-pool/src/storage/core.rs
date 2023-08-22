@@ -12,9 +12,11 @@ pub struct CoreState {
     pub min_deposit: u128,
     pub treasury_share: Vec<u32>,
     pub liquidator_share: Vec<u32>,
+    pub governance_token: Address,
 }
 
 #[contracttype]
 pub enum CoreStorageKeys {
-    CoreState,
+    CoreState,                       // CoreState
+    LastGovernanceTokenDistribution, // u64
 }

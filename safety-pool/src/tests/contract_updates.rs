@@ -3,7 +3,7 @@ extern crate std;
 
 use crate::storage::core::CoreState;
 use crate::tests::utils::{create_test_data, init_contract, TestData};
-use soroban_sdk::testutils::Address as _;
+use soroban_sdk::testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation};
 use soroban_sdk::{vec, Address, Env, IntoVal, Symbol, Vec};
 
 #[test]
@@ -26,7 +26,8 @@ fn update_contract_core_state() {
             denomination_asset: target_core_state.clone().denomination_asset,
             min_deposit: target_core_state.clone().min_deposit,
             treasury_share: target_core_state.clone().treasury_share,
-            liquidator_share: target_core_state.clone().liquidator_share
+            liquidator_share: target_core_state.clone().liquidator_share,
+            governance_token: target_core_state.clone().governance_token,
         }
     );
 
@@ -34,13 +35,18 @@ fn update_contract_core_state() {
     let new_admin: Address = Address::random(&env);
     test_data.contract_client.update_contract_admin(&new_admin);
     assert_eq!(
-        env.auths(),
-        [(
-            target_core_state.admin.clone(),
-            test_data.contract_client.address.clone(),
-            Symbol::new(&env, "update_contract_admin"),
-            (new_admin.clone(),).into_val(&env),
-        )]
+        env.auths().first().unwrap(),
+        &(
+            test_data.contract_admin.clone(),
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    test_data.contract_client.address.clone(),
+                    Symbol::new(&env, "update_contract_admin"),
+                    (new_admin.clone(),).into_val(&env),
+                )),
+                sub_invocations: std::vec![],
+            }
+        )
     );
 
     target_core_state.admin = new_admin;
@@ -55,13 +61,18 @@ fn update_contract_core_state() {
         .contract_client
         .update_vaults_contract(&new_vaults_contract);
     assert_eq!(
-        env.auths(),
-        [(
+        env.auths().first().unwrap(),
+        &(
             target_core_state.admin.clone(),
-            test_data.contract_client.address.clone(),
-            Symbol::new(&env, "update_vaults_contract"),
-            (new_vaults_contract.clone(),).into_val(&env),
-        )]
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    test_data.contract_client.address.clone(),
+                    Symbol::new(&env, "update_vaults_contract"),
+                    (new_vaults_contract.clone(),).into_val(&env)
+                )),
+                sub_invocations: std::vec![],
+            }
+        ),
     );
 
     target_core_state.vaults_contract = new_vaults_contract;
@@ -76,13 +87,18 @@ fn update_contract_core_state() {
         .contract_client
         .update_treasury_contract(&new_treasury_contract);
     assert_eq!(
-        env.auths(),
-        [(
+        env.auths().first().unwrap(),
+        &(
             target_core_state.admin.clone(),
-            test_data.contract_client.address.clone(),
-            Symbol::new(&env, "update_treasury_contract"),
-            (new_treasury_contract.clone(),).into_val(&env),
-        )]
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    test_data.contract_client.address.clone(),
+                    Symbol::new(&env, "update_treasury_contract"),
+                    (new_treasury_contract.clone(),).into_val(&env),
+                )),
+                sub_invocations: std::vec![]
+            }
+        )
     );
 
     target_core_state.treasury_contract = new_treasury_contract;
@@ -97,13 +113,18 @@ fn update_contract_core_state() {
         .contract_client
         .update_min_deposit(&new_min_deposit);
     assert_eq!(
-        env.auths(),
-        [(
+        env.auths().first().unwrap(),
+        &(
             target_core_state.admin.clone(),
-            test_data.contract_client.address.clone(),
-            Symbol::new(&env, "update_min_deposit"),
-            (new_min_deposit.clone(),).into_val(&env),
-        )]
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    test_data.contract_client.address.clone(),
+                    Symbol::new(&env, "update_min_deposit"),
+                    (new_min_deposit.clone(),).into_val(&env),
+                )),
+                sub_invocations: std::vec![]
+            }
+        )
     );
 
     target_core_state.min_deposit = new_min_deposit;
@@ -118,13 +139,18 @@ fn update_contract_core_state() {
         .contract_client
         .update_treasury_share(&new_treasury_share);
     assert_eq!(
-        env.auths(),
-        [(
+        env.auths().first().unwrap(),
+        &(
             target_core_state.admin.clone(),
-            test_data.contract_client.address.clone(),
-            Symbol::new(&env, "update_treasury_share"),
-            (new_treasury_share.clone(),).into_val(&env),
-        )]
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    test_data.contract_client.address.clone(),
+                    Symbol::new(&env, "update_treasury_share"),
+                    (new_treasury_share.clone(),).into_val(&env),
+                )),
+                sub_invocations: std::vec![]
+            }
+        ),
     );
 
     target_core_state.treasury_share = new_treasury_share;
@@ -139,13 +165,18 @@ fn update_contract_core_state() {
         .contract_client
         .update_liquidator_share(&new_liquidator_share);
     assert_eq!(
-        env.auths(),
-        [(
+        env.auths().first().unwrap(),
+        &(
             target_core_state.admin.clone(),
-            test_data.contract_client.address.clone(),
-            Symbol::new(&env, "update_liquidator_share"),
-            (new_liquidator_share.clone(),).into_val(&env),
-        )]
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    test_data.contract_client.address.clone(),
+                    Symbol::new(&env, "update_liquidator_share"),
+                    (new_liquidator_share.clone(),).into_val(&env),
+                )),
+                sub_invocations: std::vec![]
+            }
+        ),
     );
 
     target_core_state.liquidator_share = new_liquidator_share;

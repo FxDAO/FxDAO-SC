@@ -1,17 +1,37 @@
-use crate::storage_types::*;
+use crate::storage::storage_types::*;
+use crate::storage::vaults::*;
+use crate::utils::core::*;
+use crate::utils::indexes::*;
+use crate::utils::legacy_file::*;
 use crate::utils::vaults::*;
-use crate::utils::*;
-use num_integer::div_floor;
 
-use crate::utils::indexes::get_vaults_data_type_with_index;
-use soroban_sdk::{contractimpl, panic_with_error, token, vec, Address, Env, Symbol, Vec};
+use num_integer::div_floor;
+use soroban_sdk::{
+    contract, contractimpl, panic_with_error, symbol_short, token, vec, Address, BytesN, Env,
+    Symbol, Vec,
+};
+
+pub const CONTRACT_DESCRIPTION: Symbol = symbol_short!("Vaults");
+pub const CONTRACT_VERSION: Symbol = symbol_short!("0_3_0");
 
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
     /// Set up and management
-    fn init(env: Env, admin: Address, col_token: Address, stable_issuer: Address);
+    fn init(
+        env: Env,
+        admin: Address,
+        oracle_admin: Address,
+        protocol_manager: Address,
+        col_token: Address,
+        stable_issuer: Address,
+    );
+
+    fn set_admin(env: Env, address: Address);
+    fn set_protocol_manager(env: Env, address: Address);
     fn get_admin(env: Env) -> Address;
     fn get_core_state(env: Env) -> CoreState;
+    fn upgrade(env: Env, new_wasm_hash: BytesN<32>);
+    fn version(env: Env) -> (Symbol, Symbol);
 
     /// Currency vaults conditions
     fn set_vault_conditions(
@@ -50,36 +70,79 @@ pub trait VaultsContractTrait {
 
     /// Liquidation
     fn liquidate(env: Env, caller: Address, denomination: Symbol, owners: Vec<Address>);
-    // TODO: Create test which we verify this function works correctly in multi currencies cases
     fn vaults_to_liquidate(env: Env, denomination: Symbol) -> Vec<UserVault>;
 }
 
+#[contract]
 pub struct VaultsContract;
 
 // TODO: Add events for each function
 #[contractimpl]
 impl VaultsContractTrait for VaultsContract {
-    fn init(env: Env, admin: Address, col_token: Address, stable_issuer: Address) {
-        if env.storage().has(&DataKeys::CoreState) {
+    fn init(
+        env: Env,
+        admin: Address,
+        oracle_admin: Address,
+        protocol_manager: Address,
+        col_token: Address,
+        stable_issuer: Address,
+    ) {
+        bump_instance(&env);
+        if env.storage().instance().has(&DataKeys::CoreState) {
             panic_with_error!(&env, SCErrors::AlreadyInit);
         }
 
-        env.storage().set(
+        env.storage().instance().set(
             &DataKeys::CoreState,
             &CoreState {
                 col_token,
                 stable_issuer,
             },
         );
-        env.storage().set(&DataKeys::Admin, &admin);
+        env.storage().instance().set(&DataKeys::Admin, &admin);
+        env.storage()
+            .instance()
+            .set(&DataKeys::OracleAdmin, &oracle_admin);
+        env.storage()
+            .instance()
+            .set(&DataKeys::ProtocolManager, &protocol_manager);
+    }
+
+    // TODO: Test this
+    fn set_admin(env: Env, address: Address) {
+        bump_instance(&env);
+        check_admin(&env);
+        env.storage().instance().set(&DataKeys::Admin, &address);
+    }
+
+    // TODO: Test this
+    fn set_protocol_manager(env: Env, address: Address) {
+        bump_instance(&env);
+        check_protocol_manager(&env);
+        env.storage()
+            .instance()
+            .set(&DataKeys::ProtocolManager, &address);
     }
 
     fn get_admin(env: Env) -> Address {
-        env.storage().get(&DataKeys::Admin).unwrap().unwrap()
+        bump_instance(&env);
+        env.storage().instance().get(&DataKeys::Admin).unwrap()
     }
 
     fn get_core_state(env: Env) -> CoreState {
+        bump_instance(&env);
         get_core_state(&env)
+    }
+
+    fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        bump_instance(&env);
+        check_admin(&env);
+        env.deployer().update_current_contract_wasm(new_wasm_hash);
+    }
+
+    fn version(env: Env) -> (Symbol, Symbol) {
+        bump_instance(&env);
+        (CONTRACT_DESCRIPTION, CONTRACT_VERSION)
     }
 
     fn set_vault_conditions(
@@ -89,6 +152,7 @@ impl VaultsContractTrait for VaultsContract {
         opening_col_rate: i128,
         denomination: Symbol,
     ) {
+        bump_instance(&env);
         check_admin(&env);
         check_positive(&env, &min_col_rate);
         check_positive(&env, &min_debt_creation);
@@ -103,13 +167,19 @@ impl VaultsContractTrait for VaultsContract {
     }
 
     fn get_vault_conditions(env: Env, denomination: Symbol) -> CurrencyVaultsConditions {
+        bump_instance(&env);
         get_currency_vault_conditions(&env, &denomination)
     }
 
     fn create_currency(env: Env, denomination: Symbol, contract: Address) {
-        check_admin(&env);
+        bump_instance(&env);
+        check_protocol_manager(&env);
 
-        if env.storage().has(&DataKeys::Currency(denomination.clone())) {
+        if env
+            .storage()
+            .instance()
+            .has(&DataKeys::Currency(denomination.clone()))
+        {
             panic_with_error!(&env, &SCErrors::CurrencyAlreadyAdded);
         }
 
@@ -126,18 +196,21 @@ impl VaultsContractTrait for VaultsContract {
     }
 
     fn get_currency(env: Env, denomination: Symbol) -> Currency {
+        bump_instance(&env);
         validate_currency(&env, &denomination);
         get_currency(&env, &denomination)
     }
 
     fn get_currency_stats(env: Env, denomination: Symbol) -> CurrencyStats {
+        bump_instance(&env);
         validate_currency(&env, &denomination);
         get_currency_stats(&env, &denomination)
     }
 
     fn set_currency_rate(env: Env, denomination: Symbol, rate: i128) {
+        bump_instance(&env);
         // TODO: this method should be updated in the future once there are oracles in the network
-        check_admin(&env);
+        check_oracle_admin(&env);
         validate_currency(&env, &denomination);
         check_positive(&env, &rate);
 
@@ -154,6 +227,7 @@ impl VaultsContractTrait for VaultsContract {
     }
 
     fn toggle_currency(env: Env, denomination: Symbol, active: bool) {
+        bump_instance(&env);
         check_admin(&env);
         validate_currency(&env, &denomination);
         let mut currency = get_currency(&env, &denomination);
@@ -168,6 +242,7 @@ impl VaultsContractTrait for VaultsContract {
         collateral_amount: i128,
         denomination: Symbol,
     ) {
+        bump_instance(&env);
         // TODO: check if we are in panic mode once is implemented
 
         caller.require_auth();
@@ -182,7 +257,7 @@ impl VaultsContractTrait for VaultsContract {
         let currency_vault_conditions: CurrencyVaultsConditions =
             get_currency_vault_conditions(&env, &denomination);
 
-        valid_initial_debt(&env, &currency_vault_conditions, initial_debt);
+        validate_initial_debt(&env, &currency_vault_conditions, initial_debt);
 
         let currency: Currency = get_currency(&env, &denomination);
 
@@ -202,12 +277,29 @@ impl VaultsContractTrait for VaultsContract {
             index: calculate_user_vault_index(initial_debt, collateral_amount),
             denomination: denomination.clone(),
         };
+        let user_vault_data_type: UserVaultDataType = UserVaultDataType {
+            user: caller.clone(),
+            denomination: denomination.clone(),
+        };
+        let vaults_data_types_with_index_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                index: new_vault.index,
+                denomination: denomination.clone(),
+            });
+        let vaults_indexes_list_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsIndexes(denomination.clone());
 
         let core_state: CoreState = get_core_state(&env);
 
         deposit_collateral(&env, &core_state, &caller, &collateral_amount);
 
-        save_new_user_vault(&env, &caller, &denomination, &new_vault);
+        save_new_user_vault(
+            &env,
+            &new_vault,
+            &user_vault_data_type,
+            &vaults_data_types_with_index_key,
+            &vaults_indexes_list_key,
+        );
 
         withdraw_stablecoin(&env, &core_state, &currency, &caller, &initial_debt);
 
@@ -218,20 +310,51 @@ impl VaultsContractTrait for VaultsContract {
         currency_stats.total_col = currency_stats.total_col + collateral_amount;
 
         set_currency_stats(&env, &denomination, &currency_stats);
+
+        bump_user_vault(&env, user_vault_data_type);
+        bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
+        bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
     }
 
     fn get_vault(env: Env, user: Address, denomination: Symbol) -> UserVault {
-        validate_user_vault(&env, &user, &denomination);
-        get_user_vault(&env, &user, &denomination)
+        bump_instance(&env);
+
+        let vaults_indexes_list_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsIndexes(denomination.clone());
+        let user_vault_data_type: UserVaultDataType = UserVaultDataType { user, denomination };
+
+        validate_user_vault(&env, &user_vault_data_type);
+        let user_vault: UserVault = get_user_vault(&env, &user_vault_data_type);
+
+        let vaults_data_types_with_index_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                index: user_vault.index.clone(),
+                denomination: user_vault.denomination.clone(),
+            });
+
+        bump_user_vault(&env, user_vault_data_type);
+        bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
+        bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
+
+        user_vault
     }
 
     fn incr_col(env: Env, caller: Address, collateral_amount: i128, denomination: Symbol) {
+        bump_instance(&env);
         caller.require_auth();
 
         validate_currency(&env, &denomination);
         is_currency_active(&env, &denomination);
         check_positive(&env, &collateral_amount);
-        validate_user_vault(&env, &caller, &denomination);
+
+        let user_vault_data_type: UserVaultDataType = UserVaultDataType {
+            user: caller.clone(),
+            denomination: denomination.clone(),
+        };
+        let vaults_indexes_list_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsIndexes(denomination.clone());
+
+        validate_user_vault(&env, &user_vault_data_type);
 
         // TODO: Add fee logic
 
@@ -239,42 +362,67 @@ impl VaultsContractTrait for VaultsContract {
 
         deposit_collateral(&env, &core_state, &caller, &collateral_amount);
 
-        let current_user_vault: UserVault = get_user_vault(&env, &caller, &denomination);
+        let current_user_vault: UserVault = get_user_vault(&env, &user_vault_data_type);
         let mut new_user_vault: UserVault = current_user_vault.clone();
         new_user_vault.total_col = new_user_vault.total_col + collateral_amount;
         new_user_vault.index =
             calculate_user_vault_index(new_user_vault.total_debt, new_user_vault.total_col);
 
+        let current_vaults_data_types_with_index_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                index: current_user_vault.index.clone(),
+                denomination: denomination.clone(),
+            });
+
+        let new_vaults_data_types_with_index_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                index: new_user_vault.index.clone(),
+                denomination: denomination.clone(),
+            });
+
         update_user_vault(
             &env,
-            &caller,
-            &denomination,
             &current_user_vault,
             &new_user_vault,
+            &user_vault_data_type,
+            &vaults_indexes_list_key,
+            &current_vaults_data_types_with_index_key,
+            &new_vaults_data_types_with_index_key,
         );
 
         let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
         currency_stats.total_col = currency_stats.total_col + collateral_amount;
         set_currency_stats(&env, &denomination, &currency_stats);
+
+        bump_user_vault(&env, user_vault_data_type);
+        bump_vaults_data_types_with_index(&env, &new_vaults_data_types_with_index_key);
+        bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
     }
 
     fn incr_debt(env: Env, caller: Address, debt_amount: i128, denomination: Symbol) {
+        bump_instance(&env);
         caller.require_auth();
 
         validate_currency(&env, &denomination);
         is_currency_active(&env, &denomination);
         check_positive(&env, &debt_amount);
-        validate_user_vault(&env, &caller, &denomination);
+
+        let user_vault_data_type: UserVaultDataType = UserVaultDataType {
+            user: caller.clone(),
+            denomination: denomination.clone(),
+        };
+
+        validate_user_vault(&env, &user_vault_data_type);
 
         // TODO: Add fee logic
         // TODO: check if we are in panic mode once is implemented
         // TODO: check if collateral price has been updated lately
 
-        let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
+        let core_state: CoreState = get_core_state(&env);
 
         let currency: Currency = get_currency(&env, &denomination);
 
-        let current_user_vault: UserVault = get_user_vault(&env, &caller, &denomination);
+        let current_user_vault: UserVault = get_user_vault(&env, &user_vault_data_type);
         let mut new_user_vault: UserVault = current_user_vault.clone();
 
         let currency_vault_conditions: CurrencyVaultsConditions =
@@ -295,43 +443,81 @@ impl VaultsContractTrait for VaultsContract {
         new_user_vault.total_debt = new_debt_amount;
         new_user_vault.index =
             calculate_user_vault_index(new_user_vault.total_debt, new_user_vault.total_col);
+
+        let current_vaults_data_types_with_index_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                index: current_user_vault.index.clone(),
+                denomination: denomination.clone(),
+            });
+
+        let new_vaults_data_types_with_index_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                index: new_user_vault.index.clone(),
+                denomination: denomination.clone(),
+            });
+
+        let vaults_indexes_list_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsIndexes(denomination.clone());
+
         update_user_vault(
             &env,
-            &caller,
-            &denomination,
             &current_user_vault,
             &new_user_vault,
+            &user_vault_data_type,
+            &vaults_indexes_list_key,
+            &current_vaults_data_types_with_index_key,
+            &new_vaults_data_types_with_index_key,
         );
 
         let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
         currency_stats.total_debt = currency_stats.total_debt + debt_amount;
         set_currency_stats(&env, &denomination, &currency_stats);
+
+        bump_user_vault(&env, user_vault_data_type);
+        bump_vaults_data_types_with_index(&env, &new_vaults_data_types_with_index_key);
+        bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
     }
 
     fn pay_debt(env: Env, caller: Address, deposit_amount: i128, denomination: Symbol) {
+        bump_instance(&env);
         caller.require_auth();
 
         validate_currency(&env, &denomination);
         is_currency_active(&env, &denomination);
         check_positive(&env, &deposit_amount);
-        validate_user_vault(&env, &caller, &denomination);
+
+        let user_vault_data_type: UserVaultDataType = UserVaultDataType {
+            user: caller.clone(),
+            denomination: denomination.clone(),
+        };
+
+        validate_user_vault(&env, &user_vault_data_type);
 
         // TODO: Add fee logic
 
         let currency: Currency = get_currency(&env, &denomination);
 
-        let current_user_vault: UserVault = get_user_vault(&env, &caller, &denomination);
-        let mut updated_user_vault: UserVault = current_user_vault.clone();
+        let current_user_vault: UserVault = get_user_vault(&env, &user_vault_data_type);
+        let mut new_user_vault: UserVault = current_user_vault.clone();
 
         if deposit_amount > current_user_vault.total_debt {
             panic_with_error!(&env, SCErrors::DepositAmountIsMoreThanTotalDebt);
         }
 
-        let core_state: CoreState = env.storage().get(&DataKeys::CoreState).unwrap().unwrap();
+        let core_state: CoreState = get_core_state(&env);
 
         deposit_stablecoin(&env, &core_state, &currency, &caller, &deposit_amount);
 
         let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
+
+        let current_vaults_data_types_with_index_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                index: current_user_vault.index.clone(),
+                denomination: denomination.clone(),
+            });
+
+        let vaults_indexes_list_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsIndexes(denomination.clone());
 
         if current_user_vault.total_debt == deposit_amount {
             // If the amount is equal to the debt it means it is paid in full so we release the collateral and remove the vault
@@ -344,46 +530,96 @@ impl VaultsContractTrait for VaultsContract {
                 &current_user_vault.total_col,
             );
 
-            remove_user_vault(&env, &caller, &denomination, &current_user_vault);
+            let vaults_data_types_with_index_key: VaultsDataKeys =
+                VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                    index: current_user_vault.index,
+                    denomination: denomination.clone(),
+                });
+
+            let vaults_indexes_list_key: VaultsDataKeys =
+                VaultsDataKeys::VaultsIndexes(denomination.clone());
+
+            remove_user_vault(
+                &env,
+                &current_user_vault,
+                &user_vault_data_type,
+                &vaults_data_types_with_index_key,
+                &vaults_indexes_list_key,
+            );
+
+            bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
         } else {
             // If amount is not enough to pay all the debt, we just updated the stats of the user's vault
-            updated_user_vault.total_debt = updated_user_vault.total_debt - deposit_amount;
-            updated_user_vault.index = calculate_user_vault_index(
-                updated_user_vault.total_debt,
-                updated_user_vault.total_col,
-            );
+            new_user_vault.total_debt = new_user_vault.total_debt - deposit_amount;
+            new_user_vault.index =
+                calculate_user_vault_index(new_user_vault.total_debt, new_user_vault.total_col);
+
+            let new_vaults_data_types_with_index_key: VaultsDataKeys =
+                VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                    index: new_user_vault.index.clone(),
+                    denomination: denomination.clone(),
+                });
+
             update_user_vault(
                 &env,
-                &caller,
-                &denomination,
                 &current_user_vault,
-                &updated_user_vault,
+                &new_user_vault,
+                &user_vault_data_type,
+                &vaults_indexes_list_key,
+                &current_vaults_data_types_with_index_key,
+                &new_vaults_data_types_with_index_key,
             );
+
+            bump_vaults_data_types_with_index(&env, &new_vaults_data_types_with_index_key);
         }
 
         currency_stats.total_debt = currency_stats.total_debt - deposit_amount;
         set_currency_stats(&env, &denomination, &currency_stats);
+
+        bump_user_vault(&env, user_vault_data_type);
+        bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
     }
 
     fn get_indexes(env: Env, denomination: Symbol) -> Vec<i128> {
-        get_sorted_indexes_list(&env, &denomination)
+        bump_instance(&env);
+
+        let vaults_indexes_list_key: VaultsDataKeys = VaultsDataKeys::VaultsIndexes(denomination);
+
+        bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
+        get_vaults_indexes_list(&env, &vaults_indexes_list_key)
     }
 
     fn get_vaults_with_index(env: Env, denomination: Symbol, index: i128) -> Vec<UserVault> {
+        bump_instance(&env);
+
+        let vaults_data_types_with_index_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                index,
+                denomination: denomination.clone(),
+            });
+
         let data_keys: Vec<UserVaultDataType> =
-            get_vaults_data_type_with_index(&env, &denomination, &index);
+            get_vaults_data_type_with_index(&env, &vaults_data_types_with_index_key);
         let mut vaults: Vec<UserVault> = vec![&env] as Vec<UserVault>;
 
-        for result in data_keys.iter() {
-            let data_key: UserVaultDataType = result.unwrap();
-            let vault: UserVault = get_user_vault(&env, &data_key.user, &data_key.denomination);
+        for user_vault_data_type in data_keys.iter() {
+            let vault: UserVault = get_user_vault(&env, &user_vault_data_type);
+
+            bump_user_vault(&env, user_vault_data_type);
             vaults.push_back(vault);
         }
+
+        let vaults_indexes_list_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsIndexes(denomination.clone());
+
+        bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
+        bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
 
         vaults
     }
 
     fn redeem(env: Env, caller: Address, amount_to_redeem: i128, denomination: Symbol) {
+        bump_instance(&env);
         caller.require_auth();
 
         validate_currency(&env, &denomination);
@@ -395,8 +631,11 @@ impl VaultsContractTrait for VaultsContract {
         let core_state: CoreState = get_core_state(&env);
         let currency: Currency = get_currency(&env, &denomination);
 
+        let vaults_indexes_list_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsIndexes(denomination.clone());
+
         let redeemable_vaults: Vec<UserVault> =
-            get_redeemable_vaults(&env, &amount_to_redeem, &currency);
+            get_redeemable_vaults(&env, &amount_to_redeem, &currency, &vaults_indexes_list_key);
 
         deposit_stablecoin(&env, &core_state, &currency, &caller, &amount_to_redeem);
 
@@ -406,18 +645,30 @@ impl VaultsContractTrait for VaultsContract {
         let mut amount_redeemed: i128 = 0;
         let mut collateral_to_withdraw: i128 = 0;
 
-        for redeemable_vault in redeemable_vaults.iter() {
-            let user_vault: UserVault = redeemable_vault.unwrap();
+        for current_user_vault in redeemable_vaults.iter() {
+            let user_vault_data_type: UserVaultDataType = UserVaultDataType {
+                user: current_user_vault.id.clone(),
+                denomination: current_user_vault.denomination.clone(),
+            };
 
-            if (amount_redeemed + user_vault.total_debt) > amount_to_redeem {
-                let mut updated_vault: UserVault = user_vault.clone();
+            let vaults_data_types_with_index_key: VaultsDataKeys =
+                VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                    index: current_user_vault.index,
+                    denomination: denomination.clone(),
+                });
+
+            let vaults_indexes_list_key: VaultsDataKeys =
+                VaultsDataKeys::VaultsIndexes(denomination.clone());
+
+            if (amount_redeemed + current_user_vault.total_debt) > amount_to_redeem {
+                let mut new_user_vault: UserVault = current_user_vault.clone();
                 let missing_amount: i128 = amount_to_redeem - amount_redeemed;
                 let missing_collateral: i128 = div_floor(missing_amount * 10000000, currency.rate);
 
-                updated_vault.total_col = updated_vault.total_col - missing_collateral;
-                updated_vault.total_debt = updated_vault.total_debt - missing_amount;
-                updated_vault.index =
-                    calculate_user_vault_index(updated_vault.total_debt, updated_vault.total_col);
+                new_user_vault.total_col = new_user_vault.total_col - missing_collateral;
+                new_user_vault.total_debt = new_user_vault.total_debt - missing_amount;
+                new_user_vault.index =
+                    calculate_user_vault_index(new_user_vault.total_debt, new_user_vault.total_col);
 
                 currency_stats.total_col = currency_stats.total_col - missing_collateral;
                 currency_stats.total_debt = currency_stats.total_debt - missing_amount;
@@ -425,39 +676,69 @@ impl VaultsContractTrait for VaultsContract {
                 collateral_to_withdraw = collateral_to_withdraw + missing_collateral;
                 amount_redeemed = amount_redeemed + missing_amount;
 
+                let current_vaults_data_types_with_index_key: VaultsDataKeys =
+                    VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                        index: current_user_vault.index.clone(),
+                        denomination: denomination.clone(),
+                    });
+
+                let new_vaults_data_types_with_index_key: VaultsDataKeys =
+                    VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                        index: new_user_vault.index.clone(),
+                        denomination: denomination.clone(),
+                    });
+
                 update_user_vault(
                     &env,
-                    &user_vault.id,
-                    &denomination,
-                    &user_vault,
-                    &updated_vault,
+                    &current_user_vault,
+                    &new_user_vault,
+                    &user_vault_data_type,
+                    &vaults_indexes_list_key,
+                    &current_vaults_data_types_with_index_key,
+                    &new_vaults_data_types_with_index_key,
                 );
+
+                bump_user_vault(&env, user_vault_data_type);
+                bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
             } else {
-                let collateral_amount = div_floor(user_vault.total_debt * 10000000, currency.rate);
+                let collateral_amount =
+                    div_floor(current_user_vault.total_debt * 10000000, currency.rate);
 
                 collateral_to_withdraw = collateral_to_withdraw + collateral_amount;
-                amount_redeemed = amount_redeemed + user_vault.total_debt;
+                amount_redeemed = amount_redeemed + current_user_vault.total_debt;
 
                 currency_stats.total_vaults = currency_stats.total_vaults - 1;
-                currency_stats.total_col = currency_stats.total_col - user_vault.total_col;
-                currency_stats.total_debt = currency_stats.total_debt - user_vault.total_debt;
+                currency_stats.total_col = currency_stats.total_col - current_user_vault.total_col;
+                currency_stats.total_debt =
+                    currency_stats.total_debt - current_user_vault.total_debt;
 
                 withdraw_collateral(
                     &env,
                     &core_state,
-                    &user_vault.id,
-                    &(user_vault.total_col - collateral_amount),
+                    &current_user_vault.id,
+                    &(current_user_vault.total_col - collateral_amount),
                 );
 
-                remove_user_vault(&env, &user_vault.id, &denomination, &user_vault);
+                remove_user_vault(
+                    &env,
+                    &current_user_vault,
+                    &user_vault_data_type,
+                    &vaults_data_types_with_index_key,
+                    &vaults_indexes_list_key,
+                );
+
+                bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
             }
         }
 
         withdraw_collateral(&env, &core_state, &caller, &collateral_to_withdraw);
         set_currency_stats(&env, &denomination, &currency_stats);
+
+        bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
     }
 
     fn liquidate(env: Env, liquidator: Address, denomination: Symbol, owners: Vec<Address>) {
+        bump_instance(&env);
         liquidator.require_auth();
 
         // TODO: Add fee logic
@@ -471,12 +752,15 @@ impl VaultsContractTrait for VaultsContract {
         let mut collateral_to_withdraw: i128 = 0;
         let mut amount_to_deposit: i128 = 0;
 
-        for item in owners.iter() {
-            let owner: Address = item.unwrap();
-            let user_vault: UserVault = get_user_vault(&env, &owner, &denomination);
+        for owner in owners.iter() {
+            let user_vault_data_type: UserVaultDataType = UserVaultDataType {
+                user: owner,
+                denomination: denomination.clone(),
+            };
+            let user_vault: UserVault = get_user_vault(&env, &user_vault_data_type);
 
             if !can_be_liquidated(&user_vault, &currency, &currency_vault_conditions) {
-                panic_with_error!(&env, &SCErrors::UserVaultCantBeLiquidated);
+                panic_with_error!(&env, SCErrors::UserVaultCantBeLiquidated);
             }
 
             collateral_to_withdraw = collateral_to_withdraw + user_vault.total_col;
@@ -486,7 +770,25 @@ impl VaultsContractTrait for VaultsContract {
             currency_stats.total_col = currency_stats.total_col - user_vault.total_col;
             currency_stats.total_debt = currency_stats.total_debt - user_vault.total_debt;
 
-            remove_user_vault(&env, &owner, &denomination, &user_vault);
+            let vaults_data_types_with_index_key: VaultsDataKeys =
+                VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                    index: user_vault.index,
+                    denomination: denomination.clone(),
+                });
+
+            let vaults_indexes_list_key: VaultsDataKeys =
+                VaultsDataKeys::VaultsIndexes(denomination.clone());
+
+            remove_user_vault(
+                &env,
+                &user_vault,
+                &user_vault_data_type,
+                &vaults_data_types_with_index_key,
+                &vaults_indexes_list_key,
+            );
+
+            bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
+            bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
         }
 
         withdraw_collateral(&env, &core_state, &liquidator, &collateral_to_withdraw);
@@ -501,7 +803,12 @@ impl VaultsContractTrait for VaultsContract {
     }
 
     fn vaults_to_liquidate(env: Env, denomination: Symbol) -> Vec<UserVault> {
-        let indexes: Vec<i128> = get_sorted_indexes_list(&env, &denomination);
+        bump_instance(&env);
+
+        let vaults_indexes_list_key: VaultsDataKeys =
+            VaultsDataKeys::VaultsIndexes(denomination.clone());
+
+        let indexes: Vec<i128> = get_vaults_indexes_list(&env, &vaults_indexes_list_key);
         let mut vaults: Vec<UserVault> = vec![&env] as Vec<UserVault>;
         let mut completed: bool = false;
 
@@ -509,20 +816,22 @@ impl VaultsContractTrait for VaultsContract {
         let currency_vaults_conditions: CurrencyVaultsConditions =
             get_currency_vault_conditions(&env, &denomination);
 
-        for result in indexes.iter() {
-            let index: i128 = result.unwrap();
+        for index in indexes.iter() {
+            let vaults_data_types_with_index_key: VaultsDataKeys =
+                VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+                    index,
+                    denomination: denomination.clone(),
+                });
+
             let vaults_data_types: Vec<UserVaultDataType> =
-                get_vaults_data_type_with_index(&env, &denomination, &index);
+                get_vaults_data_type_with_index(&env, &vaults_data_types_with_index_key);
 
-            for result2 in vaults_data_types.iter() {
-                let vault_data_type: UserVaultDataType = result2.unwrap();
-
-                let user_vault: UserVault =
-                    get_user_vault(&env, &vault_data_type.user, &vault_data_type.denomination);
+            for user_vault_data_type in vaults_data_types.iter() {
+                let user_vault: UserVault = get_user_vault(&env, &user_vault_data_type);
 
                 if can_be_liquidated(&user_vault, &currency, &currency_vaults_conditions) {
                     // This condition is because the indexes include all denominations
-                    if vault_data_type.denomination == currency.denomination {
+                    if user_vault_data_type.denomination == currency.denomination {
                         vaults.push_back(user_vault);
                     }
                 } else {

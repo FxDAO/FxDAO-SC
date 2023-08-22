@@ -1,15 +1,16 @@
 #![cfg(test)]
 extern crate std;
 
-use crate::storage_types::{CurrencyStats, UserVault};
+use crate::storage::storage_types::*;
+use crate::storage::vaults::*;
 use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_allowance, set_initial_state, InitialVariables,
     TestData,
 };
-use crate::utils::vaults::calculate_user_vault_index;
+use crate::utils::indexes::calculate_user_vault_index;
 use num_integer::div_floor;
-use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{token, Address, Env, IntoVal, Symbol};
+use soroban_sdk::testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation};
+use soroban_sdk::{symbol_short, token, Address, Env, IntoVal, Symbol};
 
 /// It tests the redeem method, this must comply with the next behaviour:
 ///
@@ -59,7 +60,7 @@ fn test_redeem() {
     let depositor_4_debt: i128 = 1200000000;
     let depositor_4_index: i128 = 25000000000;
 
-    token::Client::new(&env, &data.collateral_token_client.address)
+    token::AdminClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor_1, &depositor_1_collateral);
 
     set_allowance(&env, &data, &depositor_1);
@@ -77,7 +78,7 @@ fn test_redeem() {
 
     assert_eq!(depositor_1_vault.index, depositor_1_index);
 
-    token::Client::new(&env, &data.collateral_token_client.address)
+    token::AdminClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor_2, &depositor_2_collateral);
 
     set_allowance(&env, &data, &depositor_2);
@@ -95,7 +96,7 @@ fn test_redeem() {
 
     assert_eq!(depositor_2_vault.index, depositor_2_index);
 
-    token::Client::new(&env, &data.collateral_token_client.address)
+    token::AdminClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor_3, &depositor_3_collateral);
 
     set_allowance(&env, &data, &depositor_3);
@@ -113,7 +114,7 @@ fn test_redeem() {
 
     assert_eq!(depositor_3_vault.index, depositor_3_index);
 
-    token::Client::new(&env, &data.collateral_token_client.address)
+    token::AdminClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor_4, &depositor_4_collateral);
 
     set_allowance(&env, &data, &depositor_4);
@@ -183,22 +184,35 @@ fn test_redeem() {
 
     // Check the function is requiring the sender approved this operation
     assert_eq!(
-        env.auths(),
-        [(
-            // Address for which auth is performed
+        env.auths().first().unwrap(),
+        &(
             redeem_user.clone(),
-            // Identifier of the called contract
-            data.contract_client.address.clone(),
-            // Name of the called function
-            Symbol::short("redeem"),
-            // Arguments used (converted to the env-managed vector via `into_val`)
-            (
-                redeem_user.clone(),
-                amount_to_redeem.clone(),
-                data.stable_token_denomination.clone()
-            )
-                .into_val(&env),
-        )]
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    data.contract_client.address.clone(),
+                    symbol_short!("redeem"),
+                    (
+                        redeem_user.clone(),
+                        amount_to_redeem.clone(),
+                        data.stable_token_denomination.clone()
+                    )
+                        .into_val(&env),
+                )),
+                sub_invocations: std::vec![AuthorizedInvocation {
+                    function: AuthorizedFunction::Contract((
+                        data.stable_token_client.address.clone(),
+                        symbol_short!("transfer"),
+                        (
+                            redeem_user.clone(),
+                            data.stable_token_issuer.clone(),
+                            amount_to_redeem.clone(),
+                        )
+                            .into_val(&env),
+                    )),
+                    sub_invocations: std::vec![],
+                }],
+            }
+        )
     );
 
     // We check the results after redeeming

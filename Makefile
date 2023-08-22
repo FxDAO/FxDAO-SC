@@ -9,8 +9,10 @@ test-optimized: build-optimized
 	cargo test --features testutils
 
 build:
-	cargo build --target wasm32-unknown-unknown --release -p vaults
-	cargo build --target wasm32-unknown-unknown --release -p safety-pool
+	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package vaults
+	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package safety-pool
+	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package governance
+	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package stable-liquidity-pool
 	cd target/wasm32-unknown-unknown/release/ && \
 		for i in *.wasm ; do \
 			ls -l "$$i"; \
@@ -19,6 +21,8 @@ build:
 build-optimized:
 	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p vaults
 	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p safety-pool
+	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p governance
+	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p stable-liquidity-pool
 	cd target/wasm32-unknown-unknown/release/ && \
 		for i in *.wasm ; do \
 			wasm-opt -Oz "$$i" -o "$$i.tmp" && mv "$$i.tmp" "$$i"; \
@@ -42,7 +46,7 @@ launch_standalone:
 	docker run -d -it \
       -p 8000:8000 \
       --name stellar-soroban-network \
-      stellar/quickstart:soroban-dev@sha256:57e8ab498bfa14c65595fbb01cb94b1cdee9637ef2e6634e59d54f6958c05bdb \
+      stellar/quickstart:soroban-dev@sha256:8a99332f834ca82e3ac1418143736af59b5288e792d1c4278d6c547c6ed8da3b \
       --standalone \
       --enable-soroban-rpc
 

@@ -12,4 +12,7 @@ pub enum SCErrors {
 
     // Liquidations
     CantLiquidateVaults = 30000,
+    
+    // Distributions
+    RecentDistribution = 40000,
 }

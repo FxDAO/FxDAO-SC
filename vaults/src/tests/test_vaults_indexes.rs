@@ -2,12 +2,13 @@
 
 extern crate std;
 
-use crate::storage_types::UserVault;
+use crate::storage::storage_types::*;
+use crate::storage::vaults::*;
 use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_allowance, set_initial_state, InitialVariables,
     TestData,
 };
-use crate::utils::vaults::calculate_user_vault_index;
+use crate::utils::indexes::calculate_user_vault_index;
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{vec, Address, Env, Vec};
 
@@ -41,7 +42,7 @@ fn test_vault_indexes_logic_around() {
     let depositor_1_debt: i128 = 1500000000;
     let depositor_1_collateral_amount: i128 = 30000000000;
 
-    data.collateral_token_client
+    data.collateral_token_admin_client
         .mint(&depositor_1, &(depositor_1_collateral_amount * 2));
 
     set_allowance(&env, &data, &depositor_1);
@@ -59,7 +60,7 @@ fn test_vault_indexes_logic_around() {
 
     assert_eq!(current_indexes.len(), 1);
     assert_eq!(
-        current_indexes.first().unwrap().unwrap(),
+        current_indexes.first().unwrap(),
         calculate_user_vault_index(depositor_1_debt, depositor_1_collateral_amount)
     );
 
@@ -68,7 +69,7 @@ fn test_vault_indexes_logic_around() {
     let depositor_2_debt: i128 = 1400000000;
     let depositor_2_collateral_amount: i128 = 26000000000;
 
-    data.collateral_token_client
+    data.collateral_token_admin_client
         .mint(&depositor_2, &(depositor_2_collateral_amount * 2));
 
     set_allowance(&env, &data, &depositor_2);
@@ -86,11 +87,11 @@ fn test_vault_indexes_logic_around() {
 
     assert_eq!(current_indexes.len(), 2);
     assert_eq!(
-        current_indexes.first().unwrap().unwrap(),
+        current_indexes.first().unwrap(),
         calculate_user_vault_index(depositor_2_debt, depositor_2_collateral_amount)
     );
     assert_eq!(
-        current_indexes.last().unwrap().unwrap(),
+        current_indexes.last().unwrap(),
         calculate_user_vault_index(depositor_1_debt, depositor_1_collateral_amount)
     );
 
@@ -99,7 +100,7 @@ fn test_vault_indexes_logic_around() {
     let depositor_3_debt: i128 = 1000000000;
     let depositor_3_collateral_amount: i128 = 32500000000;
 
-    data.collateral_token_client
+    data.collateral_token_admin_client
         .mint(&depositor_3, &(depositor_3_collateral_amount * 2));
 
     set_allowance(&env, &data, &depositor_3);
@@ -117,11 +118,11 @@ fn test_vault_indexes_logic_around() {
 
     assert_eq!(current_indexes.len(), 3);
     assert_eq!(
-        current_indexes.first().unwrap().unwrap(),
+        current_indexes.first().unwrap(),
         calculate_user_vault_index(depositor_2_debt, depositor_2_collateral_amount)
     );
     assert_eq!(
-        current_indexes.last().unwrap().unwrap(),
+        current_indexes.last().unwrap(),
         calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount)
     );
 
@@ -130,7 +131,7 @@ fn test_vault_indexes_logic_around() {
     let depositor_4_debt: i128 = 1000000000;
     let depositor_4_collateral_amount: i128 = 32500000000;
 
-    data.collateral_token_client
+    data.collateral_token_admin_client
         .mint(&depositor_4, &(depositor_4_collateral_amount * 2));
 
     set_allowance(&env, &data, &depositor_4);
@@ -148,11 +149,11 @@ fn test_vault_indexes_logic_around() {
 
     assert_eq!(current_indexes.len(), 3);
     assert_eq!(
-        current_indexes.first().unwrap().unwrap(),
+        current_indexes.first().unwrap(),
         calculate_user_vault_index(depositor_2_debt, depositor_2_collateral_amount)
     );
     assert_eq!(
-        current_indexes.last().unwrap().unwrap(),
+        current_indexes.last().unwrap(),
         calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount)
     );
 
@@ -161,7 +162,7 @@ fn test_vault_indexes_logic_around() {
     let depositor_5_debt: i128 = 1400000000;
     let depositor_5_collateral_amount: i128 = 24590000000;
 
-    data.collateral_token_client
+    data.collateral_token_admin_client
         .mint(&depositor_5, &(depositor_5_collateral_amount * 2));
 
     set_allowance(&env, &data, &depositor_5);
@@ -179,11 +180,11 @@ fn test_vault_indexes_logic_around() {
 
     assert_eq!(current_indexes.len(), 4);
     assert_eq!(
-        current_indexes.first().unwrap().unwrap(),
+        current_indexes.first().unwrap(),
         calculate_user_vault_index(depositor_5_debt, depositor_5_collateral_amount)
     );
     assert_eq!(
-        current_indexes.last().unwrap().unwrap(),
+        current_indexes.last().unwrap(),
         calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount)
     );
 
