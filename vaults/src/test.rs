@@ -2,9 +2,7 @@
 
 #![cfg(test)]
 extern crate std;
-use crate::storage_types::*;
-
-use crate::storage_types::CoreState;
+use crate::storage::storage_types::*;
 use soroban_sdk::testutils::{AuthorizedFunction, AuthorizedInvocation};
 use soroban_sdk::{symbol_short, Address, Env, Error, FromVal, IntoVal, Symbol};
 

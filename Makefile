@@ -46,7 +46,7 @@ launch_standalone:
 	docker run -d -it \
       -p 8000:8000 \
       --name stellar-soroban-network \
-      stellar/quickstart:soroban-dev@sha256:57e8ab498bfa14c65595fbb01cb94b1cdee9637ef2e6634e59d54f6958c05bdb \
+      stellar/quickstart:soroban-dev@sha256:8a99332f834ca82e3ac1418143736af59b5288e792d1c4278d6c547c6ed8da3b \
       --standalone \
       --enable-soroban-rpc
 

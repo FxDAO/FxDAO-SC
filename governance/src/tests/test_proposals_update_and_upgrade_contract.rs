@@ -360,6 +360,7 @@ pub fn test_create_update_proposal_wrong_params() {
 pub fn test_update_proposal_flow() {
     let env: Env = Env::default();
     env.mock_all_auths();
+    env.budget().reset_unlimited();
     let test_data: TestData = create_test_data(&env);
     setup_contracts(&env, &test_data);
 

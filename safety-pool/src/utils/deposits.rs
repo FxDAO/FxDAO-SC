@@ -1,5 +1,19 @@
 use crate::storage::deposits::{Deposit, DepositsDataKeys};
 use soroban_sdk::{token, vec, Address, Env, Vec};
+pub const PERSISTENT_BUMP_CONSTANT: u32 = 1036800;
+
+pub fn bump_deposit(env: &Env, depositor: Address) {
+    env.storage().persistent().bump(
+        &DepositsDataKeys::Deposit(depositor),
+        PERSISTENT_BUMP_CONSTANT,
+    );
+}
+
+pub fn bump_depositors(env: &Env) {
+    env.storage()
+        .persistent()
+        .bump(&DepositsDataKeys::Depositors, PERSISTENT_BUMP_CONSTANT);
+}
 
 pub fn make_deposit(env: &Env, asset: &Address, depositor: &Address, amount: &u128) {
     token::Client::new(env, asset).transfer(
