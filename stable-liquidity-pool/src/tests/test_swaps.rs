@@ -227,7 +227,6 @@ fn test_swaps_and_profit_retiring() {
             &env,
             (test_data.usdc_token_client.address.clone(), 50_0500000),
             (test_data.usdt_token_client.address.clone(), 50_0500000),
-            (test_data.usdx_token_client.address.clone(), 0),
         ],
     );
 
@@ -261,7 +260,6 @@ fn test_swaps_and_profit_retiring() {
             &env,
             (test_data.usdc_token_client.address.clone(), 50_0500000),
             (test_data.usdt_token_client.address.clone(), 50_0500000),
-            (test_data.usdx_token_client.address.clone(), 00_0000000),
         ],
     );
 
@@ -278,7 +276,6 @@ fn test_swaps_and_profit_retiring() {
             &env,
             (test_data.usdc_token_client.address.clone(), 50_0000000),
             (test_data.usdt_token_client.address.clone(), 50_0000000),
-            (test_data.usdx_token_client.address.clone(), 00_0000000),
         ],
     );
 

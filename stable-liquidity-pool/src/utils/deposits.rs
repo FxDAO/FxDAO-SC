@@ -99,7 +99,7 @@ pub fn remove_deposit(env: &Env, depositor: &Address) {
 pub fn make_withdrawal(env: &Env, depositor: &Address, asset: &Address, amount: &u128) {
     token::Client::new(env, asset).transfer(
         &env.current_contract_address(),
-        &depositor,
+        depositor,
         &(amount.clone() as i128),
     );
 }

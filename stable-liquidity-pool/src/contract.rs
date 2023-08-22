@@ -12,7 +12,7 @@ use crate::utils::deposits::{
 };
 use num_integer::div_floor;
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, symbol_short, token, Address, BytesN, Env, Map,
+    contract, contractimpl, map, panic_with_error, symbol_short, token, Address, BytesN, Env, Map,
     Symbol, Vec,
 };
 
@@ -112,7 +112,7 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         let mut core_state: CoreState = get_core_state(&env);
 
         if !validate_deposit_asset(&core_state.accepted_assets, &asset) {
-            panic_with_error!(&env, SCErrors::InvalidAsset);
+            panic_with_error!(&env, &SCErrors::InvalidAsset);
         }
 
         make_deposit(&env, &caller, &asset, &amount_deposit);
@@ -154,31 +154,35 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
 
         let mut deposit: Deposit = get_deposit(&env, &caller);
         if deposit.shares == 0 {
-            panic_with_error!(&env, SCErrors::NothingToWithdraw);
+            panic_with_error!(&env, &SCErrors::NothingToWithdraw);
         }
 
         if &deposit.shares < &shares_to_redeem {
-            panic_with_error!(&env, SCErrors::NotEnoughSharesToWithdraw);
+            panic_with_error!(&env, &SCErrors::NotEnoughSharesToWithdraw);
         }
 
         let min_timestamp: u64 = deposit.last_deposit + (3600 * 48);
 
         if env.ledger().timestamp() < min_timestamp {
-            panic_with_error!(&env, SCErrors::LockedPeriodUncompleted);
+            panic_with_error!(&env, &SCErrors::LockedPeriodUncompleted);
         }
 
         let mut withdraw_amount: u128 = 0;
 
         for token in core_state.accepted_assets.iter() {
-            withdraw_amount = withdraw_amount + assets_orders.get(token.clone()).unwrap();
+            if assets_orders.contains_key(token.clone()) {
+                withdraw_amount = withdraw_amount + assets_orders.get(token.clone()).unwrap();
+            }
         }
 
         if calculated_amount_to_withdraw != withdraw_amount {
-            panic_with_error!(&env, SCErrors::InvalidWithdraw);
+            panic_with_error!(&env, &SCErrors::InvalidWithdraw);
         }
 
         for (asset, amount) in assets_orders.iter() {
-            make_withdrawal(&env, &deposit.depositor, &asset, &amount);
+            if amount != 0 {
+                make_withdrawal(&env, &deposit.depositor, &asset, &amount);
+            }
         }
 
         if shares_to_redeem < deposit.shares {
@@ -199,6 +203,7 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         set_core_state(&env, &core_state);
 
         bump_deposit(&env, caller);
+
         bump_depositors(&env);
     }
 
@@ -230,11 +235,11 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         let mut core_state: CoreState = get_core_state(&env);
 
         if !validate_deposit_asset(&core_state.accepted_assets, &from_asset) {
-            panic_with_error!(&env, SCErrors::InvalidAsset);
+            panic_with_error!(&env, &SCErrors::InvalidAsset);
         }
 
         if !validate_deposit_asset(&core_state.accepted_assets, &to_asset) {
-            panic_with_error!(&env, SCErrors::InvalidAsset);
+            panic_with_error!(&env, &SCErrors::InvalidAsset);
         }
 
         let fee: u128 = div_floor(amount * core_state.fee_percentage, 1_0000000);
@@ -263,6 +268,7 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         set_core_state(&env, &core_state);
     }
 
+    // Update the way we distribute the governance tokens
     fn last_gov_distribution_time(env: Env) -> u64 {
         bump_instance(&env);
         bump_depositors(&env);
