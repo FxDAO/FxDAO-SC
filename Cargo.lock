@@ -494,7 +494,7 @@ checksum = "ad0a93d233ebf96623465aad4046a8d3aa4da22d4f4beba5388838c8a434bbb4"
 
 [[package]]
 name = "governance"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "soroban-sdk",
 ]
@@ -874,7 +874,7 @@ checksum = "7b4b9743ed687d4b4bcedf9ff5eaa7398495ae14e61cba0a295704edbc7decde"
 
 [[package]]
 name = "safety-pool"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "num-integer",
  "soroban-sdk",
@@ -1216,7 +1216,7 @@ dependencies = [
 
 [[package]]
 name = "stable-liquidity-pool"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "num-integer",
  "soroban-sdk",
@@ -1380,7 +1380,7 @@ checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
 
 [[package]]
 name = "vaults"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "num-integer",
  "soroban-sdk",
