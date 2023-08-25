@@ -1,2 +1,3 @@
-pub mod storage_types;
+pub mod core;
+pub mod currencies;
 pub mod vaults;

@@ -39,14 +39,14 @@ pub struct TestData<'a> {
 }
 
 pub struct InitialVariables {
-    pub currency_price: i128,
+    pub currency_price: u128,
     pub depositor: Address,
-    pub initial_debt: i128,
-    pub collateral_amount: i128,
+    pub initial_debt: u128,
+    pub collateral_amount: u128,
     pub contract_address: Address,
-    pub min_col_rate: i128,
-    pub min_debt_creation: i128,
-    pub opening_col_rate: i128,
+    pub min_col_rate: u128,
+    pub min_debt_creation: u128,
+    pub opening_col_rate: u128,
 }
 
 pub fn create_base_data(env: &Env) -> TestData {

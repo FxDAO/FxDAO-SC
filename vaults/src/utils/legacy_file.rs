@@ -2,12 +2,6 @@ use crate::storage::storage_types::*;
 use crate::storage::vaults::*;
 use soroban_sdk::{panic_with_error, token, Address, Env, Symbol};
 
-pub fn check_admin(env: &Env) -> Address {
-    let admin: Address = env.storage().instance().get(&DataKeys::Admin).unwrap();
-    admin.require_auth();
-    admin
-}
-
 pub fn check_oracle_admin(env: &Env) -> Address {
     let oracle_admin: Address = env
         .storage()
@@ -66,42 +60,6 @@ pub fn vault_spot_available(env: &Env, user: Address, denomination: &Symbol) {
     {
         panic_with_error!(&env, SCErrors::UserAlreadyHasDenominationVault);
     }
-}
-
-/// Currency utils
-pub fn validate_currency(env: &Env, denomination: &Symbol) {
-    if !env
-        .storage()
-        .instance()
-        .has(&DataKeys::Currency(denomination.clone()))
-    {
-        panic_with_error!(&env, SCErrors::CurrencyDoesntExist);
-    }
-}
-
-pub fn is_currency_active(env: &Env, denomination: &Symbol) {
-    let currency: Currency = env
-        .storage()
-        .instance()
-        .get(&DataKeys::Currency(denomination.clone()))
-        .unwrap();
-
-    if !currency.active {
-        panic_with_error!(&env, SCErrors::CurrencyIsInactive);
-    }
-}
-
-pub fn save_currency(env: &Env, currency: &Currency) {
-    env.storage()
-        .instance()
-        .set(&DataKeys::Currency(currency.denomination.clone()), currency);
-}
-
-pub fn get_currency(env: &Env, denomination: &Symbol) -> Currency {
-    env.storage()
-        .instance()
-        .get(&DataKeys::Currency(denomination.clone()))
-        .unwrap()
 }
 
 /// Currency Vault conditions
