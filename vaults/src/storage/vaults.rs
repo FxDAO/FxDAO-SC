@@ -7,6 +7,7 @@ pub enum OptionalVaultKey {
     Some(VaultKey),
 }
 
+#[derive(Debug)]
 #[contracttype]
 pub struct VaultsInfo {
     pub denomination: Symbol,

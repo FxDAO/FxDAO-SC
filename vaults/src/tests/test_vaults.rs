@@ -97,8 +97,6 @@ fn test_new_vault() {
     token::AdminClient::new(&env, &data.stable_token_client.address)
         .mint(&data.stable_token_issuer, &90000000000000000000);
 
-    set_allowance(&env, &data, &depositor);
-
     // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
     // let inactive_currency = data
     //     .contract_client
@@ -336,8 +334,6 @@ fn test_new_vault() {
 
     data.collateral_token_admin_client
         .mint(&depositor_2, &(collateral_amount as i128 * 2));
-
-    set_allowance(&env, &data, &depositor_2);
 
     // If there is already a lowest key, prev key cant not be None
     // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
