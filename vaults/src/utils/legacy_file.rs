@@ -22,16 +22,6 @@ pub fn check_protocol_manager(env: &Env) -> Address {
     protocol_manager
 }
 
-pub fn validate_initial_debt(
-    env: &Env,
-    currency_vault_conditions: &CurrencyVaultsConditions,
-    initial_debt: i128,
-) {
-    if currency_vault_conditions.min_debt_creation > initial_debt {
-        panic_with_error!(env, SCErrors::InvalidInitialDebtAmount);
-    }
-}
-
 pub fn check_positive(env: &Env, value: &i128) {
     if value < &0 {
         panic_with_error!(&env, SCErrors::UnsupportedNegativeValue);
@@ -39,28 +29,6 @@ pub fn check_positive(env: &Env, value: &i128) {
 }
 
 /// Vaults utils
-pub fn validate_user_vault(env: &Env, user_vault_data_type: &UserVaultDataType) {
-    if !env
-        .storage()
-        .persistent()
-        .has(&VaultsDataKeys::UserVault(user_vault_data_type.clone()))
-    {
-        panic_with_error!(&env, SCErrors::UserVaultDoesntExist);
-    }
-}
-
-pub fn vault_spot_available(env: &Env, user: Address, denomination: &Symbol) {
-    if env
-        .storage()
-        .persistent()
-        .has(&VaultsDataKeys::UserVault(UserVaultDataType {
-            user,
-            denomination: denomination.clone(),
-        }))
-    {
-        panic_with_error!(&env, SCErrors::UserAlreadyHasDenominationVault);
-    }
-}
 
 /// Currency Vault conditions
 pub fn get_currency_vault_conditions(env: &Env, denomination: &Symbol) -> CurrencyVaultsConditions {
@@ -111,29 +79,6 @@ pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Addres
     token::Client::new(&env, &core_state.col_token).transfer(
         &env.current_contract_address(),
         &requester,
-        &amount,
-    );
-}
-
-pub fn deposit_collateral(env: &Env, core_state: &CoreState, depositor: &Address, amount: &i128) {
-    token::Client::new(&env, &core_state.col_token).transfer(
-        &depositor,
-        &env.current_contract_address(),
-        &amount,
-    );
-}
-
-pub fn withdraw_stablecoin(
-    env: &Env,
-    core_state: &CoreState,
-    currency: &Currency,
-    recipient: &Address,
-    amount: &i128,
-) {
-    token::Client::new(&env, &currency.contract).transfer_from(
-        &env.current_contract_address(),
-        &core_state.stable_issuer,
-        &recipient,
         &amount,
     );
 }

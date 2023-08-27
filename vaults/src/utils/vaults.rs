@@ -1,14 +1,28 @@
 // use crate::storage::storage_types::*;
-use crate::storage::vaults::{VaultsDataKeys, VaultsInfo};
+use crate::storage::vaults::{Vault, VaultIndexKey, VaultKey, VaultsDataKeys, VaultsInfo};
 // use crate::utils::indexes::{
 //     add_new_index_into_indexes_list, get_vaults_data_type_with_index, get_vaults_indexes_list,
 //     remove_index_from_indexes_list, remove_vaults_data_type_with_index, save_vaults_indexes_list,
 //     set_vaults_data_types_with_index,
 // };
+use crate::errors::SCErrors;
 use num_integer::div_floor;
 use soroban_sdk::{panic_with_error, vec, Address, Env, Symbol, Vec};
 
 pub const PERSISTENT_BUMP_CONSTANT: u32 = 1036800;
+
+pub fn bump_vault(env: &Env, vault_key: VaultKey) {
+    env.storage()
+        .persistent()
+        .bump(&VaultsDataKeys::Vault(vault_key), PERSISTENT_BUMP_CONSTANT);
+}
+
+pub fn bump_vault_index(env: &Env, vault_index_key: VaultIndexKey) {
+    env.storage().persistent().bump(
+        &VaultsDataKeys::VaultIndex(vault_index_key),
+        PERSISTENT_BUMP_CONSTANT,
+    );
+}
 
 pub fn is_vaults_info_started(env: &Env, denomination: &Symbol) -> bool {
     env.storage()
@@ -30,19 +44,36 @@ pub fn set_vaults_info(env: &Env, vaults_info: &VaultsInfo) {
     );
 }
 
-// pub fn bump_user_vault(env: &Env, user_vault_data_type: UserVaultDataType) {
-//     env.storage().persistent().bump(
-//         &VaultsDataKeys::UserVault(user_vault_data_type),
-//         PERSISTENT_BUMP_CONSTANT,
-//     );
-// }
-//
-// pub fn get_user_vault(env: &Env, user_vault_data_type: &UserVaultDataType) -> UserVault {
-//     env.storage()
-//         .persistent()
-//         .get(&VaultsDataKeys::UserVault(user_vault_data_type.clone()))
-//         .unwrap()
-// }
+pub fn get_vault(env: &Env, vault_key: VaultKey) -> Vault {
+    env.storage()
+        .persistent()
+        .get(&VaultsDataKeys::Vault(vault_key))
+        .unwrap()
+}
+
+pub fn set_vault(env: &Env, vault: &Vault, vault_key: &VaultKey) {
+    env.storage()
+        .persistent()
+        .set(&VaultsDataKeys::Vault(vault_key.clone()), vault);
+}
+
+pub fn set_vault_index(env: &Env, vault_key: &VaultKey) {
+    env.storage().persistent().set(
+        &VaultsDataKeys::VaultIndex(VaultIndexKey {
+            user: vault_key.account.clone(),
+            denomination: vault_key.denomination.clone(),
+        }),
+        &vault_key.index,
+    );
+}
+
+pub fn get_vault_index(env: &Env, vault_index_key: VaultIndexKey) -> u128 {
+    env.storage()
+        .persistent()
+        .get(&VaultsDataKeys::VaultIndex(vault_index_key))
+        .unwrap()
+}
+
 //
 // pub fn save_new_user_vault(
 //     env: &Env,
@@ -186,14 +217,7 @@ pub fn set_vaults_info(env: &Env, vaults_info: &VaultsInfo) {
 //         save_vaults_indexes_list(env, vaults_indexes_list_key, &indexes_list);
 //     }
 // }
-//
-// pub fn set_user_vault(env: &Env, user_vault_data_type: &UserVaultDataType, user_vault: &UserVault) {
-//     env.storage().persistent().set(
-//         &VaultsDataKeys::UserVault(user_vault_data_type.clone()),
-//         user_vault,
-//     );
-// }
-//
+
 // pub fn get_redeemable_vaults(
 //     env: &Env,
 //     amount: &i128,
@@ -271,8 +295,37 @@ pub fn set_vaults_info(env: &Env, vaults_info: &VaultsInfo) {
 //
 //     updated_record
 // }
-//
-// // Validations
+
+// Validations
+pub fn is_vault_created(env: &Env, vault_key: VaultKey) -> bool {
+    env.storage()
+        .persistent()
+        .has(&VaultsDataKeys::Vault(vault_key))
+}
+
+pub fn vault_spot_available(env: &Env, user: Address, denomination: &Symbol) {
+    if env
+        .storage()
+        .persistent()
+        .has(&VaultsDataKeys::VaultIndex(VaultIndexKey {
+            user,
+            denomination: denomination.clone(),
+        }))
+    {
+        panic_with_error!(&env, &SCErrors::UserAlreadyHasDenominationVault);
+    }
+}
+
+pub fn validate_user_vault(env: &Env, vault_key: VaultKey) {
+    if !env
+        .storage()
+        .persistent()
+        .has(&VaultsDataKeys::Vault(vault_key))
+    {
+        panic_with_error!(&env, SCErrors::VaultDoesntExist);
+    }
+}
+
 // pub fn can_be_liquidated(
 //     user_vault: &UserVault,
 //     currency: &Currency,

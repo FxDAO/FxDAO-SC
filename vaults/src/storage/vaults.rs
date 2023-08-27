@@ -1,34 +1,44 @@
 use soroban_sdk::{contracttype, Address, Symbol};
 
 #[contracttype]
+#[derive(Clone, PartialEq, Debug)]
+pub enum OptionalVaultKey {
+    None,
+    Some(VaultKey),
+}
+
+#[contracttype]
 pub struct VaultsInfo {
     pub denomination: Symbol,
     pub total_vaults: u64,
     pub total_debt: u128,
     pub total_col: u128,
-    pub lowest_index: u128,
+    pub lowest_key: OptionalVaultKey,
     pub min_col_rate: u128,      // Min collateral ratio - ex: 1.10
     pub min_debt_creation: u128, // Min vault creation amount - ex: 5000
     pub opening_col_rate: u128,  // Opening collateral ratio - ex: 1.15
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[contracttype]
 pub struct VaultKey {
     pub index: u128,
+    pub account: Address,
     pub denomination: Symbol,
 }
 
 #[derive(Clone, Debug)]
 #[contracttype]
 pub struct Vault {
-    pub index: i128,
-    pub next_index: i128,
+    pub index: u128,
+    pub next_key: OptionalVaultKey,
     pub account: Address,
-    pub total_debt: i128,
-    pub total_collateral: i128,
+    pub total_debt: u128,
+    pub total_collateral: u128,
     pub denomination: Symbol,
 }
 
+#[derive(Clone, Debug)]
 #[contracttype]
 pub struct VaultIndexKey {
     pub user: Address,
