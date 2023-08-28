@@ -14,9 +14,9 @@ use crate::utils::currencies::{
 use crate::utils::indexes::calculate_user_vault_index;
 use crate::utils::payments::{deposit_collateral, withdraw_stablecoin};
 use crate::utils::vaults::{
-    bump_vault, bump_vault_index, get_vault, get_vault_index, get_vaults_info, is_vault_created,
-    is_vaults_info_started, set_vault, set_vault_index, set_vaults_info, validate_user_vault,
-    vault_spot_available,
+    bump_vault, bump_vault_index, create_and_insert_vault, get_vault, get_vault_index,
+    get_vaults_info, has_vault, is_vaults_info_started, search_vault, set_vault, set_vault_index,
+    set_vaults_info, validate_user_vault, vault_spot_available, withdraw_vault,
 };
 use num_integer::div_floor;
 use soroban_sdk::{
@@ -72,7 +72,13 @@ pub trait VaultsContractTrait {
         denomination: Symbol,
     );
     fn get_vault(env: Env, caller: Address, denomination: Symbol) -> Vault;
-    // fn incr_col(env: Env, caller: Address, amount: i128, denomination: Symbol);
+    fn increase_collateral(
+        env: Env,
+        prev_key: OptionalVaultKey,
+        vault_key: VaultKey,
+        new_prev_key: OptionalVaultKey,
+        amount: u128,
+    );
     // fn incr_debt(env: Env, caller: Address, debt_amount: i128, denomination: Symbol);
     // fn pay_debt(env: Env, caller: Address, amount: i128, denomination: Symbol);
     // fn get_indexes(env: Env, denomination: Symbol) -> Vec<i128>;
@@ -306,83 +312,14 @@ impl VaultsContractTrait for VaultsContract {
             }
         }
 
-        let new_vault_next_key: OptionalVaultKey;
-        let updated_lowest_key: OptionalVaultKey;
-        match vaults_info.lowest_key.clone() {
-            // Case 1: If lowest key is None, it means this is the first vault and so we don't need to do any other major validation
-            OptionalVaultKey::None => {
-                new_vault_next_key = OptionalVaultKey::None;
-                updated_lowest_key = OptionalVaultKey::Some(new_vault_key.clone());
-            }
-
-            // Case 2: If the lowest key exists, it means the list is not empty and we need to consider some scenarios
-            OptionalVaultKey::Some(current_lowest_key) => {
-                if new_vault_index < current_lowest_key.index {
-                    // Case 2.1: If new index is lower than the lowest index, we continue like if the list was empty but using the old lowest as the next value for the new Vault
-                    new_vault_next_key = OptionalVaultKey::Some(current_lowest_key);
-                    updated_lowest_key = OptionalVaultKey::Some(new_vault_key.clone());
-                } else {
-                    // Case 2.2: New vault is higher than the lowest, we need to consider a few things and do some validations
-                    // - The prev value can not be None
-                    // - The prev vault must exist
-                    let prev_key = match prev_key {
-                        OptionalVaultKey::None => {
-                            panic_with_error!(&env, &SCErrors::PrevVaultCantBeNone);
-                        }
-                        OptionalVaultKey::Some(key) => key,
-                    };
-
-                    if !is_vault_created(&env, prev_key.clone()) {
-                        panic_with_error!(&env, &SCErrors::PrevVaultDoesntExist);
-                    }
-
-                    let mut prev_vault: Vault = get_vault(&env, prev_key.clone());
-
-                    match prev_vault.next_key {
-                        // Case 2.2.1: If the prev next key is None, the new Vault will have None as its next key and the prev vault will now have the new vault key as its next key. The lowest key stays the same.
-                        OptionalVaultKey::None => {
-                            new_vault_next_key = OptionalVaultKey::None;
-                            updated_lowest_key = vaults_info.lowest_key.clone();
-                            prev_vault.next_key = OptionalVaultKey::Some(new_vault_key.clone());
-                            set_vault(&env, &prev_vault, &prev_key);
-                        }
-                        // Case 2.2.2: If the prev key isn't None, we make this two flows:
-                        // - If the prev next key is lower than the new vault, we panic
-                        // - If prev next key is higher than the new vault, the new vault will have the current prev next as its next key and the prev vault will update its next key with the new vault. The lowest key stays the same.
-                        OptionalVaultKey::Some(current_prev_next_key) => {
-                            if current_prev_next_key.index < new_vault_index {
-                                // TODO: test this
-                                panic_with_error!(
-                                    &env,
-                                    &SCErrors::PrevVaultNextIndexIsLowerThanNewVault
-                                );
-                            }
-
-                            new_vault_next_key = OptionalVaultKey::Some(current_prev_next_key);
-                            updated_lowest_key = vaults_info.lowest_key.clone();
-                            prev_vault.next_key = OptionalVaultKey::Some(new_vault_key.clone());
-                            set_vault(&env, &prev_vault, &prev_key);
-                        }
-                    }
-                }
-            }
-        }
-
-        let new_vault: Vault = Vault {
-            next_key: new_vault_next_key,
-            denomination: denomination.clone(),
-            account: caller.clone(),
-            total_debt: initial_debt,
-            total_collateral: collateral_amount,
-            index: new_vault_index.clone(),
-        };
-        let new_vault_key: VaultKey = VaultKey {
-            index: new_vault_index.clone(),
-            account: caller.clone(),
-            denomination: denomination.clone(),
-        };
-        set_vault(&env, &new_vault, &new_vault_key);
-        set_vault_index(&env, &new_vault_key);
+        let (_, new_vault_key, new_vault_index_key, updated_lowest_key) = create_and_insert_vault(
+            &env,
+            &vaults_info.lowest_key,
+            &new_vault_key,
+            &prev_key,
+            initial_debt.clone(),
+            collateral_amount.clone(),
+        );
 
         vaults_info.lowest_key = updated_lowest_key;
         vaults_info.total_vaults = vaults_info.total_vaults + 1;
@@ -395,30 +332,13 @@ impl VaultsContractTrait for VaultsContract {
         withdraw_stablecoin(&env, &core_state, &currency, &caller, initial_debt as i128);
 
         bump_vault(&env, new_vault_key);
-        bump_vault_index(
-            &env,
-            VaultIndexKey {
-                denomination: denomination.clone(),
-                user: caller.clone(),
-            },
-        );
+        bump_vault_index(&env, new_vault_index_key);
     }
 
     fn get_vault(env: Env, user: Address, denomination: Symbol) -> Vault {
         bump_instance(&env);
 
-        let vault_index_key: VaultIndexKey = VaultIndexKey {
-            user: user.clone(),
-            denomination: denomination.clone(),
-        };
-        let vault_index: u128 = get_vault_index(&env, vault_index_key.clone());
-        let vault_key: VaultKey = VaultKey {
-            index: vault_index,
-            account: user.clone(),
-            denomination: denomination.clone(),
-        };
-        validate_user_vault(&env, vault_key.clone());
-        let user_vault: Vault = get_vault(&env, vault_key.clone());
+        let (user_vault, vault_key, vault_index_key) = search_vault(&env, &user, &denomination);
 
         bump_vault(&env, vault_key);
         bump_vault_index(&env, vault_index_key);
@@ -426,65 +346,74 @@ impl VaultsContractTrait for VaultsContract {
         user_vault
     }
 
-    // fn incr_col(env: Env, caller: Address, collateral_amount: i128, denomination: Symbol) {
-    //     bump_instance(&env);
-    //     caller.require_auth();
-    //
-    //     validate_currency(&env, &denomination);
-    //     is_currency_active(&env, &denomination);
-    //     check_positive(&env, &collateral_amount);
-    //
-    //     let user_vault_data_type: UserVaultDataType = UserVaultDataType {
-    //         user: caller.clone(),
-    //         denomination: denomination.clone(),
-    //     };
-    //     let vaults_indexes_list_key: VaultsDataKeys =
-    //         VaultsDataKeys::VaultsIndexes(denomination.clone());
-    //
-    //     validate_user_vault(&env, &user_vault_data_type);
-    //
-    //     // TODO: Add fee logic
-    //
-    //     let core_state: CoreState = get_core_state(&env);
-    //
-    //     deposit_collateral(&env, &core_state, &caller, &collateral_amount);
-    //
-    //     let current_user_vault: UserVault = get_user_vault(&env, &user_vault_data_type);
-    //     let mut new_user_vault: UserVault = current_user_vault.clone();
-    //     new_user_vault.total_col = new_user_vault.total_col + collateral_amount;
-    //     new_user_vault.index =
-    //         calculate_user_vault_index(new_user_vault.total_debt, new_user_vault.total_col);
-    //
-    //     let current_vaults_data_types_with_index_key: VaultsDataKeys =
-    //         VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
-    //             index: current_user_vault.index.clone(),
-    //             denomination: denomination.clone(),
-    //         });
-    //
-    //     let new_vaults_data_types_with_index_key: VaultsDataKeys =
-    //         VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
-    //             index: new_user_vault.index.clone(),
-    //             denomination: denomination.clone(),
-    //         });
-    //
-    //     update_user_vault(
-    //         &env,
-    //         &current_user_vault,
-    //         &new_user_vault,
-    //         &user_vault_data_type,
-    //         &vaults_indexes_list_key,
-    //         &current_vaults_data_types_with_index_key,
-    //         &new_vaults_data_types_with_index_key,
-    //     );
-    //
-    //     let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
-    //     currency_stats.total_col = currency_stats.total_col + collateral_amount;
-    //     set_currency_stats(&env, &denomination, &currency_stats);
-    //
-    //     bump_user_vault(&env, user_vault_data_type);
-    //     bump_vaults_data_types_with_index(&env, &new_vaults_data_types_with_index_key);
-    //     bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
-    // }
+    fn increase_collateral(
+        env: Env,
+        prev_key: OptionalVaultKey,
+        vault_key: VaultKey,
+        new_prev_key: OptionalVaultKey,
+        amount: u128,
+    ) {
+        bump_instance(&env);
+        vault_key.account.require_auth();
+        validate_currency(&env, &vault_key.denomination);
+        is_currency_active(&env, &vault_key.denomination);
+
+        // TODO: Add fee logic
+        let core_state: CoreState = get_core_state(&env);
+        deposit_collateral(&env, &core_state, &vault_key.account, amount as i128);
+
+        let (target_vault, target_vault_key, _) =
+            search_vault(&env, &vault_key.account, &vault_key.denomination);
+
+        let mut vaults_info: VaultsInfo = get_vaults_info(&env, &target_vault_key.denomination);
+
+        let lowest_key = match vaults_info.lowest_key.clone() {
+            // It should be impossible to reach this case, but just in case we panic if it happens.
+            OptionalVaultKey::None => panic_with_error!(&env, &SCErrors::ThereAreNoVaults),
+            OptionalVaultKey::Some(key) => key,
+        };
+
+        // If prev_key is None, the target Vault needs to be the lowest vault otherwise panic
+        if prev_key == OptionalVaultKey::None && target_vault_key != lowest_key {
+            panic_with_error!(&env, &SCErrors::PrevVaultCantBeNone);
+        }
+
+        withdraw_vault(&env, &target_vault, &prev_key);
+
+        // If the target vault is the lowest, we update the lowest value
+        if lowest_key == target_vault_key {
+            vaults_info.lowest_key = target_vault.next_key.clone();
+        }
+
+        let new_vault_initial_debt: u128 = target_vault.total_debt.clone();
+        let new_vault_collateral_amount: u128 = target_vault.total_collateral.clone() + amount;
+        let new_vault_key: VaultKey = VaultKey {
+            index: calculate_user_vault_index(
+                new_vault_initial_debt.clone(),
+                new_vault_collateral_amount.clone(),
+            ),
+            account: target_vault.account,
+            denomination: target_vault.denomination,
+        };
+
+        let (_, updated_target_vault_key, updated_target_vault_index_key, updated_lowest_key) =
+            create_and_insert_vault(
+                &env,
+                &vaults_info.lowest_key,
+                &new_vault_key,
+                &new_prev_key,
+                new_vault_initial_debt.clone(),
+                new_vault_collateral_amount.clone(),
+            );
+
+        vaults_info.lowest_key = updated_lowest_key;
+        vaults_info.total_col = vaults_info.total_col + amount;
+        set_vaults_info(&env, &vaults_info);
+
+        bump_vault(&env, updated_target_vault_key);
+        bump_vault_index(&env, updated_target_vault_index_key);
+    }
+
     //
     // fn incr_debt(env: Env, caller: Address, debt_amount: i128, denomination: Symbol) {
     //     bump_instance(&env);

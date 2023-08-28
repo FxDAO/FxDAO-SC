@@ -1,5 +1,7 @@
 // use crate::storage::storage_types::*;
-use crate::storage::vaults::{Vault, VaultIndexKey, VaultKey, VaultsDataKeys, VaultsInfo};
+use crate::storage::vaults::{
+    OptionalVaultKey, Vault, VaultIndexKey, VaultKey, VaultsDataKeys, VaultsInfo,
+};
 // use crate::utils::indexes::{
 //     add_new_index_into_indexes_list, get_vaults_data_type_with_index, get_vaults_indexes_list,
 //     remove_index_from_indexes_list, remove_vaults_data_type_with_index, save_vaults_indexes_list,
@@ -44,6 +46,143 @@ pub fn set_vaults_info(env: &Env, vaults_info: &VaultsInfo) {
     );
 }
 
+/// Creates and insert a Vault into the storage while updating the prev vault in case it exists.
+/// **This function doesn't admit errors IE if something goes wrong it must panic.**
+///
+/// **Arguments:**
+/// - `lowest_key` - This key must come from the current (most recent update) lowest key in the storage. If we are making multiple operations, make sure the lowest key passed to this function is the latest state.
+/// - `new_vault_key` - We accept the VaultKey of the new vault because it's something that it already includes basic information like: account, denomination and the calculated index of the new vault.
+/// - `prev_key` - This value must be the key of the Vault that comes BEFORE the position this new Vault is going to be inserted
+/// - `initial_debt` - The debt the new vault will be opened with
+/// - `collateral_amount` - The collateral the new vault will be opened with
+///
+/// **Returns:**
+/// - The new saved Vault
+/// - The VaultKey of the new Vault
+/// - The VaultKeyIndex of the new Vault
+/// - The updated value of the `lowest_key`
+pub fn create_and_insert_vault(
+    env: &Env,
+    lowest_key: &OptionalVaultKey,
+    new_vault_key: &VaultKey,
+    prev_key: &OptionalVaultKey,
+    initial_debt: u128,
+    collateral_amount: u128,
+) -> (Vault, VaultKey, VaultIndexKey, OptionalVaultKey) {
+    let new_vault_next_key: OptionalVaultKey;
+    let updated_lowest_key: OptionalVaultKey;
+    match lowest_key.clone() {
+        // Case 1: If lowest key is None, it means this is the first vault and so we don't need to do any other major validation
+        OptionalVaultKey::None => {
+            new_vault_next_key = OptionalVaultKey::None;
+            updated_lowest_key = OptionalVaultKey::Some(new_vault_key.clone());
+        }
+
+        // Case 2: If the lowest key exists, it means the list is not empty and we need to consider some scenarios
+        OptionalVaultKey::Some(current_lowest_key) => {
+            if new_vault_key.index < current_lowest_key.index {
+                // Case 2.1: If new index is lower than the lowest index, we continue like if the list was empty but using the old lowest as the next value for the new Vault
+                new_vault_next_key = OptionalVaultKey::Some(current_lowest_key);
+                updated_lowest_key = OptionalVaultKey::Some(new_vault_key.clone());
+            } else {
+                // Case 2.2: New vault is higher than the lowest, we need to consider a few things and do some validations
+                // - The prev value can not be None
+                // - The prev vault must exist
+                let prev_key = match prev_key {
+                    OptionalVaultKey::None => {
+                        panic_with_error!(&env, &SCErrors::PrevVaultCantBeNone);
+                    }
+                    OptionalVaultKey::Some(key) => key,
+                };
+
+                if !has_vault(&env, prev_key.clone()) {
+                    panic_with_error!(&env, &SCErrors::PrevVaultDoesntExist);
+                }
+
+                let mut prev_vault: Vault = get_vault(&env, prev_key.clone());
+
+                match prev_vault.next_key {
+                    // Case 2.2.1: If the prev next key is None, the new Vault will have None as its next key and the prev vault will now have the new vault key as its next key. The lowest key stays the same.
+                    OptionalVaultKey::None => {
+                        new_vault_next_key = OptionalVaultKey::None;
+                        updated_lowest_key = lowest_key.clone();
+                        prev_vault.next_key = OptionalVaultKey::Some(new_vault_key.clone());
+                        set_vault(&env, &prev_vault);
+                    }
+                    // Case 2.2.2: If the prev key isn't None, we make this two flows:
+                    // - If the prev next key is lower than the new vault, we panic
+                    // - If prev next key is higher than the new vault, the new vault will have the current prev next as its next key and the prev vault will update its next key with the new vault. The lowest key stays the same.
+                    OptionalVaultKey::Some(current_prev_next_key) => {
+                        if current_prev_next_key.index < new_vault_key.index {
+                            // TODO: test this
+                            panic_with_error!(
+                                &env,
+                                &SCErrors::PrevVaultNextIndexIsLowerThanNewVault
+                            );
+                        }
+
+                        new_vault_next_key = OptionalVaultKey::Some(current_prev_next_key);
+                        updated_lowest_key = lowest_key.clone();
+                        prev_vault.next_key = OptionalVaultKey::Some(new_vault_key.clone());
+                        set_vault(&env, &prev_vault);
+                    }
+                }
+            }
+        }
+    }
+
+    let new_vault: Vault = Vault {
+        next_key: new_vault_next_key,
+        denomination: new_vault_key.denomination.clone(),
+        account: new_vault_key.account.clone(),
+        total_debt: initial_debt,
+        total_collateral: collateral_amount,
+        index: new_vault_key.index.clone(),
+    };
+    set_vault(&env, &new_vault);
+    set_vault_index(&env, &new_vault_key);
+
+    (
+        new_vault,
+        new_vault_key.clone(),
+        VaultIndexKey {
+            user: new_vault_key.account.clone(),
+            denomination: new_vault_key.denomination.clone(),
+        },
+        updated_lowest_key,
+    )
+}
+
+pub fn search_vault(
+    env: &Env,
+    user: &Address,
+    denomination: &Symbol,
+) -> (Vault, VaultKey, VaultIndexKey) {
+    let vault_index_key: VaultIndexKey = VaultIndexKey {
+        user: user.clone(),
+        denomination: denomination.clone(),
+    };
+
+    if !has_vault_index(&env, vault_index_key.clone()) {
+        panic_with_error!(&env, &SCErrors::VaultDoesntExist);
+    }
+
+    let vault_index: u128 = get_vault_index(&env, vault_index_key.clone());
+    let vault_key: VaultKey = VaultKey {
+        index: vault_index,
+        account: user.clone(),
+        denomination: denomination.clone(),
+    };
+
+    if !has_vault(&env, vault_key.clone()) {
+        panic_with_error!(&env, &SCErrors::VaultDoesntExist);
+    }
+
+    let user_vault: Vault = get_vault(&env, vault_key.clone());
+
+    (user_vault, vault_key, vault_index_key)
+}
+
 pub fn get_vault(env: &Env, vault_key: VaultKey) -> Vault {
     env.storage()
         .persistent()
@@ -51,10 +190,21 @@ pub fn get_vault(env: &Env, vault_key: VaultKey) -> Vault {
         .unwrap()
 }
 
-pub fn set_vault(env: &Env, vault: &Vault, vault_key: &VaultKey) {
+pub fn set_vault(env: &Env, vault: &Vault) {
+    env.storage().persistent().set(
+        &VaultsDataKeys::Vault(VaultKey {
+            index: vault.index.clone(),
+            account: vault.account.clone(),
+            denomination: vault.denomination.clone(),
+        }),
+        vault,
+    );
+}
+
+pub fn remove_vault(env: &Env, vault_key: &VaultKey) {
     env.storage()
         .persistent()
-        .set(&VaultsDataKeys::Vault(vault_key.clone()), vault);
+        .remove(&VaultsDataKeys::Vault(vault_key.clone()));
 }
 
 pub fn set_vault_index(env: &Env, vault_key: &VaultKey) {
@@ -67,11 +217,65 @@ pub fn set_vault_index(env: &Env, vault_key: &VaultKey) {
     );
 }
 
+pub fn remove_vault_index(env: &Env, vault_index_key: &VaultIndexKey) {
+    env.storage()
+        .persistent()
+        .remove(&VaultsDataKeys::VaultIndex(vault_index_key.clone()));
+}
+
+pub fn has_vault_index(env: &Env, vault_index_key: VaultIndexKey) -> bool {
+    env.storage()
+        .persistent()
+        .has(&VaultsDataKeys::VaultIndex(vault_index_key))
+}
+
 pub fn get_vault_index(env: &Env, vault_index_key: VaultIndexKey) -> u128 {
     env.storage()
         .persistent()
         .get(&VaultsDataKeys::VaultIndex(vault_index_key))
         .unwrap()
+}
+
+/// This function checks and removes the given Vault, it also updates the previous Vault if there is one.
+/// **This function doesn't admit errors IE if something goes wrong it must panic.**
+///
+/// This function doesn't update nor care about the lowest_key of the general contract, that's something the contract needs to handle either before or after calling this function.
+///
+/// **Arguments:**
+/// - `vault` - Target Vault to remove from the storage
+/// - `prev_key` - This value must be the key of the Vault that comes BEFORE the position the Vault we are going to remove
+pub fn withdraw_vault(env: &Env, vault: &Vault, prev_key: &OptionalVaultKey) {
+    let target_vault_key: VaultKey = VaultKey {
+        index: vault.index.clone(),
+        account: vault.account.clone(),
+        denomination: vault.denomination.clone(),
+    };
+
+    if let OptionalVaultKey::Some(key) = prev_key {
+        let (mut prev_vault, _, _) = search_vault(&env, &key.account, &key.denomination);
+
+        // We check that the Next Key correctly targets the target Vault
+        // If the Next key is None, it means the target Vault is not the Vault that comes after this one
+        if let OptionalVaultKey::Some(key) = prev_vault.next_key {
+            if &key != &target_vault_key {
+                panic_with_error!(&env, &SCErrors::PrevVaultNextIndexIsInvalid);
+            }
+        } else {
+            panic_with_error!(&env, &SCErrors::PrevVaultNextIndexIsInvalid);
+        }
+
+        prev_vault.next_key = vault.next_key.clone();
+        set_vault(&env, &prev_vault);
+    }
+
+    remove_vault(&env, &target_vault_key);
+    remove_vault_index(
+        &env,
+        &VaultIndexKey {
+            user: vault.account.clone(),
+            denomination: vault.denomination.clone(),
+        },
+    );
 }
 
 //
@@ -297,7 +501,7 @@ pub fn get_vault_index(env: &Env, vault_index_key: VaultIndexKey) -> u128 {
 // }
 
 // Validations
-pub fn is_vault_created(env: &Env, vault_key: VaultKey) -> bool {
+pub fn has_vault(env: &Env, vault_key: VaultKey) -> bool {
     env.storage()
         .persistent()
         .has(&VaultsDataKeys::Vault(vault_key))

@@ -178,6 +178,7 @@ fn test_indexes_orders() {
     };
 
     assert_eq!(first_vault.index, 1756_4285714);
+    assert_eq!(first_vault.account, depositor_5);
 
     let second_vault: Vault = data
         .contract_client
@@ -189,6 +190,7 @@ fn test_indexes_orders() {
     };
 
     assert_eq!(second_vault.index, 1857_1428571);
+    assert_eq!(second_vault.account, depositor_2);
 
     let third_vault: Vault = data
         .contract_client
@@ -200,6 +202,7 @@ fn test_indexes_orders() {
     };
 
     assert_eq!(third_vault.index, 2000_0000000);
+    assert_eq!(third_vault.account, depositor_1);
 
     let fourth_vault: Vault = data
         .contract_client
@@ -211,6 +214,7 @@ fn test_indexes_orders() {
     };
 
     assert_eq!(fourth_vault.index, 3250_0000000);
+    assert_eq!(fourth_vault.account, depositor_4);
 
     let fifth_vault: Vault = data
         .contract_client
@@ -222,6 +226,7 @@ fn test_indexes_orders() {
     };
 
     assert_eq!(fifth_vault.index, 3250_0000000);
+    assert_eq!(fifth_vault.account, depositor_3);
 
     let sixth_vault: Vault = data
         .contract_client
@@ -233,4 +238,10 @@ fn test_indexes_orders() {
     };
 
     assert_eq!(sixth_vault.index, 6000_0000000);
+    assert_eq!(sixth_vault.account, depositor_6);
+
+    // 3rd phase of the test
+    // We are going to start increasing the collateral and increasing/paying the debt
+    // ----------------------------------------
+    env.budget().reset_default();
 }

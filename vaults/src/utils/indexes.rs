@@ -59,8 +59,8 @@ pub const INDEXES_BUMP_CONSTANT: u32 = 120960;
 //         .remove(vaults_data_types_with_index_key);
 // }
 
-pub fn calculate_user_vault_index(total_debt: u128, total_col: u128) -> u128 {
-    div_floor(1000000000 * total_col, total_debt)
+pub fn calculate_user_vault_index(total_debt: u128, total_collateral: u128) -> u128 {
+    div_floor(1000000000 * total_collateral, total_debt)
 }
 
 // pub fn add_new_index_into_indexes_list(indexes_list: &Vec<i128>, index: i128) -> Vec<i128> {

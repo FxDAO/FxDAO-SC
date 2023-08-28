@@ -95,10 +95,10 @@ pub fn create_base_data(env: &Env) -> TestData {
 
 pub fn create_base_variables(env: &Env, data: &TestData) -> InitialVariables {
     InitialVariables {
-        currency_price: 20000000,
+        currency_price: 830124,
         depositor: Address::random(&env),
-        initial_debt: 50000000000,
-        collateral_amount: 50000000000,
+        initial_debt: 5000_0000000,
+        collateral_amount: 90_347_8867088,
         contract_address: data.contract_client.address.clone(),
         min_col_rate: 1_1000000,
         min_debt_creation: 5000_0000000,
