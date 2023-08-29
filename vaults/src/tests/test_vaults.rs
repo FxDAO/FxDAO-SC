@@ -732,123 +732,148 @@ fn test_increase_collateral() {
     );
 }
 
-// #[test]
-// fn test_increase_debt() {
-//     let env = Env::default();
-//     let data: TestData = create_base_data(&env);
-//     let base_variables: InitialVariables = create_base_variables(&env, &data);
-//     set_initial_state(&env, &data, &base_variables);
-//
-//     data.collateral_token_admin_client.mint(
-//         &base_variables.depositor,
-//         &(base_variables.collateral_amount * 5),
-//     );
-//
-//     data.stable_token_admin_client.mint(
-//         &base_variables.contract_address,
-//         &(base_variables.initial_debt * 5),
-//     );
-//
-//     set_allowance(&env, &data, &base_variables.depositor);
-//
-//     // It should fail if the user doesn't have a Vault open
-//     // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-//     assert!(data
-//         .contract_client
-//         .try_incr_debt(
-//             &base_variables.depositor,
-//             &base_variables.collateral_amount,
-//             &data.stable_token_denomination
-//         )
-//         .is_err());
-//
-//     data.contract_client.new_vault(
-//         &base_variables.depositor,
-//         &base_variables.initial_debt,
-//         &(base_variables.collateral_amount * 2),
-//         &data.stable_token_denomination,
-//     );
-//
-//     let current_currency_stats: CurrencyStats = data
-//         .contract_client
-//         .get_currency_stats(&data.stable_token_denomination);
-//
-//     assert_eq!(current_currency_stats.total_vaults, 1);
-//     assert_eq!(
-//         current_currency_stats.total_debt,
-//         base_variables.initial_debt
-//     );
-//     assert_eq!(
-//         current_currency_stats.total_col,
-//         base_variables.collateral_amount * 2
-//     );
-//
-//     assert_eq!(
-//         data.stable_token_client.balance(&base_variables.depositor),
-//         base_variables.initial_debt
-//     );
-//
-//     data.contract_client.incr_debt(
-//         &base_variables.depositor,
-//         &base_variables.initial_debt,
-//         &data.stable_token_denomination,
-//     );
-//
-//     // Check the function is requiring the sender approved this operation
-//     assert_eq!(
-//         env.auths().first().unwrap(),
-//         &(
-//             base_variables.depositor.clone(),
-//             AuthorizedInvocation {
-//                 function: AuthorizedFunction::Contract((
-//                     data.contract_client.address.clone(),
-//                     symbol_short!("incr_debt"),
-//                     (
-//                         base_variables.depositor.clone(),
-//                         base_variables.initial_debt.clone(),
-//                         data.stable_token_denomination.clone(),
-//                     )
-//                         .into_val(&env),
-//                 )),
-//                 sub_invocations: std::vec![]
-//             }
-//         ) // [(
-//           //     // Address for which auth is performed
-//           //     base_variables.depositor.clone(),
-//           //     // Identifier of the called contract
-//           //     data.contract_client.address.clone(),
-//           //     // Name of the called function
-//           //     Symbol::short("incr_debt"),
-//           //     // Arguments used (converted to the env-managed vector via `into_val`)
-//           //     (
-//           //         base_variables.depositor.clone(),
-//           //         base_variables.initial_debt.clone(),
-//           //         data.stable_token_denomination.clone(),
-//           //     )
-//           //         .into_val(&env),
-//           // )]
-//     );
-//
-//     let updated_currency_stats: CurrencyStats = data
-//         .contract_client
-//         .get_currency_stats(&data.stable_token_denomination);
-//
-//     assert_eq!(updated_currency_stats.total_vaults, 1);
-//     assert_eq!(
-//         updated_currency_stats.total_debt,
-//         base_variables.initial_debt * 2
-//     );
-//     assert_eq!(
-//         updated_currency_stats.total_col,
-//         base_variables.collateral_amount * 2
-//     );
-//
-//     assert_eq!(
-//         data.stable_token_client.balance(&base_variables.depositor),
-//         (base_variables.initial_debt * 2)
-//     );
-// }
-//
+#[test]
+fn test_increase_debt() {
+    let env: Env = Env::default();
+    let data: TestData = create_base_data(&env);
+    let base_variables: InitialVariables = create_base_variables(&env, &data);
+    set_initial_state(&env, &data, &base_variables);
+    let contract_address: Address = data.contract_client.address.clone();
+
+    token::Client::new(&env, &data.stable_token_client.address).approve(
+        &data.stable_token_issuer,
+        &contract_address,
+        &90000000000000000000,
+        &200_000,
+    );
+
+    data.contract_client.set_vault_conditions(
+        &base_variables.min_col_rate,
+        &base_variables.min_debt_creation,
+        &base_variables.opening_col_rate,
+        &data.stable_token_denomination,
+    );
+
+    data.contract_client.set_currency_rate(
+        &data.stable_token_denomination,
+        &base_variables.currency_price,
+    );
+
+    data.collateral_token_admin_client.mint(
+        &base_variables.depositor,
+        &(base_variables.collateral_amount as i128 * 5),
+    );
+
+    data.stable_token_admin_client.mint(
+        &base_variables.contract_address,
+        &(base_variables.initial_debt as i128 * 5),
+    );
+
+    // It should fail if the user doesn't have a Vault open
+    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
+    // let no_vault_created_error = data
+    //     .contract_client
+    //     .try_increase_debt(
+    //         &OptionalVaultKey::None,
+    //         &VaultKey {
+    //             index: 1,
+    //             account: base_variables.depositor.clone(),
+    //             denomination: data.stable_token_denomination.clone(),
+    //         },
+    //         &OptionalVaultKey::None,
+    //         &100_0000000,
+    //     )
+    //     .unwrap_err()
+    //     .unwrap();
+    //
+    // assert_eq!(no_vault_created_error, SCErrors::VaultDoesntExist.into());
+
+    data.contract_client.new_vault(
+        &OptionalVaultKey::None,
+        &base_variables.depositor,
+        &base_variables.initial_debt,
+        &(base_variables.collateral_amount * 2),
+        &data.stable_token_denomination,
+    );
+
+    let current_vaults_info: VaultsInfo = data
+        .contract_client
+        .get_vaults_info(&data.stable_token_denomination);
+
+    assert_eq!(current_vaults_info.total_vaults, 1);
+    assert_eq!(current_vaults_info.total_debt, base_variables.initial_debt);
+    assert_eq!(
+        current_vaults_info.total_col,
+        base_variables.collateral_amount * 2
+    );
+    assert_eq!(
+        data.stable_token_client.balance(&base_variables.depositor),
+        base_variables.initial_debt as i128
+    );
+
+    data.contract_client.increase_debt(
+        &OptionalVaultKey::None,
+        &VaultKey {
+            index: calculate_user_vault_index(
+                base_variables.initial_debt.clone(),
+                (base_variables.collateral_amount * 2).clone(),
+            ),
+            account: base_variables.depositor.clone(),
+            denomination: data.stable_token_denomination.clone(),
+        },
+        &OptionalVaultKey::None,
+        &base_variables.initial_debt,
+    );
+
+    // Check the function is requiring the sender approved this operation
+    assert_eq!(
+        env.auths().first().unwrap(),
+        &(
+            base_variables.depositor.clone(),
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    data.contract_client.address.clone(),
+                    Symbol::new(&env, "increase_debt"),
+                    (
+                        OptionalVaultKey::None,
+                        VaultKey {
+                            index: calculate_user_vault_index(
+                                base_variables.initial_debt.clone(),
+                                (base_variables.collateral_amount * 2).clone(),
+                            ),
+                            account: base_variables.depositor.clone(),
+                            denomination: data.stable_token_denomination.clone(),
+                        },
+                        OptionalVaultKey::None,
+                        base_variables.initial_debt,
+                    )
+                        .into_val(&env),
+                )),
+                sub_invocations: std::vec![]
+            }
+        )
+    );
+
+    let updated_vaults_info: VaultsInfo = data
+        .contract_client
+        .get_vaults_info(&data.stable_token_denomination);
+
+    assert_eq!(updated_vaults_info.total_vaults, 1);
+    assert_eq!(
+        updated_vaults_info.total_debt,
+        base_variables.initial_debt * 2
+    );
+    assert_eq!(
+        updated_vaults_info.total_col,
+        base_variables.collateral_amount * 2
+    );
+
+    assert_eq!(
+        data.stable_token_client.balance(&base_variables.depositor),
+        base_variables.initial_debt as i128 * 2
+    );
+}
+
 // #[test]
 // fn test_pay_debt() {
 //     let env = Env::default();
