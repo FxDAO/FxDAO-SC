@@ -874,146 +874,225 @@ fn test_increase_debt() {
     );
 }
 
-// #[test]
-// fn test_pay_debt() {
-//     let env = Env::default();
-//     let data: TestData = create_base_data(&env);
-//     let base_variables: InitialVariables = create_base_variables(&env, &data);
-//     set_initial_state(&env, &data, &base_variables);
-//
-//     let currency_price: i128 = 20000000;
-//     let depositor = Address::random(&env);
-//     let initial_debt: i128 = 50000000000;
-//     let collateral_amount: i128 = 50000000000;
-//     let contract_address: Address = data.contract_client.address.clone();
-//
-//     let min_col_rate: i128 = 11000000;
-//     let min_debt_creation: i128 = 50000000000;
-//     let opening_col_rate: i128 = 11500000;
-//
-//     data.contract_client
-//         .set_currency_rate(&data.stable_token_denomination, &currency_price);
-//
-//     data.collateral_token_admin_client
-//         .mint(&depositor, &(collateral_amount));
-//
-//     set_allowance(&env, &data, &depositor);
-//
-//     data.stable_token_admin_client
-//         .mint(&contract_address, &(initial_debt * 10));
-//
-//     data.contract_client.set_vault_conditions(
-//         &min_col_rate,
-//         &min_debt_creation,
-//         &opening_col_rate,
-//         &data.stable_token_denomination,
-//     );
-//
-//     // It should fail if the user doesn't have a Vault open
-//     // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-//     assert!(data
-//         .contract_client
-//         .try_pay_debt(
-//             &depositor,
-//             &(initial_debt / 2),
-//             &data.stable_token_denomination
-//         )
-//         .is_err());
-//
-//     data.contract_client.new_vault(
-//         &depositor,
-//         &initial_debt,
-//         &collateral_amount,
-//         &data.stable_token_denomination,
-//     );
-//
-//     let current_currency_stats: CurrencyStats = data
-//         .contract_client
-//         .get_currency_stats(&data.stable_token_denomination);
-//
-//     assert_eq!(current_currency_stats.total_vaults, 1);
-//     assert_eq!(current_currency_stats.total_debt, initial_debt);
-//     assert_eq!(current_currency_stats.total_col, collateral_amount);
-//
-//     data.contract_client.pay_debt(
-//         &depositor,
-//         &(initial_debt / 2),
-//         &data.stable_token_denomination,
-//     );
-//
-//     // Check the function is requiring the sender approved this operation
-//     assert_eq!(
-//         env.auths().first().unwrap(),
-//         &(
-//             depositor.clone(),
-//             AuthorizedInvocation {
-//                 function: AuthorizedFunction::Contract((
-//                     data.contract_client.address.clone(),
-//                     symbol_short!("pay_debt"),
-//                     (
-//                         depositor.clone(),
-//                         (initial_debt / 2).clone(),
-//                         data.stable_token_denomination.clone(),
-//                     )
-//                         .into_val(&env),
-//                 )),
-//                 sub_invocations: std::vec![AuthorizedInvocation {
-//                     function: AuthorizedFunction::Contract((
-//                         data.stable_token_client.address.clone(),
-//                         symbol_short!("transfer"),
-//                         (
-//                             depositor.clone(),
-//                             data.stable_token_issuer.clone(),
-//                             (initial_debt / 2).clone(),
-//                         )
-//                             .into_val(&env),
-//                     )),
-//                     sub_invocations: std::vec![],
-//                 }],
-//             }
-//         )
-//     );
-//
-//     let updated_currency_stats: CurrencyStats = data
-//         .contract_client
-//         .get_currency_stats(&data.stable_token_denomination);
-//
-//     assert_eq!(updated_currency_stats.total_vaults, 1);
-//     assert_eq!(updated_currency_stats.total_debt, initial_debt / 2);
-//     assert_eq!(updated_currency_stats.total_col, collateral_amount);
-//
-//     assert_eq!(
-//         data.stable_token_client.balance(&depositor),
-//         (initial_debt / 2)
-//     );
-//     assert_eq!(
-//         data.collateral_token_client.balance(&contract_address),
-//         (collateral_amount)
-//     );
-//
-//     data.contract_client.pay_debt(
-//         &depositor,
-//         &(initial_debt / 2),
-//         &data.stable_token_denomination,
-//     );
-//
-//     let final_currency_stats: CurrencyStats = data
-//         .contract_client
-//         .get_currency_stats(&data.stable_token_denomination);
-//
-//     assert_eq!(final_currency_stats.total_vaults, 0);
-//     assert_eq!(final_currency_stats.total_debt, 0);
-//     assert_eq!(final_currency_stats.total_col, 0);
-//
-//     assert_eq!(data.stable_token_client.balance(&depositor), 0);
-//     assert_eq!(data.collateral_token_client.balance(&contract_address), 0);
-//
-//     // We confirm the vault was removed from the storage
-//     // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-//     assert!(data
-//         .contract_client
-//         .try_get_vault(&depositor, &data.stable_token_denomination)
-//         .is_err());
-// }
+#[test]
+fn test_pay_debt() {
+    let env: Env = Env::default();
+    let data: TestData = create_base_data(&env);
+    let base_variables: InitialVariables = create_base_variables(&env, &data);
+    set_initial_state(&env, &data, &base_variables);
 
-// TODO: Test the vault index is always updated after each update
+    data.contract_client.set_vault_conditions(
+        &base_variables.min_col_rate,
+        &base_variables.min_debt_creation,
+        &base_variables.opening_col_rate,
+        &data.stable_token_denomination,
+    );
+
+    data.contract_client.set_currency_rate(
+        &data.stable_token_denomination,
+        &base_variables.currency_price,
+    );
+
+    data.collateral_token_admin_client.mint(
+        &base_variables.depositor,
+        &(base_variables.collateral_amount as i128 * 5),
+    );
+
+    data.stable_token_admin_client.mint(
+        &base_variables.contract_address,
+        &(base_variables.initial_debt as i128 * 5),
+    );
+
+    // It should fail if the user doesn't have a Vault open
+    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
+    // let no_vault_open_error = data
+    //     .contract_client
+    //     .try_pay_debt(
+    //         &OptionalVaultKey::None,
+    //         &VaultKey {
+    //             index: calculate_user_vault_index(
+    //                 base_variables.initial_debt.clone(),
+    //                 base_variables.collateral_amount.clone(),
+    //             ),
+    //             account: base_variables.depositor.clone(),
+    //             denomination: data.stable_token_denomination.clone(),
+    //         },
+    //         &OptionalVaultKey::None,
+    //         &base_variables.initial_debt,
+    //     )
+    //     .unwrap_err()
+    //     .unwrap();
+    //
+    // assert_eq!(no_vault_open_error, SCErrors::VaultDoesntExist.into());
+
+    data.contract_client.new_vault(
+        &OptionalVaultKey::None,
+        &base_variables.depositor,
+        &(base_variables.initial_debt * 2),
+        &(base_variables.collateral_amount * 2),
+        &data.stable_token_denomination,
+    );
+
+    let current_vaults_info: VaultsInfo = data
+        .contract_client
+        .get_vaults_info(&data.stable_token_denomination);
+
+    assert_eq!(current_vaults_info.total_vaults, 1);
+    assert_eq!(
+        current_vaults_info.total_debt,
+        base_variables.initial_debt * 2
+    );
+    assert_eq!(
+        current_vaults_info.total_col,
+        (base_variables.collateral_amount * 2)
+    );
+    assert_eq!(
+        data.stable_token_client.balance(&base_variables.depositor),
+        (base_variables.initial_debt * 2) as i128
+    );
+
+    let mut vault: Vault = data
+        .contract_client
+        .get_vault(&base_variables.depositor, &data.stable_token_denomination);
+
+    data.contract_client.pay_debt(
+        &OptionalVaultKey::None,
+        &VaultKey {
+            index: vault.index.clone(),
+            account: vault.account.clone(),
+            denomination: vault.denomination.clone(),
+        },
+        &OptionalVaultKey::None,
+        &base_variables.initial_debt,
+    );
+
+    // Check the function is requiring the sender approved this operation
+    assert_eq!(
+        env.auths(),
+        std::vec![
+            (
+                vault.account.clone(),
+                AuthorizedInvocation {
+                    function: AuthorizedFunction::Contract((
+                        data.contract_client.address.clone(),
+                        symbol_short!("pay_debt"),
+                        (
+                            OptionalVaultKey::None,
+                            VaultKey {
+                                index: vault.index.clone(),
+                                account: vault.account.clone(),
+                                denomination: vault.denomination.clone(),
+                            },
+                            OptionalVaultKey::None,
+                            base_variables.initial_debt.clone(),
+                        )
+                            .into_val(&env),
+                    )),
+                    sub_invocations: std::vec![],
+                }
+            ),
+            (
+                vault.account.clone(),
+                AuthorizedInvocation {
+                    function: AuthorizedFunction::Contract((
+                        data.stable_token_client.address.clone(),
+                        symbol_short!("transfer"),
+                        (
+                            vault.account.clone(),
+                            data.contract_client.address.clone(),
+                            base_variables.initial_debt.clone() as i128,
+                        )
+                            .into_val(&env),
+                    )),
+                    sub_invocations: std::vec![],
+                }
+            )
+        ]
+    );
+
+    let updated_vaults_info: VaultsInfo = data
+        .contract_client
+        .get_vaults_info(&data.stable_token_denomination);
+
+    assert_eq!(updated_vaults_info.total_vaults, 1);
+    assert_eq!(updated_vaults_info.total_debt, base_variables.initial_debt,);
+    assert_eq!(
+        updated_vaults_info.total_col,
+        base_variables.collateral_amount * 2,
+    );
+
+    assert_eq!(
+        data.stable_token_client.balance(&base_variables.depositor),
+        base_variables.initial_debt as i128
+    );
+    assert_eq!(
+        data.collateral_token_client
+            .balance(&base_variables.contract_address),
+        (base_variables.collateral_amount * 2) as i128
+    );
+
+    vault = data
+        .contract_client
+        .get_vault(&base_variables.depositor, &data.stable_token_denomination);
+
+    // If the vault will be below the min deb it should fail
+    // TODO: FIX THIS ONCE SOROBAN FIX IT
+    // let min_debt_invalid_error = data
+    //     .contract_client
+    //     .try_pay_debt(
+    //         &OptionalVaultKey::None,
+    //         &VaultKey {
+    //             index: vault.index.clone(),
+    //             account: vault.account.clone(),
+    //             denomination: vault.denomination.clone(),
+    //         },
+    //         &OptionalVaultKey::None,
+    //         &(base_variables.initial_debt / 2),
+    //     )
+    //     .unwrap_err()
+    //     .unwrap();
+    //
+    // assert_eq!(
+    //     min_debt_invalid_error,
+    //     SCErrors::InvalidMinDebtAmount.into()
+    // );
+
+    data.contract_client.pay_debt(
+        &OptionalVaultKey::None,
+        &VaultKey {
+            index: vault.index.clone(),
+            account: vault.account.clone(),
+            denomination: vault.denomination.clone(),
+        },
+        &OptionalVaultKey::None,
+        &base_variables.initial_debt,
+    );
+
+    let final_vaults_info: VaultsInfo = data
+        .contract_client
+        .get_vaults_info(&data.stable_token_denomination);
+
+    assert_eq!(final_vaults_info.total_vaults, 0);
+    assert_eq!(final_vaults_info.total_debt, 0);
+    assert_eq!(final_vaults_info.total_col, 0);
+
+    assert_eq!(
+        data.stable_token_client.balance(&base_variables.depositor),
+        0
+    );
+    assert_eq!(
+        data.collateral_token_client
+            .balance(&base_variables.contract_address),
+        0
+    );
+
+    // We confirm the vault was removed from the storage
+    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
+    // let vault_removed_error = data
+    //     .contract_client
+    //     .try_get_vault(&base_variables.depositor, &data.stable_token_denomination)
+    //     .unwrap_err()
+    //     .unwrap();
+    //
+    // assert_eq!(vault_removed_error, SCErrors::VaultDoesntExist.into());
+}

@@ -73,26 +73,3 @@ pub fn set_currency_stats(env: &Env, denomination: &Symbol, currency_stats: &Cur
         currency_stats,
     );
 }
-
-/// Payments Utils
-pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Address, amount: &i128) {
-    token::Client::new(&env, &core_state.col_token).transfer(
-        &env.current_contract_address(),
-        &requester,
-        &amount,
-    );
-}
-
-pub fn deposit_stablecoin(
-    env: &Env,
-    core_state: &CoreState,
-    currency: &Currency,
-    depositor: &Address,
-    amount: &i128,
-) {
-    token::Client::new(&env, &currency.contract).transfer(
-        &depositor,
-        &core_state.stable_issuer,
-        &amount,
-    );
-}
