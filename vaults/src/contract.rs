@@ -16,13 +16,13 @@ use crate::utils::payments::{
     deposit_collateral, deposit_stablecoin, withdraw_collateral, withdraw_stablecoin,
 };
 use crate::utils::vaults::{
-    bump_vault, bump_vault_index, create_and_insert_vault, get_vault, get_vault_index,
-    get_vaults_info, has_vault, is_vaults_info_started, search_vault, set_vault, set_vault_index,
-    set_vaults_info, validate_user_vault, vault_spot_available, withdraw_vault,
+    bump_vault, bump_vault_index, can_be_liquidated, create_and_insert_vault, get_vault,
+    get_vault_index, get_vaults_info, has_vault, is_vaults_info_started, search_vault, set_vault,
+    set_vault_index, set_vaults_info, validate_user_vault, vault_spot_available, withdraw_vault,
 };
 use num_integer::div_floor;
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, symbol_short, token, vec, Address, BytesN, Env,
+    contract, contractimpl, panic_with_error, symbol_short, token, vec, Address, BytesN, Env, Map,
     Symbol, Vec,
 };
 
@@ -74,6 +74,8 @@ pub trait VaultsContractTrait {
         denomination: Symbol,
     );
     fn get_vault(env: Env, caller: Address, denomination: Symbol) -> Vault;
+    fn get_vault_from_key(env: Env, vault_key: VaultKey) -> Vault;
+    fn get_vaults(env: Env, denomination: Symbol, only_to_liquidate: bool) -> Vec<Vault>;
     fn increase_collateral(
         env: Env,
         prev_key: OptionalVaultKey,
@@ -95,15 +97,12 @@ pub trait VaultsContractTrait {
         new_prev_key: OptionalVaultKey,
         deposit_amount: u128,
     );
-    // fn get_indexes(env: Env, denomination: Symbol) -> Vec<i128>;
-    // fn get_vaults_with_index(env: Env, denomination: Symbol, index: i128) -> Vec<UserVault>;
-    //
+
     // /// Redeeming
     // fn redeem(env: Env, caller: Address, amount: i128, denomination: Symbol);
-    //
-    // /// Liquidation
-    // fn liquidate(env: Env, caller: Address, denomination: Symbol, owners: Vec<Address>);
-    // fn vaults_to_liquidate(env: Env, denomination: Symbol) -> Vec<UserVault>;
+
+    /// Liquidation
+    fn liquidate(env: Env, liquidator: Address, vault_keys: Vec<VaultKey>);
 }
 
 #[contract]
@@ -360,6 +359,56 @@ impl VaultsContractTrait for VaultsContract {
         user_vault
     }
 
+    fn get_vault_from_key(env: Env, vault_key: VaultKey) -> Vault {
+        bump_instance(&env);
+
+        validate_user_vault(&env, vault_key.clone());
+
+        let vault_index_key: VaultIndexKey = VaultIndexKey {
+            user: vault_key.account.clone(),
+            denomination: vault_key.denomination.clone(),
+        };
+
+        bump_vault(&env, vault_key.clone());
+        bump_vault_index(&env, vault_index_key);
+
+        get_vault(&env, vault_key)
+    }
+
+    fn get_vaults(env: Env, denomination: Symbol, only_to_liquidate: bool) -> Vec<Vault> {
+        bump_instance(&env);
+
+        let mut vaults: Vec<Vault> = vec![&env] as Vec<Vault>;
+
+        let currency: Currency = get_currency(&env, &denomination);
+        let vaults_info: VaultsInfo = get_vaults_info(&env, &denomination);
+
+        let mut target_key: VaultKey = match vaults_info.lowest_key.clone() {
+            OptionalVaultKey::None => {
+                panic_with_error!(&env, &SCErrors::ThereAreNoVaultsToLiquidate);
+            }
+            OptionalVaultKey::Some(key) => key,
+        };
+
+        for _ in 0..20 {
+            let vault = get_vault(&env, target_key.clone());
+
+            if !can_be_liquidated(&vault, &currency, &vaults_info) && only_to_liquidate {
+                break;
+            }
+
+            vaults.push_back(vault.clone());
+
+            if let OptionalVaultKey::Some(key) = vault.next_key {
+                target_key = key
+            } else {
+                break;
+            }
+        }
+
+        vaults
+    }
+
     fn increase_collateral(
         env: Env,
         prev_key: OptionalVaultKey,
@@ -432,6 +481,125 @@ impl VaultsContractTrait for VaultsContract {
         bump_vault(&env, updated_target_vault_key);
         bump_vault_index(&env, updated_target_vault_index_key);
     }
+
+    // fn redeem(env: Env, caller: Address, amount_to_redeem: i128, denomination: Symbol) {
+    //     bump_instance(&env);
+    //     caller.require_auth();
+    //
+    //     validate_currency(&env, &denomination);
+    //     is_currency_active(&env, &denomination);
+    //     check_positive(&env, &amount_to_redeem);
+    //
+    //     // TODO: Add fee logic
+    //
+    //     let core_state: CoreState = get_core_state(&env);
+    //     let currency: Currency = get_currency(&env, &denomination);
+    //
+    //     let vaults_indexes_list_key: VaultsDataKeys =
+    //         VaultsDataKeys::VaultsIndexes(denomination.clone());
+    //
+    //     let redeemable_vaults: Vec<UserVault> =
+    //         get_redeemable_vaults(&env, &amount_to_redeem, &currency, &vaults_indexes_list_key);
+    //
+    //     deposit_stablecoin(&env, &core_state, &currency, &caller, &amount_to_redeem);
+    //
+    //     let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
+    //
+    //     // Update the redeemable vaults information
+    //     let mut amount_redeemed: i128 = 0;
+    //     let mut collateral_to_withdraw: i128 = 0;
+    //
+    //     for current_user_vault in redeemable_vaults.iter() {
+    //         let user_vault_data_type: UserVaultDataType = UserVaultDataType {
+    //             user: current_user_vault.id.clone(),
+    //             denomination: current_user_vault.denomination.clone(),
+    //         };
+    //
+    //         let vaults_data_types_with_index_key: VaultsDataKeys =
+    //             VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+    //                 index: current_user_vault.index,
+    //                 denomination: denomination.clone(),
+    //             });
+    //
+    //         let vaults_indexes_list_key: VaultsDataKeys =
+    //             VaultsDataKeys::VaultsIndexes(denomination.clone());
+    //
+    //         if (amount_redeemed + current_user_vault.total_debt) > amount_to_redeem {
+    //             let mut new_user_vault: UserVault = current_user_vault.clone();
+    //             let missing_amount: i128 = amount_to_redeem - amount_redeemed;
+    //             let missing_collateral: i128 = div_floor(missing_amount * 10000000, currency.rate);
+    //
+    //             new_user_vault.total_col = new_user_vault.total_col - missing_collateral;
+    //             new_user_vault.total_debt = new_user_vault.total_debt - missing_amount;
+    //             new_user_vault.index =
+    //                 calculate_user_vault_index(new_user_vault.total_debt, new_user_vault.total_col);
+    //
+    //             currency_stats.total_col = currency_stats.total_col - missing_collateral;
+    //             currency_stats.total_debt = currency_stats.total_debt - missing_amount;
+    //
+    //             collateral_to_withdraw = collateral_to_withdraw + missing_collateral;
+    //             amount_redeemed = amount_redeemed + missing_amount;
+    //
+    //             let current_vaults_data_types_with_index_key: VaultsDataKeys =
+    //                 VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+    //                     index: current_user_vault.index.clone(),
+    //                     denomination: denomination.clone(),
+    //                 });
+    //
+    //             let new_vaults_data_types_with_index_key: VaultsDataKeys =
+    //                 VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
+    //                     index: new_user_vault.index.clone(),
+    //                     denomination: denomination.clone(),
+    //                 });
+    //
+    //             update_user_vault(
+    //                 &env,
+    //                 &current_user_vault,
+    //                 &new_user_vault,
+    //                 &user_vault_data_type,
+    //                 &vaults_indexes_list_key,
+    //                 &current_vaults_data_types_with_index_key,
+    //                 &new_vaults_data_types_with_index_key,
+    //             );
+    //
+    //             bump_user_vault(&env, user_vault_data_type);
+    //             bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
+    //         } else {
+    //             let collateral_amount =
+    //                 div_floor(current_user_vault.total_debt * 10000000, currency.rate);
+    //
+    //             collateral_to_withdraw = collateral_to_withdraw + collateral_amount;
+    //             amount_redeemed = amount_redeemed + current_user_vault.total_debt;
+    //
+    //             currency_stats.total_vaults = currency_stats.total_vaults - 1;
+    //             currency_stats.total_col = currency_stats.total_col - current_user_vault.total_col;
+    //             currency_stats.total_debt =
+    //                 currency_stats.total_debt - current_user_vault.total_debt;
+    //
+    //             withdraw_collateral(
+    //                 &env,
+    //                 &core_state,
+    //                 &current_user_vault.id,
+    //                 &(current_user_vault.total_col - collateral_amount),
+    //             );
+    //
+    //             remove_user_vault(
+    //                 &env,
+    //                 &current_user_vault,
+    //                 &user_vault_data_type,
+    //                 &vaults_data_types_with_index_key,
+    //                 &vaults_indexes_list_key,
+    //             );
+    //
+    //             bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
+    //         }
+    //     }
+    //
+    //     withdraw_collateral(&env, &core_state, &caller, &collateral_to_withdraw);
+    //     set_currency_stats(&env, &denomination, &currency_stats);
+    //
+    //     bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
+    // }
 
     fn increase_debt(
         env: Env,
@@ -643,271 +811,80 @@ impl VaultsContractTrait for VaultsContract {
         set_vaults_info(&env, &vaults_info);
     }
 
-    // fn get_indexes(env: Env, denomination: Symbol) -> Vec<i128> {
-    //     bump_instance(&env);
-    //
-    //     let vaults_indexes_list_key: VaultsDataKeys = VaultsDataKeys::VaultsIndexes(denomination);
-    //
-    //     bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
-    //     get_vaults_indexes_list(&env, &vaults_indexes_list_key)
-    // }
-    //
-    // fn get_vaults_with_index(env: Env, denomination: Symbol, index: i128) -> Vec<UserVault> {
-    //     bump_instance(&env);
-    //
-    //     let vaults_data_types_with_index_key: VaultsDataKeys =
-    //         VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
-    //             index,
-    //             denomination: denomination.clone(),
-    //         });
-    //
-    //     let data_keys: Vec<UserVaultDataType> =
-    //         get_vaults_data_type_with_index(&env, &vaults_data_types_with_index_key);
-    //     let mut vaults: Vec<UserVault> = vec![&env] as Vec<UserVault>;
-    //
-    //     for user_vault_data_type in data_keys.iter() {
-    //         let vault: UserVault = get_user_vault(&env, &user_vault_data_type);
-    //
-    //         bump_user_vault(&env, user_vault_data_type);
-    //         vaults.push_back(vault);
-    //     }
-    //
-    //     let vaults_indexes_list_key: VaultsDataKeys =
-    //         VaultsDataKeys::VaultsIndexes(denomination.clone());
-    //
-    //     bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
-    //     bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
-    //
-    //     vaults
-    // }
-    //
-    // fn redeem(env: Env, caller: Address, amount_to_redeem: i128, denomination: Symbol) {
-    //     bump_instance(&env);
-    //     caller.require_auth();
-    //
-    //     validate_currency(&env, &denomination);
-    //     is_currency_active(&env, &denomination);
-    //     check_positive(&env, &amount_to_redeem);
-    //
-    //     // TODO: Add fee logic
-    //
-    //     let core_state: CoreState = get_core_state(&env);
-    //     let currency: Currency = get_currency(&env, &denomination);
-    //
-    //     let vaults_indexes_list_key: VaultsDataKeys =
-    //         VaultsDataKeys::VaultsIndexes(denomination.clone());
-    //
-    //     let redeemable_vaults: Vec<UserVault> =
-    //         get_redeemable_vaults(&env, &amount_to_redeem, &currency, &vaults_indexes_list_key);
-    //
-    //     deposit_stablecoin(&env, &core_state, &currency, &caller, &amount_to_redeem);
-    //
-    //     let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
-    //
-    //     // Update the redeemable vaults information
-    //     let mut amount_redeemed: i128 = 0;
-    //     let mut collateral_to_withdraw: i128 = 0;
-    //
-    //     for current_user_vault in redeemable_vaults.iter() {
-    //         let user_vault_data_type: UserVaultDataType = UserVaultDataType {
-    //             user: current_user_vault.id.clone(),
-    //             denomination: current_user_vault.denomination.clone(),
-    //         };
-    //
-    //         let vaults_data_types_with_index_key: VaultsDataKeys =
-    //             VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
-    //                 index: current_user_vault.index,
-    //                 denomination: denomination.clone(),
-    //             });
-    //
-    //         let vaults_indexes_list_key: VaultsDataKeys =
-    //             VaultsDataKeys::VaultsIndexes(denomination.clone());
-    //
-    //         if (amount_redeemed + current_user_vault.total_debt) > amount_to_redeem {
-    //             let mut new_user_vault: UserVault = current_user_vault.clone();
-    //             let missing_amount: i128 = amount_to_redeem - amount_redeemed;
-    //             let missing_collateral: i128 = div_floor(missing_amount * 10000000, currency.rate);
-    //
-    //             new_user_vault.total_col = new_user_vault.total_col - missing_collateral;
-    //             new_user_vault.total_debt = new_user_vault.total_debt - missing_amount;
-    //             new_user_vault.index =
-    //                 calculate_user_vault_index(new_user_vault.total_debt, new_user_vault.total_col);
-    //
-    //             currency_stats.total_col = currency_stats.total_col - missing_collateral;
-    //             currency_stats.total_debt = currency_stats.total_debt - missing_amount;
-    //
-    //             collateral_to_withdraw = collateral_to_withdraw + missing_collateral;
-    //             amount_redeemed = amount_redeemed + missing_amount;
-    //
-    //             let current_vaults_data_types_with_index_key: VaultsDataKeys =
-    //                 VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
-    //                     index: current_user_vault.index.clone(),
-    //                     denomination: denomination.clone(),
-    //                 });
-    //
-    //             let new_vaults_data_types_with_index_key: VaultsDataKeys =
-    //                 VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
-    //                     index: new_user_vault.index.clone(),
-    //                     denomination: denomination.clone(),
-    //                 });
-    //
-    //             update_user_vault(
-    //                 &env,
-    //                 &current_user_vault,
-    //                 &new_user_vault,
-    //                 &user_vault_data_type,
-    //                 &vaults_indexes_list_key,
-    //                 &current_vaults_data_types_with_index_key,
-    //                 &new_vaults_data_types_with_index_key,
-    //             );
-    //
-    //             bump_user_vault(&env, user_vault_data_type);
-    //             bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
-    //         } else {
-    //             let collateral_amount =
-    //                 div_floor(current_user_vault.total_debt * 10000000, currency.rate);
-    //
-    //             collateral_to_withdraw = collateral_to_withdraw + collateral_amount;
-    //             amount_redeemed = amount_redeemed + current_user_vault.total_debt;
-    //
-    //             currency_stats.total_vaults = currency_stats.total_vaults - 1;
-    //             currency_stats.total_col = currency_stats.total_col - current_user_vault.total_col;
-    //             currency_stats.total_debt =
-    //                 currency_stats.total_debt - current_user_vault.total_debt;
-    //
-    //             withdraw_collateral(
-    //                 &env,
-    //                 &core_state,
-    //                 &current_user_vault.id,
-    //                 &(current_user_vault.total_col - collateral_amount),
-    //             );
-    //
-    //             remove_user_vault(
-    //                 &env,
-    //                 &current_user_vault,
-    //                 &user_vault_data_type,
-    //                 &vaults_data_types_with_index_key,
-    //                 &vaults_indexes_list_key,
-    //             );
-    //
-    //             bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
-    //         }
-    //     }
-    //
-    //     withdraw_collateral(&env, &core_state, &caller, &collateral_to_withdraw);
-    //     set_currency_stats(&env, &denomination, &currency_stats);
-    //
-    //     bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
-    // }
-    //
-    // fn liquidate(env: Env, liquidator: Address, denomination: Symbol, owners: Vec<Address>) {
-    //     bump_instance(&env);
-    //     liquidator.require_auth();
-    //
-    //     // TODO: Add fee logic
-    //
-    //     let core_state: CoreState = get_core_state(&env);
-    //     let currency: Currency = get_currency(&env, &denomination);
-    //     let currency_vault_conditions: CurrencyVaultsConditions =
-    //         get_currency_vault_conditions(&env, &denomination);
-    //
-    //     let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
-    //     let mut collateral_to_withdraw: i128 = 0;
-    //     let mut amount_to_deposit: i128 = 0;
-    //
-    //     for owner in owners.iter() {
-    //         let user_vault_data_type: UserVaultDataType = UserVaultDataType {
-    //             user: owner,
-    //             denomination: denomination.clone(),
-    //         };
-    //         let user_vault: UserVault = get_user_vault(&env, &user_vault_data_type);
-    //
-    //         if !can_be_liquidated(&user_vault, &currency, &currency_vault_conditions) {
-    //             panic_with_error!(&env, SCErrors::UserVaultCantBeLiquidated);
-    //         }
-    //
-    //         collateral_to_withdraw = collateral_to_withdraw + user_vault.total_col;
-    //         amount_to_deposit = amount_to_deposit + user_vault.total_debt;
-    //
-    //         currency_stats.total_vaults = currency_stats.total_vaults - 1;
-    //         currency_stats.total_col = currency_stats.total_col - user_vault.total_col;
-    //         currency_stats.total_debt = currency_stats.total_debt - user_vault.total_debt;
-    //
-    //         let vaults_data_types_with_index_key: VaultsDataKeys =
-    //             VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
-    //                 index: user_vault.index,
-    //                 denomination: denomination.clone(),
-    //             });
-    //
-    //         let vaults_indexes_list_key: VaultsDataKeys =
-    //             VaultsDataKeys::VaultsIndexes(denomination.clone());
-    //
-    //         remove_user_vault(
-    //             &env,
-    //             &user_vault,
-    //             &user_vault_data_type,
-    //             &vaults_data_types_with_index_key,
-    //             &vaults_indexes_list_key,
-    //         );
-    //
-    //         bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
-    //         bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
-    //     }
-    //
-    //     withdraw_collateral(&env, &core_state, &liquidator, &collateral_to_withdraw);
-    //     deposit_stablecoin(
-    //         &env,
-    //         &core_state,
-    //         &currency,
-    //         &liquidator,
-    //         &amount_to_deposit,
-    //     );
-    //     set_currency_stats(&env, &denomination, &currency_stats);
-    // }
-    //
-    // fn vaults_to_liquidate(env: Env, denomination: Symbol) -> Vec<UserVault> {
-    //     bump_instance(&env);
-    //
-    //     let vaults_indexes_list_key: VaultsDataKeys =
-    //         VaultsDataKeys::VaultsIndexes(denomination.clone());
-    //
-    //     let indexes: Vec<i128> = get_vaults_indexes_list(&env, &vaults_indexes_list_key);
-    //     let mut vaults: Vec<UserVault> = vec![&env] as Vec<UserVault>;
-    //     let mut completed: bool = false;
-    //
-    //     let currency: Currency = get_currency(&env, &denomination);
-    //     let currency_vaults_conditions: CurrencyVaultsConditions =
-    //         get_currency_vault_conditions(&env, &denomination);
-    //
-    //     for index in indexes.iter() {
-    //         let vaults_data_types_with_index_key: VaultsDataKeys =
-    //             VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
-    //                 index,
-    //                 denomination: denomination.clone(),
-    //             });
-    //
-    //         let vaults_data_types: Vec<UserVaultDataType> =
-    //             get_vaults_data_type_with_index(&env, &vaults_data_types_with_index_key);
-    //
-    //         for user_vault_data_type in vaults_data_types.iter() {
-    //             let user_vault: UserVault = get_user_vault(&env, &user_vault_data_type);
-    //
-    //             if can_be_liquidated(&user_vault, &currency, &currency_vaults_conditions) {
-    //                 // This condition is because the indexes include all denominations
-    //                 if user_vault_data_type.denomination == currency.denomination {
-    //                     vaults.push_back(user_vault);
-    //                 }
-    //             } else {
-    //                 completed = true;
-    //                 break;
-    //             }
-    //         }
-    //
-    //         if completed {
-    //             break;
-    //         }
-    //     }
-    //
-    //     vaults
-    // }
+    fn liquidate(env: Env, liquidator: Address, vault_keys: Vec<VaultKey>) {
+        // bump_instance(&env);
+        // liquidator.require_auth();
+        //
+        // // TODO: Add fee logic
+        //
+        // let core_state: CoreState = get_core_state(&env);
+        // let mut currencies_map: Map<Symbol, Currency> = Map::new(&env);
+        // let mut vaults_info_map: Map<Symbol, VaultsInfo> = Map::new(&env);
+        //
+        // let mut collateral_to_withdraw: u128 = 0;
+        // let mut amounts_to_deposit: Map<Symbol, u128> = Map::new(&env);
+        //
+        // for vault_key in vault_keys {
+        //     let vault: Vault = get_vault(&env, vault_key.clone());
+        //     let currency: Currency =
+        //         match currencies_map.try_get(vault.denomination.clone()).unwrap() {
+        //             None => {
+        //                 let c: Currency = get_currency(&env, &vault.denomination);
+        //                 currencies_map.set(vault.denomination, c.clone());
+        //                 c
+        //             }
+        //             Some(c) => c,
+        //         };
+        //
+        //     let mut vaults_info: VaultsInfo =
+        //         match vaults_info_map.try_get(vault.denomination.clone()).unwrap() {
+        //             None => {
+        //                 let v: VaultsInfo = get_vaults_info(&env, &vault.denomination.clone());
+        //                 vaults_info_map.set(vault.denomination.clone(), v.clone());
+        //                 v
+        //             }
+        //             Some(v) => v,
+        //         };
+        //
+        //     if !can_be_liquidated(&vault, &currency, &vaults_info) {
+        //         panic_with_error!(&env, SCErrors::UserVaultCantBeLiquidated);
+        //     }
+        //
+        //     collateral_to_withdraw = collateral_to_withdraw + vault.total_collateral;
+        //     let current_amount_to_deposit: u128 = match amounts_to_deposit
+        //         .try_get(vault.denomination.clone())
+        //         .unwrap()
+        //     {
+        //         None => 0,
+        //         Some(a) => a,
+        //     };
+        //
+        //     amounts_to_deposit.set(
+        //         vault.denomination.clone(),
+        //         current_amount_to_deposit + vault.total_debt,
+        //     );
+        //
+        //     vaults_info.total_vaults = vaults_info.total_vaults - 1;
+        //     vaults_info.total_col = vaults_info.total_col - vault.total_collateral;
+        //     vaults_info.total_debt = vaults_info.total_debt - vault.total_debt;
+        //
+        //     withdraw_vault(
+        //         &env,
+        //         &vault,
+        //         &user_vault_data_type,
+        //         &vaults_data_types_with_index_key,
+        //         &vaults_indexes_list_key,
+        //     );
+        // }
+        //
+        // withdraw_collateral(&env, &core_state, &liquidator, &collateral_to_withdraw);
+        // deposit_stablecoin(
+        //     &env,
+        //     &core_state,
+        //     &currency,
+        //     &liquidator,
+        //     &amount_to_deposit,
+        // );
+        // set_currency_stats(&env, &denomination, &currency_stats);
+    }
 }

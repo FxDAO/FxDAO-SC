@@ -7,7 +7,7 @@ pub enum OptionalVaultKey {
     Some(VaultKey),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[contracttype]
 pub struct VaultsInfo {
     pub denomination: Symbol,
@@ -28,7 +28,7 @@ pub struct VaultKey {
     pub denomination: Symbol,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[contracttype]
 pub struct Vault {
     pub index: u128,

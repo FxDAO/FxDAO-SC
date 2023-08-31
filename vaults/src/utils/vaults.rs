@@ -8,6 +8,7 @@ use crate::storage::vaults::{
 //     set_vaults_data_types_with_index,
 // };
 use crate::errors::SCErrors;
+use crate::storage::currencies::Currency;
 use num_integer::div_floor;
 use soroban_sdk::{panic_with_error, vec, Address, Env, Symbol, Vec};
 
@@ -530,12 +531,12 @@ pub fn validate_user_vault(env: &Env, vault_key: VaultKey) {
     }
 }
 
-// pub fn can_be_liquidated(
-//     user_vault: &UserVault,
-//     currency: &Currency,
-//     currency_vaults_conditions: &CurrencyVaultsConditions,
-// ) -> bool {
-//     let collateral_value: i128 = currency.rate * user_vault.total_col;
-//     let deposit_rate: i128 = div_floor(collateral_value, user_vault.total_debt);
-//     deposit_rate < currency_vaults_conditions.min_col_rate
-// }
+pub fn can_be_liquidated(
+    user_vault: &Vault,
+    currency: &Currency,
+    vaults_info: &VaultsInfo,
+) -> bool {
+    let collateral_value: u128 = currency.rate * user_vault.total_collateral;
+    let deposit_rate: u128 = div_floor(collateral_value, user_vault.total_debt);
+    deposit_rate < vaults_info.min_col_rate
+}

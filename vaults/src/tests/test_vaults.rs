@@ -1096,3 +1096,73 @@ fn test_pay_debt() {
     //
     // assert_eq!(vault_removed_error, SCErrors::VaultDoesntExist.into());
 }
+
+#[test]
+fn get_vaults() {
+    let env: Env = Env::default();
+    let data: TestData = create_base_data(&env);
+    let base_variables: InitialVariables = create_base_variables(&env, &data);
+    set_initial_state(&env, &data, &base_variables);
+
+    data.contract_client.set_vault_conditions(
+        &base_variables.min_col_rate,
+        &base_variables.min_debt_creation,
+        &base_variables.opening_col_rate,
+        &data.stable_token_denomination,
+    );
+
+    data.contract_client.set_currency_rate(
+        &data.stable_token_denomination,
+        &base_variables.currency_price,
+    );
+
+    data.collateral_token_admin_client.mint(
+        &base_variables.depositor,
+        &(base_variables.collateral_amount as i128 * 5),
+    );
+
+    data.stable_token_admin_client.mint(
+        &base_variables.contract_address,
+        &(base_variables.initial_debt as i128 * 5),
+    );
+
+    data.contract_client.new_vault(
+        &OptionalVaultKey::None,
+        &base_variables.depositor,
+        &(base_variables.initial_debt * 2),
+        &(base_variables.collateral_amount * 2),
+        &data.stable_token_denomination,
+    );
+
+    let vault_to_validate: Vault = Vault {
+        index: calculate_user_vault_index(
+            base_variables.initial_debt * 2,
+            base_variables.collateral_amount * 2,
+        ),
+        next_key: OptionalVaultKey::None,
+        account: base_variables.depositor.clone(),
+        total_debt: base_variables.initial_debt * 2,
+        total_collateral: base_variables.collateral_amount * 2,
+        denomination: data.stable_token_denomination.clone(),
+    };
+
+    let vault_from_basic: Vault = data
+        .contract_client
+        .get_vault(&base_variables.depositor, &data.stable_token_denomination);
+
+    assert_eq!(&vault_from_basic, &vault_to_validate);
+
+    let vault_from_key: Vault = data.contract_client.get_vault_from_key(&VaultKey {
+        index: vault_from_basic.index.clone(),
+        account: vault_from_basic.account.clone(),
+        denomination: vault_from_basic.denomination.clone(),
+    });
+
+    assert_eq!(&vault_from_key, &vault_to_validate);
+
+    let vaults: Vec<Vault> = data
+        .contract_client
+        .get_vaults(&data.stable_token_denomination, &false);
+
+    assert_eq!(&vaults.first().unwrap(), &vault_from_basic);
+}
