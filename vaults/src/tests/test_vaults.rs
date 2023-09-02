@@ -1160,9 +1160,9 @@ fn get_vaults() {
 
     assert_eq!(&vault_from_key, &vault_to_validate);
 
-    let vaults: Vec<Vault> = data
-        .contract_client
-        .get_vaults(&data.stable_token_denomination, &false);
+    let vaults: Vec<Vault> =
+        data.contract_client
+            .get_vaults(&data.stable_token_denomination, &1, &false);
 
     assert_eq!(&vaults.first().unwrap(), &vault_from_basic);
 }

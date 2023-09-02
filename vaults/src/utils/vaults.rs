@@ -9,6 +9,7 @@ use crate::storage::vaults::{
 // };
 use crate::errors::SCErrors;
 use crate::storage::currencies::Currency;
+use crate::utils::currencies::get_currency;
 use num_integer::div_floor;
 use soroban_sdk::{panic_with_error, vec, Address, Env, Symbol, Vec};
 
@@ -103,7 +104,7 @@ pub fn create_and_insert_vault(
                 let mut prev_vault: Vault = get_vault(&env, prev_key.clone());
 
                 match prev_vault.next_key {
-                    // Case 2.2.1: If the prev next key is None, the new Vault will have None as its next key and the prev vault will now have the new vault key as its next key. The lowest key stays the same.
+                    // Case 2.2.1: If the prev vault's next key is None, the new Vault will have None as its next key and the prev vault will now have the new vault key as its next key. The lowest key stays the same.
                     OptionalVaultKey::None => {
                         new_vault_next_key = OptionalVaultKey::None;
                         updated_lowest_key = lowest_key.clone();
@@ -184,6 +185,41 @@ pub fn search_vault(
     (user_vault, vault_key, vault_index_key)
 }
 
+pub fn get_vaults(
+    env: &Env,
+    currency: &Currency,
+    vaults_info: &VaultsInfo,
+    total: u32,
+    only_to_liquidate: bool,
+) -> Vec<Vault> {
+    let mut vaults: Vec<Vault> = vec![&env] as Vec<Vault>;
+
+    let mut target_key: VaultKey = match vaults_info.lowest_key.clone() {
+        OptionalVaultKey::None => {
+            panic_with_error!(&env, &SCErrors::ThereAreNoVaultsToLiquidate);
+        }
+        OptionalVaultKey::Some(key) => key,
+    };
+
+    for _ in 0..total {
+        let vault = get_vault(&env, target_key.clone());
+
+        if !can_be_liquidated(&vault, &currency, &vaults_info) && only_to_liquidate {
+            break;
+        }
+
+        vaults.push_back(vault.clone());
+
+        if let OptionalVaultKey::Some(key) = vault.next_key {
+            target_key = key
+        } else {
+            break;
+        }
+    }
+
+    vaults
+}
+
 pub fn get_vault(env: &Env, vault_key: VaultKey) -> Vault {
     env.storage()
         .persistent()
@@ -257,8 +293,8 @@ pub fn withdraw_vault(env: &Env, vault: &Vault, prev_key: &OptionalVaultKey) {
 
         // We check that the Next Key correctly targets the target Vault
         // If the Next key is None, it means the target Vault is not the Vault that comes after this one
-        if let OptionalVaultKey::Some(key) = prev_vault.next_key {
-            if &key != &target_vault_key {
+        if let OptionalVaultKey::Some(k) = prev_vault.next_key {
+            if &k != &target_vault_key {
                 panic_with_error!(&env, &SCErrors::PrevVaultNextIndexIsInvalid);
             }
         } else {

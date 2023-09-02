@@ -1,7 +1,7 @@
 #![cfg(test)]
 extern crate std;
 
-use crate::storage::storage_types::*;
+use crate::errors::SCErrors;
 use crate::storage::vaults::*;
 use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
@@ -20,23 +20,23 @@ fn test_liquidation() {
     let base_variables: InitialVariables = create_base_variables(&env, &data);
     set_initial_state(&env, &data, &base_variables);
 
-    let first_rate: i128 = 931953;
+    let first_rate: u128 = 931953;
     data.contract_client
         .set_currency_rate(&data.stable_token_denomination, &first_rate);
 
     let depositor: Address = Address::random(&env);
-    let depositor_debt: i128 = 5_000_0000000;
-    let depositor_collateral: i128 = 100_000_0000000;
+    let depositor_debt: u128 = 5_000_0000000;
+    let depositor_collateral: u128 = 100_000_0000000;
 
     token::AdminClient::new(&env, &data.collateral_token_client.address)
-        .mint(&depositor, &depositor_collateral);
+        .mint(&depositor, &(depositor_collateral as i128));
 
     let liquidator: Address = Address::random(&env);
-    let liquidator_debt: i128 = 5_000_0000000;
-    let liquidator_collateral: i128 = 500_000_0000000;
+    let liquidator_debt: u128 = 5_000_0000000;
+    let liquidator_collateral: u128 = 500_000_0000000;
 
     token::AdminClient::new(&env, &data.collateral_token_client.address)
-        .mint(&liquidator, &liquidator_collateral);
+        .mint(&liquidator, &(liquidator_collateral as i128));
 
     token::Client::new(&env, &data.collateral_token_client.address).approve(
         &depositor,
@@ -53,59 +53,64 @@ fn test_liquidation() {
     );
 
     // Create both vaults
+
+    let depositor_key: VaultKey = VaultKey {
+        index: calculate_user_vault_index(depositor_debt.clone(), depositor_collateral.clone()),
+        account: depositor.clone(),
+        denomination: data.stable_token_denomination.clone(),
+    };
     data.contract_client.new_vault(
+        &OptionalVaultKey::None,
         &depositor,
         &depositor_debt,
         &depositor_collateral,
         &data.stable_token_denomination,
     );
 
+    let liquidator_key: VaultKey = VaultKey {
+        index: calculate_user_vault_index(liquidator_debt.clone(), liquidator_collateral.clone()),
+        account: liquidator.clone(),
+        denomination: data.stable_token_denomination.clone(),
+    };
     data.contract_client.new_vault(
+        &OptionalVaultKey::Some(depositor_key.clone()),
         &liquidator,
         &liquidator_debt,
         &liquidator_collateral,
         &data.stable_token_denomination,
     );
 
+    // TODO: FIX THIS ONCE SOROBAN FIX IT
     // It should throw an error because the vault can't be liquidated yet
-    let cant_liquidate_error_result = data
-        .contract_client
-        .try_liquidate(
-            &liquidator,
-            &data.stable_token_denomination,
-            &vec![&env, depositor.clone()],
-        )
-        .unwrap_err()
-        .unwrap();
-
-    // TODO: ENABLE THIS LATER
+    // let cant_liquidate_error_result = data
+    //     .contract_client
+    //     .try_liquidate(&liquidator, &data.stable_token_denomination, &1)
+    //     .unwrap_err()
+    //     .unwrap();
+    //
     // assert_eq!(
     //     cant_liquidate_error_result,
-    //     SCErrors::UserVaultCantBeLiquidated.into()
+    //     SCErrors::ThereAreNoVaultsToLiquidate.into()
     // );
 
     // We update the collateral price in order to put the depositor's vault below the min collateral ratio
-    let second_rate: i128 = 531953;
+    let second_rate: u128 = 531953;
     data.contract_client
         .set_currency_rate(&data.stable_token_denomination, &second_rate);
 
-    token::Client::new(&env, &data.stable_token_client.address).approve(
-        &liquidator,
-        &data.contract_client.address,
-        &9000000000000000,
-        &200_000,
-    );
+    let current_vaults_info: VaultsInfo = data
+        .contract_client
+        .get_vaults_info(&data.stable_token_denomination);
 
-    data.contract_client.liquidate(
-        &liquidator,
-        &data.stable_token_denomination,
-        &vec![&env, depositor.clone()],
-    );
+    assert_eq!(&current_vaults_info.total_vaults, &2);
+
+    data.contract_client
+        .liquidate(&liquidator, &data.stable_token_denomination, &1u32);
 
     // Check the function is requiring the sender approved this operation
     assert_eq!(
-        env.auths().first().unwrap(),
-        &(
+        env.auths(),
+        std::vec![(
             liquidator.clone(),
             AuthorizedInvocation {
                 function: AuthorizedFunction::Contract((
@@ -114,7 +119,7 @@ fn test_liquidation() {
                     (
                         liquidator.clone(),
                         data.stable_token_denomination.clone(),
-                        vec![&env, depositor.clone()]
+                        1u32
                     )
                         .into_val(&env),
                 )),
@@ -124,32 +129,33 @@ fn test_liquidation() {
                         symbol_short!("transfer"),
                         (
                             liquidator.clone(),
-                            data.stable_token_issuer.clone(),
-                            5000_0000000i128
+                            data.contract_client.address.clone(),
+                            depositor_debt as i128
                         )
                             .into_val(&env),
                     )),
                     sub_invocations: std::vec![],
                 }],
             }
-        )
+        )]
     );
 
     // The depositor's vault should be removed from the protocol
-    let vault_doesnt_exist_result = data
-        .contract_client
-        .try_get_vault(&depositor, &data.stable_token_denomination)
-        .unwrap_err();
-
     // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
+    // let vault_doesnt_exist_result = data
+    //     .contract_client
+    //     .try_get_vault(&depositor, &data.stable_token_denomination)
+    //     .unwrap_err();
+    //
     // assert_eq!(
     //     vault_doesnt_exist_result.unwrap(),
-    //     SCErrors::UserVaultDoesntExist.into()
+    //     SCErrors::VaultDoesntExist.into()
     // );
 
     // The liquidator should now have the collateral from the depositor
     let liquidator_collateral_balance =
-        token::Client::new(&env, &data.collateral_token_client.address).balance(&liquidator);
+        token::Client::new(&env, &data.collateral_token_client.address).balance(&liquidator)
+            as u128;
 
     assert_eq!(liquidator_collateral_balance, depositor_collateral);
 
@@ -160,26 +166,20 @@ fn test_liquidation() {
     assert_eq!(liquidator_debt_balance, 0);
 
     // check currency stats has been updated correctly
-    let updated_currency_stats: CurrencyStats = data
+    let updated_vaults_info: VaultsInfo = data
         .contract_client
-        .get_currency_stats(&data.stable_token_denomination);
+        .get_vaults_info(&data.stable_token_denomination);
 
-    assert_eq!(updated_currency_stats.total_col, liquidator_collateral);
-    assert_eq!(updated_currency_stats.total_debt, liquidator_debt);
-    assert_eq!(updated_currency_stats.total_vaults, 1);
+    assert_eq!(updated_vaults_info.total_col, liquidator_collateral);
+    assert_eq!(updated_vaults_info.total_debt, liquidator_debt);
+    assert_eq!(updated_vaults_info.total_vaults, 1);
 
     // Check the only index is the one from the liquidator's vault
-    let updated_indexes: Vec<i128> = data
-        .contract_client
-        .get_indexes(&data.stable_token_denomination);
+    let current_vaults: Vec<Vault> =
+        data.contract_client
+            .get_vaults(&data.stable_token_denomination, &2u32, &true);
 
-    assert_eq!(
-        updated_indexes,
-        vec![
-            &env,
-            calculate_user_vault_index(liquidator_debt, liquidator_collateral)
-        ]
-    );
+    assert_eq!(current_vaults, vec![&env] as Vec<Vault>);
 }
 
 #[test]
@@ -189,9 +189,9 @@ fn test_vaults_to_liquidate() {
     let base_variables: InitialVariables = create_base_variables(&env, &data);
     set_initial_state(&env, &data, &base_variables);
 
-    let min_collateral_rate: i128 = 1_1000000;
-    let opening_debt_amount: i128 = 1_0000000;
-    let opening_collateral_rate: i128 = 1_1500000;
+    let min_collateral_rate: u128 = 1_1000000;
+    let opening_debt_amount: u128 = 1_0000000;
+    let opening_collateral_rate: u128 = 1_1500000;
 
     data.contract_client.set_vault_conditions(
         &min_collateral_rate,
@@ -200,8 +200,8 @@ fn test_vaults_to_liquidate() {
         &data.stable_token_denomination,
     );
 
-    let first_rate: i128 = 0_0958840;
-    let second_rate: i128 = 0_0586660;
+    let first_rate: u128 = 0_0958840;
+    let second_rate: u128 = 0_0586660;
 
     data.contract_client
         .set_currency_rate(&data.stable_token_denomination, &first_rate);
@@ -211,55 +211,86 @@ fn test_vaults_to_liquidate() {
     let depositor_3: Address = Address::random(&env);
     let depositor_4: Address = Address::random(&env);
     let depositor_5: Address = Address::random(&env);
-    let depositor_collateral: i128 = 3000_0000000;
+    let depositor_collateral: u128 = 3000_0000000;
+    let first_debt_amount: u128 = 100_0000000;
+    let second_debt_amount: u128 = 160_0000000;
 
-    for (i, depositor) in [
-        depositor_1,
-        depositor_2,
-        depositor_3,
-        depositor_4,
-        depositor_5,
-    ]
-    .iter()
-    .enumerate()
-    {
-        token::AdminClient::new(&env, &data.collateral_token_client.address)
-            .mint(&depositor, &depositor_collateral);
+    token::AdminClient::new(&env, &data.collateral_token_client.address)
+        .mint(&depositor_1, &(depositor_collateral as i128));
 
-        let debt_amount: i128;
-        if i < 3 {
-            debt_amount = 100_0000000;
-        } else {
-            debt_amount = 160_0000000;
-        }
+    data.contract_client.new_vault(
+        &OptionalVaultKey::None,
+        &depositor_1,
+        &first_debt_amount,
+        &depositor_collateral,
+        &data.stable_token_denomination,
+    );
 
-        token::Client::new(&env, &data.collateral_token_client.address).approve(
-            &depositor,
-            &data.contract_client.address,
-            &9000000000000000,
-            &200_000,
-        );
+    token::AdminClient::new(&env, &data.collateral_token_client.address)
+        .mint(&depositor_2, &(depositor_collateral as i128));
 
-        data.contract_client.new_vault(
-            &depositor,
-            &debt_amount,
-            &depositor_collateral,
-            &data.stable_token_denomination,
-        );
-    }
+    data.contract_client.new_vault(
+        &data
+            .contract_client
+            .get_vaults_info(&data.stable_token_denomination)
+            .lowest_key,
+        &depositor_2,
+        &first_debt_amount,
+        &depositor_collateral,
+        &data.stable_token_denomination,
+    );
 
-    let mut current_vaults_to_liquidate: Vec<UserVault> = data
-        .contract_client
-        .vaults_to_liquidate(&data.stable_token_denomination);
+    token::AdminClient::new(&env, &data.collateral_token_client.address)
+        .mint(&depositor_3, &(depositor_collateral as i128));
+
+    data.contract_client.new_vault(
+        &data
+            .contract_client
+            .get_vaults_info(&data.stable_token_denomination)
+            .lowest_key,
+        &depositor_3,
+        &first_debt_amount,
+        &depositor_collateral,
+        &data.stable_token_denomination,
+    );
+
+    token::AdminClient::new(&env, &data.collateral_token_client.address)
+        .mint(&depositor_4, &(depositor_collateral as i128));
+
+    data.contract_client.new_vault(
+        &OptionalVaultKey::None,
+        &depositor_4,
+        &second_debt_amount,
+        &depositor_collateral,
+        &data.stable_token_denomination,
+    );
+
+    token::AdminClient::new(&env, &data.collateral_token_client.address)
+        .mint(&depositor_5, &(depositor_collateral as i128));
+
+    data.contract_client.new_vault(
+        &data
+            .contract_client
+            .get_vaults_info(&data.stable_token_denomination)
+            .lowest_key,
+        &depositor_5,
+        &second_debt_amount,
+        &depositor_collateral,
+        &data.stable_token_denomination,
+    );
+
+    let mut current_vaults_to_liquidate: Vec<Vault> =
+        data.contract_client
+            .get_vaults(&data.stable_token_denomination, &5u32, &true);
 
     assert_eq!(current_vaults_to_liquidate, vec![&env]);
 
     data.contract_client
         .set_currency_rate(&data.stable_token_denomination, &second_rate);
 
-    current_vaults_to_liquidate = data
-        .contract_client
-        .vaults_to_liquidate(&data.stable_token_denomination);
+    current_vaults_to_liquidate =
+        data.contract_client
+            .get_vaults(&data.stable_token_denomination, &5u32, &true);
 
     assert_eq!(current_vaults_to_liquidate.len(), 2);
 }

@@ -17,8 +17,9 @@ use crate::utils::payments::{
 };
 use crate::utils::vaults::{
     bump_vault, bump_vault_index, can_be_liquidated, create_and_insert_vault, get_vault,
-    get_vault_index, get_vaults_info, has_vault, is_vaults_info_started, search_vault, set_vault,
-    set_vault_index, set_vaults_info, validate_user_vault, vault_spot_available, withdraw_vault,
+    get_vault_index, get_vaults, get_vaults_info, has_vault, is_vaults_info_started, search_vault,
+    set_vault, set_vault_index, set_vaults_info, validate_user_vault, vault_spot_available,
+    withdraw_vault,
 };
 use num_integer::div_floor;
 use soroban_sdk::{
@@ -75,7 +76,12 @@ pub trait VaultsContractTrait {
     );
     fn get_vault(env: Env, caller: Address, denomination: Symbol) -> Vault;
     fn get_vault_from_key(env: Env, vault_key: VaultKey) -> Vault;
-    fn get_vaults(env: Env, denomination: Symbol, only_to_liquidate: bool) -> Vec<Vault>;
+    fn get_vaults(
+        env: Env,
+        denomination: Symbol,
+        total: u32,
+        only_to_liquidate: bool,
+    ) -> Vec<Vault>;
     fn increase_collateral(
         env: Env,
         prev_key: OptionalVaultKey,
@@ -102,7 +108,12 @@ pub trait VaultsContractTrait {
     // fn redeem(env: Env, caller: Address, amount: i128, denomination: Symbol);
 
     /// Liquidation
-    fn liquidate(env: Env, liquidator: Address, vault_keys: Vec<VaultKey>);
+    fn liquidate(
+        env: Env,
+        liquidator: Address,
+        denomination: Symbol,
+        total_vaults_to_liquidate: u32,
+    );
 }
 
 #[contract]
@@ -375,38 +386,18 @@ impl VaultsContractTrait for VaultsContract {
         get_vault(&env, vault_key)
     }
 
-    fn get_vaults(env: Env, denomination: Symbol, only_to_liquidate: bool) -> Vec<Vault> {
+    fn get_vaults(
+        env: Env,
+        denomination: Symbol,
+        total: u32,
+        only_to_liquidate: bool,
+    ) -> Vec<Vault> {
         bump_instance(&env);
-
-        let mut vaults: Vec<Vault> = vec![&env] as Vec<Vault>;
 
         let currency: Currency = get_currency(&env, &denomination);
         let vaults_info: VaultsInfo = get_vaults_info(&env, &denomination);
 
-        let mut target_key: VaultKey = match vaults_info.lowest_key.clone() {
-            OptionalVaultKey::None => {
-                panic_with_error!(&env, &SCErrors::ThereAreNoVaultsToLiquidate);
-            }
-            OptionalVaultKey::Some(key) => key,
-        };
-
-        for _ in 0..20 {
-            let vault = get_vault(&env, target_key.clone());
-
-            if !can_be_liquidated(&vault, &currency, &vaults_info) && only_to_liquidate {
-                break;
-            }
-
-            vaults.push_back(vault.clone());
-
-            if let OptionalVaultKey::Some(key) = vault.next_key {
-                target_key = key
-            } else {
-                break;
-            }
-        }
-
-        vaults
+        get_vaults(&env, &currency, &vaults_info, total, only_to_liquidate)
     }
 
     fn increase_collateral(
@@ -811,80 +802,64 @@ impl VaultsContractTrait for VaultsContract {
         set_vaults_info(&env, &vaults_info);
     }
 
-    fn liquidate(env: Env, liquidator: Address, vault_keys: Vec<VaultKey>) {
-        // bump_instance(&env);
-        // liquidator.require_auth();
-        //
-        // // TODO: Add fee logic
-        //
-        // let core_state: CoreState = get_core_state(&env);
-        // let mut currencies_map: Map<Symbol, Currency> = Map::new(&env);
-        // let mut vaults_info_map: Map<Symbol, VaultsInfo> = Map::new(&env);
-        //
-        // let mut collateral_to_withdraw: u128 = 0;
-        // let mut amounts_to_deposit: Map<Symbol, u128> = Map::new(&env);
-        //
-        // for vault_key in vault_keys {
-        //     let vault: Vault = get_vault(&env, vault_key.clone());
-        //     let currency: Currency =
-        //         match currencies_map.try_get(vault.denomination.clone()).unwrap() {
-        //             None => {
-        //                 let c: Currency = get_currency(&env, &vault.denomination);
-        //                 currencies_map.set(vault.denomination, c.clone());
-        //                 c
-        //             }
-        //             Some(c) => c,
-        //         };
-        //
-        //     let mut vaults_info: VaultsInfo =
-        //         match vaults_info_map.try_get(vault.denomination.clone()).unwrap() {
-        //             None => {
-        //                 let v: VaultsInfo = get_vaults_info(&env, &vault.denomination.clone());
-        //                 vaults_info_map.set(vault.denomination.clone(), v.clone());
-        //                 v
-        //             }
-        //             Some(v) => v,
-        //         };
-        //
-        //     if !can_be_liquidated(&vault, &currency, &vaults_info) {
-        //         panic_with_error!(&env, SCErrors::UserVaultCantBeLiquidated);
-        //     }
-        //
-        //     collateral_to_withdraw = collateral_to_withdraw + vault.total_collateral;
-        //     let current_amount_to_deposit: u128 = match amounts_to_deposit
-        //         .try_get(vault.denomination.clone())
-        //         .unwrap()
-        //     {
-        //         None => 0,
-        //         Some(a) => a,
-        //     };
-        //
-        //     amounts_to_deposit.set(
-        //         vault.denomination.clone(),
-        //         current_amount_to_deposit + vault.total_debt,
-        //     );
-        //
-        //     vaults_info.total_vaults = vaults_info.total_vaults - 1;
-        //     vaults_info.total_col = vaults_info.total_col - vault.total_collateral;
-        //     vaults_info.total_debt = vaults_info.total_debt - vault.total_debt;
-        //
-        //     withdraw_vault(
-        //         &env,
-        //         &vault,
-        //         &user_vault_data_type,
-        //         &vaults_data_types_with_index_key,
-        //         &vaults_indexes_list_key,
-        //     );
-        // }
-        //
-        // withdraw_collateral(&env, &core_state, &liquidator, &collateral_to_withdraw);
-        // deposit_stablecoin(
-        //     &env,
-        //     &core_state,
-        //     &currency,
-        //     &liquidator,
-        //     &amount_to_deposit,
-        // );
-        // set_currency_stats(&env, &denomination, &currency_stats);
+    fn liquidate(
+        env: Env,
+        liquidator: Address,
+        denomination: Symbol,
+        total_vaults_to_liquidate: u32,
+    ) {
+        bump_instance(&env);
+        liquidator.require_auth();
+
+        // TODO: Add fee logic
+
+        let core_state: CoreState = get_core_state(&env);
+        let currency: Currency = get_currency(&env, &denomination);
+        let mut vaults_info: VaultsInfo = get_vaults_info(&env, &denomination);
+        let mut collateral_to_withdraw: u128 = 0;
+        let mut amount_to_deposit: u128 = 0;
+        let vaults_to_liquidate: Vec<Vault> = get_vaults(
+            &env,
+            &currency,
+            &vaults_info,
+            total_vaults_to_liquidate,
+            true,
+        );
+
+        if vaults_to_liquidate.len() == 0 {
+            panic_with_error!(&env, &SCErrors::ThereAreNoVaultsToLiquidate);
+        }
+
+        for vault in vaults_to_liquidate.iter() {
+            if !can_be_liquidated(&vault, &currency, &vaults_info) {
+                panic_with_error!(&env, SCErrors::UserVaultCantBeLiquidated);
+            }
+
+            collateral_to_withdraw = collateral_to_withdraw + vault.total_collateral;
+            amount_to_deposit = amount_to_deposit + vault.total_debt;
+
+            vaults_info.total_vaults = vaults_info.total_vaults - 1;
+            vaults_info.total_col = vaults_info.total_col - vault.total_collateral;
+            vaults_info.total_debt = vaults_info.total_debt - vault.total_debt;
+
+            withdraw_vault(&env, &vault, &OptionalVaultKey::None);
+
+            vaults_info.lowest_key = vault.next_key;
+        }
+
+        set_vaults_info(&env, &vaults_info);
+        deposit_stablecoin(
+            &env,
+            &core_state,
+            &currency,
+            &liquidator,
+            amount_to_deposit as i128,
+        );
+        withdraw_collateral(
+            &env,
+            &core_state,
+            &liquidator,
+            collateral_to_withdraw as i128,
+        );
     }
 }
