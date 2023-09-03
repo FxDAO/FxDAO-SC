@@ -206,7 +206,7 @@ pub fn test_setup_contracts() {
     setup_contracts(&env, &test_data);
 
     let vaults_core_state = test_data.vaults_contract_client.get_core_state();
-    let vaults_contract_admin = test_data.vaults_contract_client.get_admin();
+    let vaults_contract_admin = vaults_core_state.admin.clone();
     assert_eq!(
         &vaults_core_state.col_token,
         &test_data.collateral_token_client.address,

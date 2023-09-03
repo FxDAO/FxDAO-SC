@@ -4,7 +4,7 @@ mod contract;
 mod storage;
 mod utils;
 
-mod test;
+mod errors;
 mod tests;
 
 pub use crate::contract::VaultsContractClient;

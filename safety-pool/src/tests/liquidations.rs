@@ -3,11 +3,13 @@
 use crate::contract::{SafetyPoolContract, SafetyPoolContractClient};
 use crate::errors::SCErrors;
 use crate::storage::deposits::Deposit;
-use crate::tests::utils::{create_token_contract, set_allowance};
+use crate::tests::utils::create_token_contract;
+use num_integer::div_floor;
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{symbol_short, vec, Address, Env, Symbol, Vec};
 
 use crate::vaults;
+use crate::vaults::{OptionalVaultKey, VaultKey};
 
 #[test]
 fn test_simple_liquidations_flow() {
@@ -24,7 +26,7 @@ fn test_simple_liquidations_flow() {
     let (governance_token_client, governance_token_client_admin) =
         create_token_contract(&env, &governance_token_admin);
 
-    let currency_price: i128 = 0_0958840;
+    let currency_price: u128 = 0_0958840;
     let collateral_token_admin: Address = Address::random(&env);
     let (collateral_token_client, collateral_token_client_admin) =
         create_token_contract(&env, &collateral_token_admin);
@@ -48,15 +50,15 @@ fn test_simple_liquidations_flow() {
         depositor_5.clone(),
         depositor_6.clone(),
     ];
-    let collateral_initial_balance: i128 = 3000_0000000;
+    let collateral_initial_balance: u128 = 3000_0000000;
 
     // Register and start vaults' contract
     let vaults_contract_address: Address = env.register_contract_wasm(None, vaults::WASM);
     let vaults_contract_client = vaults::Client::new(&env, &vaults_contract_address);
     let vaults_contract_admin: Address = Address::random(&env);
-    let min_collateral_rate: i128 = 1_1000000;
-    let opening_debt_amount: i128 = 1_0000000;
-    let opening_collateral_rate: i128 = 1_1500000;
+    let min_collateral_rate: u128 = 1_1000000;
+    let opening_debt_amount: u128 = 1_0000000;
+    let opening_collateral_rate: u128 = 1_1500000;
 
     vaults_contract_client.init(
         &vaults_contract_admin,
@@ -114,29 +116,42 @@ fn test_simple_liquidations_flow() {
     // We create the initial vaults, a total of 6 vaults will be created where two of them
     // will be liquidated later, a total of 18k collateral (3k each) will be issued. The first 4
     // depositors will deposit all of the stablecoin balance into the pool (400 usd)
+    let mut lowest_index: OptionalVaultKey = OptionalVaultKey::None;
     let assets: Vec<Address> = vec![&env, collateral_token_client.address.clone()] as Vec<Address>;
     for (i, depositor) in depositors.iter().enumerate() {
-        collateral_token_client_admin.mint(&depositor, &collateral_initial_balance);
+        collateral_token_client_admin.mint(&depositor, &(collateral_initial_balance as i128));
 
-        set_allowance(&env, &assets, &vaults_contract_client.address, &depositor);
-
-        let initial_debt: i128;
+        let initial_debt: u128;
         if i + 1 < 5 {
             initial_debt = 100_0000000;
         } else {
             initial_debt = 160_0000000;
+            if i + 1 == 5 {
+                lowest_index = OptionalVaultKey::None;
+            }
         }
+
         vaults_contract_client.new_vault(
+            &lowest_index,
             depositor,
             &initial_debt,
             &collateral_initial_balance,
             &stable_token_denomination,
         );
 
+        let current_index: u128 = div_floor(1000000000 * collateral_initial_balance, initial_debt);
+        if lowest_index == OptionalVaultKey::None {
+            lowest_index = OptionalVaultKey::Some(VaultKey {
+                index: current_index,
+                account: depositor.clone(),
+                denomination: stable_token_denomination.clone(),
+            });
+        }
+
         // If is depositor between 1 and 4, deposit the stable balance into the pool
         if i + 1 < 5 {
-            let stablecoin_balance: i128 = stable_token_client.balance(&depositor);
-            pool_contract_client.deposit(&depositor, &(stablecoin_balance as u128));
+            let stablecoin_balance: u128 = stable_token_client.balance(&depositor) as u128;
+            pool_contract_client.deposit(&depositor, &stablecoin_balance);
         }
     }
 
@@ -183,8 +198,8 @@ fn test_simple_liquidations_flow() {
     }
 
     assert_eq!(
-        total_in_vaults as i128,
-        stable_token_client.balance(&pool_contract_id)
+        total_in_vaults,
+        stable_token_client.balance(&pool_contract_id) as u128
     );
 
     assert_eq!(

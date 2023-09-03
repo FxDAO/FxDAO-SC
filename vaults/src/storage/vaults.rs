@@ -1,42 +1,62 @@
 use soroban_sdk::{contracttype, Address, Symbol};
 
-#[derive(Clone)]
 #[contracttype]
-pub struct UserVaultDataType {
-    pub user: Address,
+#[derive(Clone, PartialEq, Debug)]
+pub enum OptionalVaultKey {
+    None,
+    Some(VaultKey),
+}
+
+#[derive(Debug, Clone)]
+#[contracttype]
+pub struct VaultsInfo {
+    pub denomination: Symbol,
+    pub total_vaults: u64,
+    pub total_debt: u128,
+    pub total_col: u128,
+    pub lowest_key: OptionalVaultKey,
+    pub min_col_rate: u128,      // Min collateral ratio - ex: 1.10
+    pub min_debt_creation: u128, // Min vault creation amount - ex: 5000
+    pub opening_col_rate: u128,  // Opening collateral ratio - ex: 1.15
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[contracttype]
+pub struct VaultKey {
+    pub index: u128,
+    pub account: Address,
+    pub denomination: Symbol,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+#[contracttype]
+pub struct Vault {
+    pub index: u128,
+    pub next_key: OptionalVaultKey,
+    pub account: Address,
+    pub total_debt: u128,
+    pub total_collateral: u128,
     pub denomination: Symbol,
 }
 
 #[derive(Clone, Debug)]
 #[contracttype]
-pub struct UserVault {
-    pub id: Address,
-    pub total_debt: i128,
-    pub total_col: i128,
-    pub index: i128,
+pub struct VaultIndexKey {
+    pub user: Address,
     pub denomination: Symbol,
 }
 
-#[derive(Clone)]
-#[contracttype]
-pub struct VaultsWithIndexDataType {
-    pub index: i128,
-    pub denomination: Symbol,
-}
-
-/// I need to be able to check who is the lowest collateral ratio no matter the currency
-/// I need to be able to check the lowest one without needing to load a huge vector of values
-/// I need to be able to sort the vec from lower to higher in an efficient way
 #[contracttype]
 pub enum VaultsDataKeys {
-    /// The "UserVault" key is the one that actually holds the information of the user's vault
-    /// Everytime this key is updated we need to update both "SortedVlts" and "RatioKey"
-    UserVault(UserVaultDataType),
-    /// This key host a Vec of i128 which is the index of the vaults, this Vec must be updated every time a Vault is updated
-    /// The Vec is sorted by the collateral ratio of the deposit IE the lower go first
-    /// The Symbol value is the denomination of the currency
-    VaultsIndexes(Symbol),
+    /// General information by currency.
+    /// Symbol is the denomination, not the asset code.
+    VaultsInfo(Symbol),
 
-    /// The result is a Vec<UserVaultDataType>
-    VaultsDataTypesWithIndex(VaultsWithIndexDataType),
+    /// By using the index and denomination (VaultKey) we can get a Vault, all Vaults' indexes are unique.
+    /// In cases where the index (collateral / debt) is the same as one already created, we add 1 to it until is unique
+    Vault(VaultKey),
+
+    /// By using the combination of the denomination and the address (VaultIndexKey) we can get
+    /// the index of the vault so the user doesn't need to know the index of its own vault at all time
+    VaultIndex(VaultIndexKey),
 }
