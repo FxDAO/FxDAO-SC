@@ -11,7 +11,7 @@ use crate::utils::deposits::{
     save_depositors,
 };
 use crate::vaults;
-use crate::vaults::{Currency, UserVault};
+use crate::vaults::{Currency, Vault};
 use num_integer::div_floor;
 use soroban_sdk::{
     contract, contractimpl, panic_with_error, symbol_short, token, vec, Address, BytesN, Env,
@@ -248,31 +248,34 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
     fn liquidate(env: Env, liquidator: Address) {
         bump_instance(&env);
         let core_state: CoreState = get_core_state(&env);
-        let stablecoin_balance: i128 = token::Client::new(&env, &core_state.deposit_asset)
-            .balance(&env.current_contract_address());
+        let stablecoin_balance: u128 = token::Client::new(&env, &core_state.deposit_asset)
+            .balance(&env.current_contract_address())
+            as u128;
 
-        let currency_stats: Currency = vaults::Client::new(&env, &core_state.vaults_contract)
+        let currency: Currency = vaults::Client::new(&env, &core_state.vaults_contract)
             .get_currency(&core_state.denomination_asset);
 
-        let vaults_to_liquidate: Vec<UserVault> =
-            vaults::Client::new(&env, &core_state.vaults_contract)
-                .vaults_to_liquidate(&core_state.denomination_asset);
+        let vaults_to_liquidate: Vec<Vault> = vaults::Client::new(
+            &env,
+            &core_state.vaults_contract,
+        )
+        .get_vaults(&core_state.denomination_asset, &10, &true);
 
-        let mut target_users: Vec<Address> = vec![&env] as Vec<Address>;
-        let mut amount_covered: i128 = 0;
-        let mut total_collateral: i128 = 0;
+        let mut amount_covered: u128 = 0;
+        let mut total_collateral: u128 = 0;
+        let mut total_vaults: u32 = 0;
 
         for user_vault in vaults_to_liquidate.iter() {
             if amount_covered + user_vault.total_debt <= stablecoin_balance {
-                target_users.push_back(user_vault.id);
                 amount_covered += user_vault.total_debt;
-                total_collateral += user_vault.total_col;
+                total_collateral += user_vault.total_collateral;
+                total_vaults += 1;
             } else {
                 break;
             }
         }
 
-        if target_users.len() == 0 {
+        if total_vaults == 0 {
             panic_with_error!(&env, SCErrors::CantLiquidateVaults);
         }
 
@@ -281,62 +284,61 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         vaults::Client::new(&env, &core_state.vaults_contract).liquidate(
             &env.current_contract_address(),
             &core_state.denomination_asset,
-            &target_users,
+            &total_vaults,
         );
 
-        let collateral_amount_paid: i128 =
-            div_floor(amount_covered * 10000000, currency_stats.rate);
+        let collateral_amount_paid: u128 =
+            div_floor(amount_covered * 10000000, currency.rate as u128);
 
-        let profit_from_liquidation: i128 = total_collateral - collateral_amount_paid;
+        let profit_from_liquidation: u128 = total_collateral - collateral_amount_paid;
 
         let share_of_profit = div_floor(
-            profit_from_liquidation * core_state.treasury_share.get(0).unwrap() as i128,
-            core_state.treasury_share.get(1).unwrap() as i128,
+            profit_from_liquidation * core_state.treasury_share.get(0).unwrap() as u128,
+            core_state.treasury_share.get(1).unwrap() as u128,
         );
 
-        let amount_to_distribute: i128 = collateral_amount_paid + share_of_profit;
+        let amount_to_distribute: u128 = collateral_amount_paid + share_of_profit;
 
         for depositor in depositors.iter() {
             let mut deposit: Deposit = get_deposit(&env, &depositor);
-            let deposit_percentage: i128 =
-                div_floor(deposit.amount as i128 * 10000000, stablecoin_balance);
-            let collateral_to_send: i128 =
+            let deposit_percentage: u128 = div_floor(deposit.amount * 10000000, stablecoin_balance);
+            let collateral_to_send: u128 =
                 div_floor(deposit_percentage * amount_to_distribute, 10000000);
 
             token::Client::new(&env, &core_state.collateral_asset).transfer(
                 &env.current_contract_address(),
                 &depositor,
-                &collateral_to_send,
+                &(collateral_to_send as i128),
             );
 
-            let deposit_amount_used: i128 =
+            let deposit_amount_used: u128 =
                 div_floor(deposit_percentage * amount_covered, 100_0000000) * 100;
 
-            deposit.amount = deposit.amount - deposit_amount_used as u128;
+            deposit.amount = deposit.amount - deposit_amount_used;
 
             save_deposit(&env, &deposit);
         }
 
-        let collateral_left: i128 = token::Client::new(&env, &core_state.collateral_asset)
-            .balance(&env.current_contract_address());
+        let collateral_left: u128 = token::Client::new(&env, &core_state.collateral_asset)
+            .balance(&env.current_contract_address()) as u128;
 
-        let liquidator_share: i128 = div_floor(
-            collateral_left * core_state.liquidator_share.get(0).unwrap() as i128,
-            core_state.liquidator_share.get(1).unwrap() as i128,
+        let liquidator_share: u128 = div_floor(
+            collateral_left * core_state.liquidator_share.get(0).unwrap() as u128,
+            core_state.liquidator_share.get(1).unwrap() as u128,
         );
 
         token::Client::new(&env, &core_state.collateral_asset).transfer(
             &env.current_contract_address(),
             &liquidator,
-            &liquidator_share,
+            &(liquidator_share as i128),
         );
 
-        let treasury_share: i128 = collateral_left - liquidator_share;
+        let treasury_share: u128 = collateral_left - liquidator_share;
 
         token::Client::new(&env, &core_state.collateral_asset).transfer(
             &env.current_contract_address(),
             &core_state.treasury_contract,
-            &treasury_share,
+            &(treasury_share as i128),
         );
 
         bump_depositors(&env);
