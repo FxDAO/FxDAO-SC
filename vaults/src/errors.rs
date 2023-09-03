@@ -24,7 +24,7 @@ pub enum SCErrors {
     ThereAreNoVaultsToLiquidate = 50011,
     DepositAmountIsMoreThanTotalDebt = 60000,
     CollateralRateUnderMinimum = 70000,
-    UnsupportedNegativeValue = 80000,
+    NotEnoughFundsToRedeem = 80000,
     CurrencyAlreadyAdded = 90000,
     CurrencyDoesntExist = 90001,
     CurrencyIsInactive = 90002,

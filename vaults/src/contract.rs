@@ -1,8 +1,6 @@
 use crate::errors::SCErrors;
 // use crate::storage::vaults::*;
 use crate::utils::core::*;
-// use crate::utils::indexes::*;
-// use crate::utils::legacy_file::*;
 // use crate::utils::vaults::*;
 
 use crate::storage::core::CoreState;
@@ -16,10 +14,10 @@ use crate::utils::payments::{
     deposit_collateral, deposit_stablecoin, withdraw_collateral, withdraw_stablecoin,
 };
 use crate::utils::vaults::{
-    bump_vault, bump_vault_index, can_be_liquidated, create_and_insert_vault, get_vault,
-    get_vault_index, get_vaults, get_vaults_info, has_vault, is_vaults_info_started, search_vault,
-    set_vault, set_vault_index, set_vaults_info, validate_user_vault, vault_spot_available,
-    withdraw_vault,
+    bump_vault, bump_vault_index, can_be_liquidated, create_and_insert_vault,
+    get_redeemable_vaults, get_vault, get_vault_index, get_vaults, get_vaults_info, has_vault,
+    is_vaults_info_started, search_vault, set_vault, set_vault_index, set_vaults_info,
+    validate_user_vault, vault_spot_available, withdraw_vault,
 };
 use num_integer::div_floor;
 use soroban_sdk::{
@@ -104,8 +102,8 @@ pub trait VaultsContractTrait {
         deposit_amount: u128,
     );
 
-    // /// Redeeming
-    // fn redeem(env: Env, caller: Address, amount: i128, denomination: Symbol);
+    /// Redeeming
+    fn redeem(env: Env, caller: Address, denomination: Symbol);
 
     /// Liquidation
     fn liquidate(
@@ -473,125 +471,6 @@ impl VaultsContractTrait for VaultsContract {
         bump_vault_index(&env, updated_target_vault_index_key);
     }
 
-    // fn redeem(env: Env, caller: Address, amount_to_redeem: i128, denomination: Symbol) {
-    //     bump_instance(&env);
-    //     caller.require_auth();
-    //
-    //     validate_currency(&env, &denomination);
-    //     is_currency_active(&env, &denomination);
-    //     check_positive(&env, &amount_to_redeem);
-    //
-    //     // TODO: Add fee logic
-    //
-    //     let core_state: CoreState = get_core_state(&env);
-    //     let currency: Currency = get_currency(&env, &denomination);
-    //
-    //     let vaults_indexes_list_key: VaultsDataKeys =
-    //         VaultsDataKeys::VaultsIndexes(denomination.clone());
-    //
-    //     let redeemable_vaults: Vec<UserVault> =
-    //         get_redeemable_vaults(&env, &amount_to_redeem, &currency, &vaults_indexes_list_key);
-    //
-    //     deposit_stablecoin(&env, &core_state, &currency, &caller, &amount_to_redeem);
-    //
-    //     let mut currency_stats: CurrencyStats = get_currency_stats(&env, &denomination);
-    //
-    //     // Update the redeemable vaults information
-    //     let mut amount_redeemed: i128 = 0;
-    //     let mut collateral_to_withdraw: i128 = 0;
-    //
-    //     for current_user_vault in redeemable_vaults.iter() {
-    //         let user_vault_data_type: UserVaultDataType = UserVaultDataType {
-    //             user: current_user_vault.id.clone(),
-    //             denomination: current_user_vault.denomination.clone(),
-    //         };
-    //
-    //         let vaults_data_types_with_index_key: VaultsDataKeys =
-    //             VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
-    //                 index: current_user_vault.index,
-    //                 denomination: denomination.clone(),
-    //             });
-    //
-    //         let vaults_indexes_list_key: VaultsDataKeys =
-    //             VaultsDataKeys::VaultsIndexes(denomination.clone());
-    //
-    //         if (amount_redeemed + current_user_vault.total_debt) > amount_to_redeem {
-    //             let mut new_user_vault: UserVault = current_user_vault.clone();
-    //             let missing_amount: i128 = amount_to_redeem - amount_redeemed;
-    //             let missing_collateral: i128 = div_floor(missing_amount * 10000000, currency.rate);
-    //
-    //             new_user_vault.total_col = new_user_vault.total_col - missing_collateral;
-    //             new_user_vault.total_debt = new_user_vault.total_debt - missing_amount;
-    //             new_user_vault.index =
-    //                 calculate_user_vault_index(new_user_vault.total_debt, new_user_vault.total_col);
-    //
-    //             currency_stats.total_col = currency_stats.total_col - missing_collateral;
-    //             currency_stats.total_debt = currency_stats.total_debt - missing_amount;
-    //
-    //             collateral_to_withdraw = collateral_to_withdraw + missing_collateral;
-    //             amount_redeemed = amount_redeemed + missing_amount;
-    //
-    //             let current_vaults_data_types_with_index_key: VaultsDataKeys =
-    //                 VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
-    //                     index: current_user_vault.index.clone(),
-    //                     denomination: denomination.clone(),
-    //                 });
-    //
-    //             let new_vaults_data_types_with_index_key: VaultsDataKeys =
-    //                 VaultsDataKeys::VaultsDataTypesWithIndex(VaultsWithIndexDataType {
-    //                     index: new_user_vault.index.clone(),
-    //                     denomination: denomination.clone(),
-    //                 });
-    //
-    //             update_user_vault(
-    //                 &env,
-    //                 &current_user_vault,
-    //                 &new_user_vault,
-    //                 &user_vault_data_type,
-    //                 &vaults_indexes_list_key,
-    //                 &current_vaults_data_types_with_index_key,
-    //                 &new_vaults_data_types_with_index_key,
-    //             );
-    //
-    //             bump_user_vault(&env, user_vault_data_type);
-    //             bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
-    //         } else {
-    //             let collateral_amount =
-    //                 div_floor(current_user_vault.total_debt * 10000000, currency.rate);
-    //
-    //             collateral_to_withdraw = collateral_to_withdraw + collateral_amount;
-    //             amount_redeemed = amount_redeemed + current_user_vault.total_debt;
-    //
-    //             currency_stats.total_vaults = currency_stats.total_vaults - 1;
-    //             currency_stats.total_col = currency_stats.total_col - current_user_vault.total_col;
-    //             currency_stats.total_debt =
-    //                 currency_stats.total_debt - current_user_vault.total_debt;
-    //
-    //             withdraw_collateral(
-    //                 &env,
-    //                 &core_state,
-    //                 &current_user_vault.id,
-    //                 &(current_user_vault.total_col - collateral_amount),
-    //             );
-    //
-    //             remove_user_vault(
-    //                 &env,
-    //                 &current_user_vault,
-    //                 &user_vault_data_type,
-    //                 &vaults_data_types_with_index_key,
-    //                 &vaults_indexes_list_key,
-    //             );
-    //
-    //             bump_vaults_data_types_with_index(&env, &vaults_data_types_with_index_key);
-    //         }
-    //     }
-    //
-    //     withdraw_collateral(&env, &core_state, &caller, &collateral_to_withdraw);
-    //     set_currency_stats(&env, &denomination, &currency_stats);
-    //
-    //     bump_vaults_indexes_list(&env, &vaults_indexes_list_key);
-    // }
-
     fn increase_debt(
         env: Env,
         prev_key: OptionalVaultKey,
@@ -799,6 +678,58 @@ impl VaultsContractTrait for VaultsContract {
         }
 
         vaults_info.total_debt = vaults_info.total_debt - deposit_amount;
+        set_vaults_info(&env, &vaults_info);
+    }
+
+    fn redeem(env: Env, caller: Address, denomination: Symbol) {
+        bump_instance(&env);
+        caller.require_auth();
+
+        validate_currency(&env, &denomination);
+        is_currency_active(&env, &denomination);
+
+        // TODO: Add fee logic
+
+        let core_state: CoreState = get_core_state(&env);
+        let currency: Currency = get_currency(&env, &denomination);
+        let mut vaults_info: VaultsInfo = get_vaults_info(&env, &denomination);
+
+        let lowest_key = match vaults_info.lowest_key.clone() {
+            // It should be impossible to reach this case, but just in case we panic if it happens.
+            OptionalVaultKey::None => panic_with_error!(&env, &SCErrors::ThereAreNoVaults),
+            OptionalVaultKey::Some(key) => key,
+        };
+
+        let lowest_vault: Vault = get_vault(&env, lowest_key);
+
+        deposit_stablecoin(
+            &env,
+            &core_state,
+            &currency,
+            &caller,
+            lowest_vault.total_debt as i128,
+        );
+
+        // Update the redeemable vaults information
+        let collateral_to_withdraw: u128 =
+            div_floor(lowest_vault.total_debt * 10000000, currency.rate);
+
+        vaults_info.total_vaults = vaults_info.total_vaults - 1;
+        vaults_info.total_col = vaults_info.total_col - lowest_vault.total_collateral;
+        vaults_info.total_debt = vaults_info.total_debt - lowest_vault.total_debt;
+        vaults_info.lowest_key = lowest_vault.next_key.clone();
+
+        // We send the remaining collateral to the owner of the Vault
+        withdraw_collateral(
+            &env,
+            &core_state,
+            &lowest_vault.account,
+            (lowest_vault.total_collateral - collateral_to_withdraw) as i128,
+        );
+
+        withdraw_vault(&env, &lowest_vault, &OptionalVaultKey::None);
+
+        withdraw_collateral(&env, &core_state, &caller, collateral_to_withdraw as i128);
         set_vaults_info(&env, &vaults_info);
     }
 

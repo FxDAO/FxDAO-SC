@@ -220,6 +220,41 @@ pub fn get_vaults(
     vaults
 }
 
+pub fn get_redeemable_vaults(
+    env: &Env,
+    vaults_info: &VaultsInfo,
+    total_to_redeem: &u128,
+) -> (u128, Vec<Vault>) {
+    let mut total_can_be_redeemed: u128 = 0u128;
+    let mut vaults: Vec<Vault> = vec![&env] as Vec<Vault>;
+
+    let mut target_key: VaultKey = match vaults_info.lowest_key.clone() {
+        OptionalVaultKey::None => {
+            panic_with_error!(&env, &SCErrors::ThereAreNoVaultsToLiquidate);
+        }
+        OptionalVaultKey::Some(key) => key,
+    };
+
+    for _ in 0..10 {
+        let vault = get_vault(&env, target_key.clone());
+
+        vaults.push_back(vault.clone());
+        total_can_be_redeemed = total_can_be_redeemed + vault.total_debt;
+
+        if total_to_redeem <= &total_can_be_redeemed {
+            break;
+        }
+
+        if let OptionalVaultKey::Some(key) = vault.next_key {
+            target_key = key
+        } else {
+            break;
+        }
+    }
+
+    (total_can_be_redeemed, vaults)
+}
+
 pub fn get_vault(env: &Env, vault_key: VaultKey) -> Vault {
     env.storage()
         .persistent()
