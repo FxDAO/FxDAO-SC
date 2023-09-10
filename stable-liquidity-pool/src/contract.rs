@@ -121,7 +121,6 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         let mut deposit: Deposit = get_deposit(&env, &caller);
         deposit.last_deposit = env.ledger().timestamp();
         deposit.shares = deposit.shares + shares_to_issue;
-
         save_deposit(&env, &deposit);
 
         let mut depositors: Vec<Address> = get_depositors(&env);

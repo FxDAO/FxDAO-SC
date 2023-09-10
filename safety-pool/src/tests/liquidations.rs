@@ -2,8 +2,9 @@
 
 use crate::contract::{SafetyPoolContract, SafetyPoolContractClient};
 use crate::errors::SCErrors;
+use crate::storage::core::CoreStats;
 use crate::storage::deposits::Deposit;
-use crate::tests::utils::create_token_contract;
+use crate::tests::utils::{create_test_data, create_token_contract, init_contract, TestData};
 use num_integer::div_floor;
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{symbol_short, vec, Address, Env, Symbol, Vec};
@@ -182,33 +183,23 @@ fn test_simple_liquidations_flow() {
         12_000_0000000
     );
 
-    for (i, depositor) in depositors.iter().enumerate() {
-        if i + 1 < 5 {
-            assert_eq!(collateral_token_client.balance(&depositor), 1431_8259298);
-        } else {
-            assert_eq!(collateral_token_client.balance(&depositor), 0);
-        }
-    }
+    let updated_stats: CoreStats = pool_contract_client.get_core_stats();
 
-    // We now check that each deposit into the pool gets updated and reflect the current pool balance
-    let mut total_in_vaults: u128 = 0;
-    for depositor in depositors.iter() {
-        let deposit: Deposit = pool_contract_client.get_deposit(&depositor);
-        total_in_vaults = total_in_vaults + deposit.amount;
-    }
+    assert_eq!(updated_stats.lifetime_deposited, 400_0000000);
+    assert_eq!(updated_stats.current_deposited, 80_0000000);
+    assert_eq!(updated_stats.lifetime_profit, 545_3925613);
+    assert_eq!(updated_stats.lifetime_liquidated, 5727_3037194);
+    assert_eq!(updated_stats.current_liquidated, 5727_3037194);
+    assert_eq!(updated_stats.collateral_factor, 14_3182592);
+    assert_eq!(updated_stats.deposit_factor, 2000000);
 
     assert_eq!(
-        total_in_vaults,
-        stable_token_client.balance(&pool_contract_id) as u128
+        collateral_token_client.balance(&treasury_contract) + 1,
+        div_floor(272_6962808, 2)
     );
 
     assert_eq!(
-        collateral_token_client.balance(&treasury_contract),
-        272_6962808 / 2
-    );
-
-    assert_eq!(
-        collateral_token_client.balance(&liquidator),
-        272_6962808 / 2
+        collateral_token_client.balance(&liquidator) + 1,
+        div_floor(272_6962808, 2)
     );
 }

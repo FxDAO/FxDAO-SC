@@ -196,7 +196,7 @@ pub fn get_vaults(
 
     let mut target_key: VaultKey = match vaults_info.lowest_key.clone() {
         OptionalVaultKey::None => {
-            panic_with_error!(&env, &SCErrors::ThereAreNoVaultsToLiquidate);
+            panic_with_error!(&env, &SCErrors::NotEnoughVaultsToLiquidate);
         }
         OptionalVaultKey::Some(key) => key,
     };
@@ -230,7 +230,7 @@ pub fn get_redeemable_vaults(
 
     let mut target_key: VaultKey = match vaults_info.lowest_key.clone() {
         OptionalVaultKey::None => {
-            panic_with_error!(&env, &SCErrors::ThereAreNoVaultsToLiquidate);
+            panic_with_error!(&env, &SCErrors::NotEnoughVaultsToLiquidate);
         }
         OptionalVaultKey::Some(key) => key,
     };

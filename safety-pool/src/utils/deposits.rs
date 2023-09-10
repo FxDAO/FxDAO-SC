@@ -23,12 +23,12 @@ pub fn make_deposit(env: &Env, asset: &Address, depositor: &Address, amount: &u1
     );
 }
 
-pub fn make_withdrawal(env: &Env, asset: &Address, deposit: &Deposit) {
-    token::Client::new(env, asset).transfer(
-        &env.current_contract_address(),
-        &deposit.depositor,
-        &(deposit.amount as i128),
-    );
+pub fn make_withdrawal(env: &Env, asset: &Address, account: &Address, amount: i128) {
+    token::Client::new(env, asset).transfer(&env.current_contract_address(), &account, &amount);
+}
+
+pub fn get_contract_balance(env: &Env, asset: &Address) -> i128 {
+    token::Client::new(env, asset).balance(&env.current_contract_address())
 }
 
 pub fn save_deposit(env: &Env, deposit: &Deposit) {
@@ -42,11 +42,13 @@ pub fn get_deposit(env: &Env, depositor: &Address) -> Deposit {
     env.storage()
         .persistent()
         .get(&DepositsDataKeys::Deposit(depositor.clone()))
-        .unwrap_or(Deposit {
-            depositor: depositor.clone(),
-            amount: 0,
-            deposit_time: env.ledger().timestamp(),
-        })
+        .unwrap()
+}
+
+pub fn has_deposit(env: &Env, depositor: &Address) -> bool {
+    env.storage()
+        .persistent()
+        .has(&DepositsDataKeys::Deposit(depositor.clone()))
 }
 
 pub fn remove_deposit(env: &Env, depositor: &Address) {

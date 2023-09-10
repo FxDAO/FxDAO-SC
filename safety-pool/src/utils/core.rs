@@ -1,5 +1,5 @@
 use crate::errors::SCErrors;
-use crate::storage::core::{CoreState, CoreStorageKeys};
+use crate::storage::core::{CoreState, CoreStats, CoreStorageKeys};
 use soroban_sdk::{panic_with_error, Env};
 pub const INSTANCE_BUMP_CONSTANT: u32 = 507904;
 
@@ -25,6 +25,19 @@ pub fn get_core_state(env: &Env) -> CoreState {
     env.storage()
         .instance()
         .get(&CoreStorageKeys::CoreState)
+        .unwrap()
+}
+
+pub fn set_core_stats(env: &Env, core_stats: &CoreStats) {
+    env.storage()
+        .instance()
+        .set(&CoreStorageKeys::CoreStats, core_stats);
+}
+
+pub fn get_core_stats(env: &Env) -> CoreStats {
+    env.storage()
+        .instance()
+        .get(&CoreStorageKeys::CoreStats)
         .unwrap()
 }
 

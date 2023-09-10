@@ -1,11 +1,13 @@
 use soroban_sdk::{contracttype, Address};
 
 #[contracttype]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Deposit {
     pub depositor: Address,
     pub amount: u128,
-    pub deposit_time: u64,
+    pub last_deposit: u64,
+    pub current_collateral_factor: u128,
+    pub current_deposit_factor: u128,
 }
 
 #[contracttype]

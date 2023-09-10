@@ -111,7 +111,7 @@ pub trait VaultsContractTrait {
         liquidator: Address,
         denomination: Symbol,
         total_vaults_to_liquidate: u32,
-    );
+    ) -> Vec<Vault>;
 }
 
 #[contract]
@@ -738,7 +738,7 @@ impl VaultsContractTrait for VaultsContract {
         liquidator: Address,
         denomination: Symbol,
         total_vaults_to_liquidate: u32,
-    ) {
+    ) -> Vec<Vault> {
         bump_instance(&env);
         liquidator.require_auth();
 
@@ -757,8 +757,8 @@ impl VaultsContractTrait for VaultsContract {
             true,
         );
 
-        if vaults_to_liquidate.len() == 0 {
-            panic_with_error!(&env, &SCErrors::ThereAreNoVaultsToLiquidate);
+        if vaults_to_liquidate.len() < total_vaults_to_liquidate {
+            panic_with_error!(&env, &SCErrors::NotEnoughVaultsToLiquidate);
         }
 
         for vault in vaults_to_liquidate.iter() {
@@ -792,5 +792,7 @@ impl VaultsContractTrait for VaultsContract {
             &liquidator,
             collateral_to_withdraw as i128,
         );
+        
+        vaults_to_liquidate
     }
 }
