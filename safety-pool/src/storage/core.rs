@@ -33,10 +33,8 @@ pub struct CoreStats {
     /// owns and should be able to withdraw.
     pub collateral_factor: u128,
 
-    /// The deposit factor is used to keep a record of relation between the amounts deposited and
-    /// that what has been already used in liquidations, this helps to calculate the amount each
-    /// depositor should be able to withdraw. (This is basically a shares price)
-    pub deposit_factor: u128,
+    pub total_shares: u128,
+    pub share_price: u128,
 }
 
 #[contracttype]

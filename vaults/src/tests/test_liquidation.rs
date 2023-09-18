@@ -175,9 +175,12 @@ fn test_liquidation() {
     assert_eq!(updated_vaults_info.total_vaults, 1);
 
     // Check the only index is the one from the liquidator's vault
-    let current_vaults: Vec<Vault> =
-        data.contract_client
-            .get_vaults(&data.stable_token_denomination, &2u32, &true);
+    let current_vaults: Vec<Vault> = data.contract_client.get_vaults(
+        &OptionalVaultKey::None,
+        &data.stable_token_denomination,
+        &2u32,
+        &true,
+    );
 
     assert_eq!(current_vaults, vec![&env] as Vec<Vault>);
 }
@@ -279,18 +282,24 @@ fn test_vaults_to_liquidate() {
         &data.stable_token_denomination,
     );
 
-    let mut current_vaults_to_liquidate: Vec<Vault> =
-        data.contract_client
-            .get_vaults(&data.stable_token_denomination, &5u32, &true);
+    let mut current_vaults_to_liquidate: Vec<Vault> = data.contract_client.get_vaults(
+        &OptionalVaultKey::None,
+        &data.stable_token_denomination,
+        &5u32,
+        &true,
+    );
 
     assert_eq!(current_vaults_to_liquidate, vec![&env]);
 
     data.contract_client
         .set_currency_rate(&data.stable_token_denomination, &second_rate);
 
-    current_vaults_to_liquidate =
-        data.contract_client
-            .get_vaults(&data.stable_token_denomination, &5u32, &true);
+    current_vaults_to_liquidate = data.contract_client.get_vaults(
+        &OptionalVaultKey::None,
+        &data.stable_token_denomination,
+        &5u32,
+        &true,
+    );
 
     assert_eq!(current_vaults_to_liquidate.len(), 2);
 }

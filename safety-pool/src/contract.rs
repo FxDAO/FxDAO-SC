@@ -12,8 +12,7 @@ use crate::utils::deposits::{
     remove_depositor_from_depositors, save_deposit, save_depositors,
 };
 use crate::vaults;
-use crate::vaults::{Currency, Vault};
-use core::ops::{Div, Mul, Sub};
+use crate::vaults::{Currency, OptionalVaultKey, Vault};
 use num_integer::div_floor;
 use soroban_sdk::{
     contract, contractimpl, panic_with_error, symbol_short, token, vec, Address, BytesN, Env,
@@ -64,6 +63,7 @@ pub trait SafetyPoolContractTrait {
 
     fn get_depositors(env: Env) -> Vec<Address>;
 
+    // TODO: Improve the logic which distributes the earned collateral
     fn withdraw(env: Env, caller: Address);
 
     fn liquidate(env: Env, liquidator: Address);
@@ -118,7 +118,8 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
                 lifetime_liquidated: 0,
                 current_liquidated: 0,
                 collateral_factor: 0,
-                deposit_factor: 1_0000000,
+                total_shares: 0,
+                share_price: 1_0000000,
             },
         );
 
@@ -211,12 +212,14 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
 
         make_deposit(&env, &core_state.deposit_asset, &caller, &amount);
 
+        let shares_to_issue: u128 = div_floor(amount * 1_0000000, core_stats.share_price);
         let deposit: Deposit = Deposit {
             depositor: caller.clone(),
             amount: amount.clone(),
             last_deposit: env.ledger().timestamp(),
+            shares: shares_to_issue,
+            share_price_paid: core_stats.share_price,
             current_collateral_factor: core_stats.collateral_factor,
-            current_deposit_factor: core_stats.deposit_factor,
         };
         save_deposit(&env, &deposit);
 
@@ -228,6 +231,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
 
         core_stats.lifetime_deposited += amount;
         core_stats.current_deposited += amount;
+        core_stats.total_shares += shares_to_issue;
         set_core_stats(&env, &core_stats);
 
         bump_deposit(&env, caller);
@@ -278,15 +282,14 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
 
         // We first calculate the amount of stables to withdraw
         let calculated_stable_to_withdraw: u128 = div_floor(
-            deposit.amount
-                * div_floor(
-                    core_stats.deposit_factor * 1_0000000,
-                    deposit.current_deposit_factor,
-                ),
-            1_0000000,
+            // deposit.shares * core_stats.current_deposited,
+            // core_stats.total_shares,
+            deposit.amount * core_stats.share_price,
+            deposit.share_price_paid,
         );
 
         core_stats.current_deposited -= calculated_stable_to_withdraw;
+        core_stats.total_shares -= deposit.shares;
         make_withdrawal(
             &env,
             &core_state.deposit_asset,
@@ -295,16 +298,19 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         );
 
         // Then we withdraw the collateral
-        let calculated_collateral_to_withdraw: u128 = div_floor(
-            deposit.amount
-                * div_floor(
-                    (core_stats.collateral_factor - deposit.current_collateral_factor) * 1_0000000,
-                    deposit.current_deposit_factor,
-                ),
+        let mut calculated_collateral_to_withdraw: u128 = div_floor(
+            // div_floor(
+            deposit.amount * (core_stats.collateral_factor - deposit.current_collateral_factor),
+            // deposit.share_price_paid,
             1_0000000,
         );
+        // 1_0000000,
+        // );
 
         if calculated_collateral_to_withdraw > 0 {
+            if calculated_collateral_to_withdraw > core_stats.current_liquidated {
+                calculated_collateral_to_withdraw = core_stats.current_liquidated;
+            }
             core_stats.current_liquidated -= calculated_collateral_to_withdraw;
             make_withdrawal(
                 &env,
@@ -339,11 +345,13 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         let currency: Currency = vaults::Client::new(&env, &core_state.vaults_contract)
             .get_currency(&core_state.denomination_asset);
 
-        let vaults_to_liquidate: Vec<Vault> = vaults::Client::new(
-            &env,
-            &core_state.vaults_contract,
-        )
-        .get_vaults(&core_state.denomination_asset, &10, &true);
+        let vaults_to_liquidate: Vec<Vault> =
+            vaults::Client::new(&env, &core_state.vaults_contract).get_vaults(
+                &OptionalVaultKey::None,
+                &core_state.denomination_asset,
+                &10,
+                &true,
+            );
 
         let mut total_debt_to_pay: u128 = 0;
         let mut total_vaults: u32 = 0;
@@ -376,7 +384,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         }
 
         let collateral_paid_for: u128 =
-            div_floor(total_debt_paid * 10000000, currency.rate as u128);
+            div_floor(total_debt_paid * 1_0000000, currency.rate as u128);
 
         // If collateral paid for is higher than the amount received it means there was a lost in the liquidation.
         let collateral_gained: u128 = if collateral_paid_for > total_collateral_received {
@@ -417,19 +425,19 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         }
 
         let end_collateral: u128 = total_collateral_received - shareable_profit;
-        core_stats.collateral_factor += div_floor(
-            end_collateral * core_stats.deposit_factor,
+        core_stats.collateral_factor +=
+            div_floor(end_collateral * 1_0000000, core_stats.lifetime_deposited);
+
+        let new_total_deposited: u128 = core_stats.current_deposited - total_debt_paid;
+        core_stats.share_price = div_floor(
+            new_total_deposited * core_stats.share_price,
             core_stats.current_deposited,
         );
 
-        let new_deposit_factor: u128 = core_stats.deposit_factor
-            * (1_0000000 - div_floor(total_debt_paid * 1_0000000, core_stats.current_deposited));
-        core_stats.deposit_factor = div_floor(new_deposit_factor, 1_0000000);
-
         core_stats.current_deposited -= total_debt_paid;
         core_stats.lifetime_profit += collateral_gained;
-        core_stats.current_liquidated += end_collateral;
         core_stats.lifetime_liquidated += end_collateral;
+        core_stats.current_liquidated += end_collateral;
 
         set_core_stats(&env, &core_stats);
         bump_depositors(&env);
