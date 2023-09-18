@@ -187,6 +187,7 @@ pub fn search_vault(
 
 pub fn get_vaults(
     env: &Env,
+    prev_key: &OptionalVaultKey,
     currency: &Currency,
     vaults_info: &VaultsInfo,
     total: u32,
@@ -194,15 +195,20 @@ pub fn get_vaults(
 ) -> Vec<Vault> {
     let mut vaults: Vec<Vault> = vec![&env] as Vec<Vault>;
 
-    let mut target_key: VaultKey = match vaults_info.lowest_key.clone() {
-        OptionalVaultKey::None => {
-            panic_with_error!(&env, &SCErrors::ThereAreNoVaultsToLiquidate);
-        }
-        OptionalVaultKey::Some(key) => key,
-    };
+    let mut target_key: VaultKey;
+    if let OptionalVaultKey::Some(vault_key) = prev_key {
+        target_key = vault_key.clone();
+    } else {
+        target_key = match vaults_info.lowest_key.clone() {
+            OptionalVaultKey::None => {
+                panic_with_error!(&env, &SCErrors::NotEnoughVaultsToLiquidate);
+            }
+            OptionalVaultKey::Some(key) => key,
+        };
+    }
 
     for _ in 0..total {
-        let vault = get_vault(&env, target_key.clone());
+        let vault: Vault = get_vault(&env, target_key.clone());
 
         if !can_be_liquidated(&vault, &currency, &vaults_info) && only_to_liquidate {
             break;
@@ -230,7 +236,7 @@ pub fn get_redeemable_vaults(
 
     let mut target_key: VaultKey = match vaults_info.lowest_key.clone() {
         OptionalVaultKey::None => {
-            panic_with_error!(&env, &SCErrors::ThereAreNoVaultsToLiquidate);
+            panic_with_error!(&env, &SCErrors::NotEnoughVaultsToLiquidate);
         }
         OptionalVaultKey::Some(key) => key,
     };
@@ -350,7 +356,10 @@ pub fn withdraw_vault(env: &Env, vault: &Vault, prev_key: &OptionalVaultKey) {
     );
 }
 
-//
+pub fn calculate_deposit_ratio(currency_rate: &u128, collateral: &u128, debt: &u128) -> u128 {
+    div_floor(currency_rate * collateral, debt.clone())
+}
+
 // pub fn save_new_user_vault(
 //     env: &Env,
 //     user_vault: &UserVault,

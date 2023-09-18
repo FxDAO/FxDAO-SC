@@ -8,11 +8,14 @@ pub enum SCErrors {
 
     // Deposits
     BelowMinDeposit = 20001,
-    NothingToWithdraw = 20002,
+    DepositDoesntExist = 20002,
+    DepositAlreadyCreated = 20003,
+    NothingToWithdraw = 20004,
+    LockedPeriodUncompleted = 20005,
 
     // Liquidations
     CantLiquidateVaults = 30000,
-    
+
     // Distributions
     RecentDistribution = 40000,
 }

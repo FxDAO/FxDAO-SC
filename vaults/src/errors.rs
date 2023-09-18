@@ -21,7 +21,7 @@ pub enum SCErrors {
     PrevVaultNextIndexIsInvalid = 50008,
     IndexProvidedIsNotTheOneSaved = 50009,
     NextPrevVaultShouldBeNone = 50010,
-    ThereAreNoVaultsToLiquidate = 50011,
+    NotEnoughVaultsToLiquidate = 50011,
     DepositAmountIsMoreThanTotalDebt = 60000,
     CollateralRateUnderMinimum = 70000,
     NotEnoughFundsToRedeem = 80000,

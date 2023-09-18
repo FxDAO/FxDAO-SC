@@ -14,10 +14,10 @@ use crate::utils::payments::{
     deposit_collateral, deposit_stablecoin, withdraw_collateral, withdraw_stablecoin,
 };
 use crate::utils::vaults::{
-    bump_vault, bump_vault_index, can_be_liquidated, create_and_insert_vault,
-    get_redeemable_vaults, get_vault, get_vault_index, get_vaults, get_vaults_info, has_vault,
-    is_vaults_info_started, search_vault, set_vault, set_vault_index, set_vaults_info,
-    validate_user_vault, vault_spot_available, withdraw_vault,
+    bump_vault, bump_vault_index, calculate_deposit_ratio, can_be_liquidated,
+    create_and_insert_vault, get_redeemable_vaults, get_vault, get_vault_index, get_vaults,
+    get_vaults_info, has_vault, is_vaults_info_started, search_vault, set_vault, set_vault_index,
+    set_vaults_info, validate_user_vault, vault_spot_available, withdraw_vault,
 };
 use num_integer::div_floor;
 use soroban_sdk::{
@@ -64,6 +64,7 @@ pub trait VaultsContractTrait {
         denomination: Symbol,
     );
     fn get_vaults_info(env: Env, denomination: Symbol) -> VaultsInfo;
+    fn calculate_deposit_ratio(currency_rate: u128, collateral: u128, debt: u128) -> u128;
     fn new_vault(
         env: Env,
         prev_key: OptionalVaultKey,
@@ -76,6 +77,7 @@ pub trait VaultsContractTrait {
     fn get_vault_from_key(env: Env, vault_key: VaultKey) -> Vault;
     fn get_vaults(
         env: Env,
+        prev_key: OptionalVaultKey,
         denomination: Symbol,
         total: u32,
         only_to_liquidate: bool,
@@ -111,7 +113,7 @@ pub trait VaultsContractTrait {
         liquidator: Address,
         denomination: Symbol,
         total_vaults_to_liquidate: u32,
-    );
+    ) -> Vec<Vault>;
 }
 
 #[contract]
@@ -281,6 +283,10 @@ impl VaultsContractTrait for VaultsContract {
         get_vaults_info(&env, &denomination)
     }
 
+    fn calculate_deposit_ratio(currency_rate: u128, collateral: u128, debt: u128) -> u128 {
+        calculate_deposit_ratio(&currency_rate, &collateral, &debt)
+    }
+
     fn new_vault(
         env: Env,
         prev_key: OptionalVaultKey,
@@ -310,10 +316,10 @@ impl VaultsContractTrait for VaultsContract {
         }
 
         let currency: Currency = get_currency(&env, &denomination);
-        let collateral_value: u128 = currency.rate * collateral_amount;
-        let deposit_collateral_rate: u128 = div_floor(collateral_value, initial_debt);
+        let deposit_collateral_rate: u128 =
+            calculate_deposit_ratio(&currency.rate, &collateral_amount, &initial_debt);
 
-        if deposit_collateral_rate < vaults_info.min_col_rate {
+        if deposit_collateral_rate < vaults_info.opening_col_rate {
             panic_with_error!(&env, &SCErrors::InvalidOpeningCollateralRatio);
         }
 
@@ -386,6 +392,7 @@ impl VaultsContractTrait for VaultsContract {
 
     fn get_vaults(
         env: Env,
+        prev_key: OptionalVaultKey,
         denomination: Symbol,
         total: u32,
         only_to_liquidate: bool,
@@ -395,7 +402,14 @@ impl VaultsContractTrait for VaultsContract {
         let currency: Currency = get_currency(&env, &denomination);
         let vaults_info: VaultsInfo = get_vaults_info(&env, &denomination);
 
-        get_vaults(&env, &currency, &vaults_info, total, only_to_liquidate)
+        get_vaults(
+            &env,
+            &prev_key,
+            &currency,
+            &vaults_info,
+            total,
+            only_to_liquidate,
+        )
     }
 
     fn increase_collateral(
@@ -738,7 +752,7 @@ impl VaultsContractTrait for VaultsContract {
         liquidator: Address,
         denomination: Symbol,
         total_vaults_to_liquidate: u32,
-    ) {
+    ) -> Vec<Vault> {
         bump_instance(&env);
         liquidator.require_auth();
 
@@ -751,14 +765,15 @@ impl VaultsContractTrait for VaultsContract {
         let mut amount_to_deposit: u128 = 0;
         let vaults_to_liquidate: Vec<Vault> = get_vaults(
             &env,
+            &OptionalVaultKey::None,
             &currency,
             &vaults_info,
             total_vaults_to_liquidate,
             true,
         );
 
-        if vaults_to_liquidate.len() == 0 {
-            panic_with_error!(&env, &SCErrors::ThereAreNoVaultsToLiquidate);
+        if vaults_to_liquidate.len() < total_vaults_to_liquidate {
+            panic_with_error!(&env, &SCErrors::NotEnoughVaultsToLiquidate);
         }
 
         for vault in vaults_to_liquidate.iter() {
@@ -792,5 +807,7 @@ impl VaultsContractTrait for VaultsContract {
             &liquidator,
             collateral_to_withdraw as i128,
         );
+
+        vaults_to_liquidate
     }
 }

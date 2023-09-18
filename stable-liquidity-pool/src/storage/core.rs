@@ -15,6 +15,6 @@ pub struct CoreState {
 
 #[contracttype]
 pub enum CoreStorageKeys {
-    CoreState,
-    LastGovernanceTokenDistribution,
+    CoreState,                       // CoreState
+    LastGovernanceTokenDistribution, // u64
 }
