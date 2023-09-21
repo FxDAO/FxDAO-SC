@@ -28,14 +28,14 @@ fn test_liquidation() {
     let depositor_debt: u128 = 5_000_0000000;
     let depositor_collateral: u128 = 100_000_0000000;
 
-    token::AdminClient::new(&env, &data.collateral_token_client.address)
+    token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor, &(depositor_collateral as i128));
 
     let liquidator: Address = Address::random(&env);
     let liquidator_debt: u128 = 5_000_0000000;
     let liquidator_collateral: u128 = 500_000_0000000;
 
-    token::AdminClient::new(&env, &data.collateral_token_client.address)
+    token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
         .mint(&liquidator, &(liquidator_collateral as i128));
 
     token::Client::new(&env, &data.collateral_token_client.address).approve(
@@ -218,7 +218,7 @@ fn test_vaults_to_liquidate() {
     let first_debt_amount: u128 = 100_0000000;
     let second_debt_amount: u128 = 160_0000000;
 
-    token::AdminClient::new(&env, &data.collateral_token_client.address)
+    token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor_1, &(depositor_collateral as i128));
 
     data.contract_client.new_vault(
@@ -229,7 +229,7 @@ fn test_vaults_to_liquidate() {
         &data.stable_token_denomination,
     );
 
-    token::AdminClient::new(&env, &data.collateral_token_client.address)
+    token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor_2, &(depositor_collateral as i128));
 
     data.contract_client.new_vault(
@@ -243,7 +243,7 @@ fn test_vaults_to_liquidate() {
         &data.stable_token_denomination,
     );
 
-    token::AdminClient::new(&env, &data.collateral_token_client.address)
+    token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor_3, &(depositor_collateral as i128));
 
     data.contract_client.new_vault(
@@ -257,7 +257,7 @@ fn test_vaults_to_liquidate() {
         &data.stable_token_denomination,
     );
 
-    token::AdminClient::new(&env, &data.collateral_token_client.address)
+    token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor_4, &(depositor_collateral as i128));
 
     data.contract_client.new_vault(
@@ -268,7 +268,7 @@ fn test_vaults_to_liquidate() {
         &data.stable_token_denomination,
     );
 
-    token::AdminClient::new(&env, &data.collateral_token_client.address)
+    token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor_5, &(depositor_collateral as i128));
 
     data.contract_client.new_vault(

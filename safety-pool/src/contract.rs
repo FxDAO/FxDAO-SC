@@ -326,7 +326,6 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         depositors = remove_depositor_from_depositors(&depositors, &caller);
         save_depositors(&env, &depositors);
 
-        bump_deposit(&env, caller);
         bump_depositors(&env);
     }
 
@@ -339,6 +338,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
     /// 6.- The collateral left is divided and distributed between the treasury and the liquidator
     fn liquidate(env: Env, liquidator: Address) {
         bump_instance(&env);
+        liquidator.require_auth();
         let core_state: CoreState = get_core_state(&env);
         let mut core_stats: CoreStats = get_core_stats(&env);
 
@@ -369,6 +369,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
             panic_with_error!(&env, SCErrors::CantLiquidateVaults);
         }
 
+        env.current_contract_address().require_auth();
         let vaults_liquidated: Vec<Vault> = vaults::Client::new(&env, &core_state.vaults_contract)
             .liquidate(
                 &env.current_contract_address(),

@@ -238,7 +238,7 @@ fn fully_test_complex_liquidations_rewards_flow() {
         base_reserve: 10,
         min_temp_entry_expiration: 0,
         min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        max_entry_expiration: u32::MAX,
     });
 
     pool_contract_client.withdraw(&depositor_1);
@@ -276,7 +276,7 @@ fn fully_test_complex_liquidations_rewards_flow() {
         base_reserve: 10,
         min_temp_entry_expiration: 0,
         min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        max_entry_expiration: u32::MAX,
     });
 
     pool_contract_client.withdraw(&depositor_6);

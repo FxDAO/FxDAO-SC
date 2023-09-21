@@ -13,8 +13,8 @@ use soroban_sdk::testutils::{Address as _, BytesN as __, Ledger, LedgerInfo};
 use soroban_sdk::{
     map, symbol_short, token, vec, Address, BytesN, Env, IntoVal, Map, Symbol, Val, Vec,
 };
-use token::AdminClient as TokenAdminClient;
 use token::Client as TokenClient;
+use token::StellarAssetClient as TokenAdminClient;
 
 mod vaults {
     soroban_sdk::contractimport!(file = "../target/wasm32-unknown-unknown/release/vaults.wasm");
@@ -182,8 +182,8 @@ fn setup_contracts(env: &Env, test_data: &TestData) {
         &test_data.usd_stable_token_client.address,
         &symbol_short!("usd"),
         &test_data.min_deposit_usd_safety_pool,
-        &vec![&env, 1u32, 2u32],
-        &vec![&env, 1u32, 2u32],
+        &(vec![&env, 1u32, 2u32] as Vec<u32>),
+        &(vec![&env, 1u32, 2u32] as Vec<u32>),
         &test_data.governance_token_client.address,
     );
 
@@ -274,13 +274,13 @@ pub fn test_create_update_proposal_wrong_params() {
         .try_create_proposal(
             &BytesN::random(&env),
             &ProposalType::UpdateContract,
-            &vec![
+            &(vec![
                 &env,
                 ProposerStat {
                     amount: test_data.governance_proposals_fee,
                     id: proposer.clone(),
                 },
-            ],
+            ] as Vec<ProposerStat>),
             &voting_time,
             &ProposalExecutionParams {
                 upgrade_contract: UpgradeContractProposalOption::None,
@@ -298,13 +298,13 @@ pub fn test_create_update_proposal_wrong_params() {
         .try_create_proposal(
             &BytesN::random(&env),
             &ProposalType::UpdateContract,
-            &vec![
+            &(vec![
                 &env,
                 ProposerStat {
                     amount: test_data.governance_proposals_fee,
                     id: proposer.clone(),
                 },
-            ],
+            ] as Vec<ProposerStat>),
             &voting_time,
             &ProposalExecutionParams {
                 upgrade_contract: UpgradeContractProposalOption::None,
@@ -329,13 +329,13 @@ pub fn test_create_update_proposal_wrong_params() {
         .try_create_proposal(
             &BytesN::random(&env),
             &ProposalType::UpdateContract,
-            &vec![
+            &(vec![
                 &env,
                 ProposerStat {
                     amount: test_data.governance_proposals_fee,
                     id: proposer.clone(),
                 },
-            ],
+            ] as Vec<ProposerStat>),
             &voting_time,
             &ProposalExecutionParams {
                 upgrade_contract: UpgradeContractProposalOption::None,
@@ -433,7 +433,7 @@ pub fn test_update_proposal_flow() {
         base_reserve: 10,
         min_temp_entry_expiration: 0,
         min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        max_entry_expiration: u32::MAX,
     });
 
     test_data
@@ -448,7 +448,7 @@ pub fn test_update_proposal_flow() {
         base_reserve: 10,
         min_temp_entry_expiration: 0,
         min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        max_entry_expiration: u32::MAX,
     });
 
     test_data
@@ -482,13 +482,13 @@ pub fn test_create_upgrade_proposal_flow_wrong_params() {
         .try_create_proposal(
             &BytesN::random(&env),
             &ProposalType::UpgradeContract,
-            &vec![
+            &(vec![
                 &env,
                 ProposerStat {
                     amount: test_data.governance_proposals_fee,
                     id: proposer.clone(),
                 },
-            ],
+            ] as Vec<ProposerStat>),
             &(3600 * 5),
             &ProposalExecutionParams {
                 upgrade_contract: UpgradeContractProposalOption::None,
@@ -507,13 +507,13 @@ pub fn test_create_upgrade_proposal_flow_wrong_params() {
         .try_create_proposal(
             &BytesN::random(&env),
             &ProposalType::UpgradeContract,
-            &vec![
+            &(vec![
                 &env,
                 ProposerStat {
                     amount: test_data.governance_proposals_fee,
                     id: test_data.governance_contract_admin.clone(),
                 },
-            ],
+            ] as Vec<ProposerStat>),
             &3500,
             &ProposalExecutionParams {
                 upgrade_contract: UpgradeContractProposalOption::None,
@@ -535,13 +535,13 @@ pub fn test_create_upgrade_proposal_flow_wrong_params() {
         .try_create_proposal(
             &BytesN::random(&env),
             &ProposalType::UpgradeContract,
-            &vec![
+            &(vec![
                 &env,
                 ProposerStat {
                     amount: test_data.governance_proposals_fee,
                     id: test_data.governance_contract_admin.clone(),
                 },
-            ],
+            ] as Vec<ProposerStat>),
             &(3600 * 24 * 15),
             &ProposalExecutionParams {
                 upgrade_contract: UpgradeContractProposalOption::Some(
@@ -622,7 +622,7 @@ pub fn test_upgrade_proposal_flow() {
         base_reserve: 10,
         min_temp_entry_expiration: 0,
         min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        max_entry_expiration: u32::MAX,
     });
 
     test_data
@@ -637,7 +637,7 @@ pub fn test_upgrade_proposal_flow() {
         base_reserve: 10,
         min_temp_entry_expiration: 0,
         min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        max_entry_expiration: u32::MAX,
     });
 
     test_data

@@ -1,12 +1,15 @@
 use crate::errors::SCErrors;
 use crate::storage::core::{CoreState, CoreStats, CoreStorageKeys};
 use soroban_sdk::{panic_with_error, Env};
-pub const INSTANCE_BUMP_CONSTANT: u32 = 507904;
+
+pub const DAY_IN_LEDGERS: u32 = 17280;
+pub const INSTANCE_BUMP_CONSTANT: u32 = DAY_IN_LEDGERS * 30;
+pub const INSTANCE_BUMP_CONSTANT_THRESHOLD: u32 = DAY_IN_LEDGERS * 20;
 
 pub fn bump_instance(env: &Env) {
     env.storage()
         .instance()
-        .bump(env.ledger().sequence() + INSTANCE_BUMP_CONSTANT)
+        .bump(INSTANCE_BUMP_CONSTANT_THRESHOLD, INSTANCE_BUMP_CONSTANT)
 }
 
 pub fn can_init_contract(env: &Env) {

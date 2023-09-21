@@ -6,8 +6,8 @@ use crate::storage::proposals::{
 };
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{map, token, vec, Address, Env, Map, Symbol, Vec};
-use token::AdminClient as TokenAdminClient;
 use token::Client as TokenClient;
+use token::StellarAssetClient as TokenAdminClient;
 
 pub const TEST_PROPOSAL_FEE: u128 = 12_00_000_0000000;
 pub const TEST_VOTING_CREDIT_PRICE: u128 = 1_0000000;

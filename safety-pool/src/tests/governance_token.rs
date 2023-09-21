@@ -30,7 +30,7 @@ fn distribute_governance_token() {
         base_reserve: 10,
         min_temp_entry_expiration: 0,
         min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        max_entry_expiration: u32::MAX,
     });
 
     for depositor in [&depositor_1, &depositor_2] {
@@ -57,7 +57,7 @@ fn distribute_governance_token() {
         base_reserve: 10,
         min_temp_entry_expiration: 0,
         min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        max_entry_expiration: u32::MAX,
     });
 
     assert_eq!(
@@ -94,7 +94,7 @@ fn distribute_governance_token() {
         base_reserve: 10,
         min_temp_entry_expiration: 0,
         min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        max_entry_expiration: u32::MAX,
     });
 
     test_data

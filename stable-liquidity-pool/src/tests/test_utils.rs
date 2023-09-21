@@ -1,8 +1,8 @@
 #![cfg(test)]
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{token, vec, Address, Env, Vec};
-use token::AdminClient as TokenAdminClient;
 use token::Client as TokenClient;
+use token::StellarAssetClient as TokenAdminClient;
 
 use crate::contract::{StableLiquidityPoolContract, StableLiquidityPoolContractClient};
 

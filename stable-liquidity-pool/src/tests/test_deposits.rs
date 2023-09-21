@@ -100,7 +100,7 @@ pub fn test_deposits() {
         base_reserve: 10,
         min_temp_entry_expiration: 0,
         min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        max_entry_expiration: u32::MAX,
     });
 
     test_data.stable_liquidity_pool_contract_client.deposit(
@@ -135,7 +135,7 @@ pub fn test_deposits() {
         base_reserve: 10,
         min_temp_entry_expiration: 0,
         min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        max_entry_expiration: u32::MAX,
     });
 
     test_data.stable_liquidity_pool_contract_client.deposit(
@@ -256,7 +256,7 @@ fn test_simple_withdrawals() {
         base_reserve: 10,
         min_temp_entry_expiration: 0,
         min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        max_entry_expiration: u32::MAX,
     });
 
     let core_state: CoreState = test_data
