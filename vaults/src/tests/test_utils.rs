@@ -3,8 +3,8 @@ use crate::contract::VaultsContract;
 use crate::VaultsContractClient;
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{symbol_short, token, Address, Env, IntoVal, Symbol};
-use token::AdminClient as TokenAdminClient;
 use token::Client as TokenClient;
+use token::StellarAssetClient as TokenAdminClient;
 
 fn create_token_contract<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, TokenAdminClient<'a>) {
     let contract_address = e.register_stellar_asset_contract(admin.clone());
@@ -142,7 +142,7 @@ pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVar
         &200_000,
     );
 
-    token::AdminClient::new(&env, &data.stable_token_client.address)
+    token::StellarAssetClient::new(&env, &data.stable_token_client.address)
         .mint(&data.stable_token_issuer, &90000000000000000000);
 }
 

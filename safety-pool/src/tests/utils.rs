@@ -2,8 +2,8 @@
 use crate::contract::{SafetyPoolContract, SafetyPoolContractClient};
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{symbol_short, token, vec, Address, Env, Symbol, Vec};
-use token::AdminClient as TokenAdminClient;
 use token::Client as TokenClient;
+use token::StellarAssetClient as TokenAdminClient;
 
 pub fn create_token_contract<'a>(
     e: &Env,

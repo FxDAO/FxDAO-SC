@@ -59,7 +59,7 @@ fn test_redeem() {
     let depositor_4_debt: u128 = 1200000000;
     let depositor_4_index: u128 = 250_00000000;
 
-    token::AdminClient::new(&env, &data.collateral_token_client.address)
+    token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor_1, &(depositor_1_collateral as i128));
 
     data.contract_client.new_vault(
@@ -76,7 +76,7 @@ fn test_redeem() {
 
     assert_eq!(depositor_1_vault.index, depositor_1_index);
 
-    token::AdminClient::new(&env, &data.collateral_token_client.address)
+    token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor_2, &(depositor_2_collateral as i128));
 
     data.contract_client.new_vault(
@@ -93,7 +93,7 @@ fn test_redeem() {
 
     assert_eq!(depositor_2_vault.index, depositor_2_index);
 
-    token::AdminClient::new(&env, &data.collateral_token_client.address)
+    token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor_3, &(depositor_3_collateral as i128));
 
     data.contract_client.new_vault(
@@ -114,7 +114,7 @@ fn test_redeem() {
 
     assert_eq!(depositor_3_vault.index, depositor_3_index);
 
-    token::AdminClient::new(&env, &data.collateral_token_client.address)
+    token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor_4, &(depositor_4_collateral as i128));
 
     data.contract_client.new_vault(

@@ -96,7 +96,7 @@ fn test_new_vault() {
         &200_000,
     );
 
-    token::AdminClient::new(&env, &data.stable_token_client.address)
+    token::StellarAssetClient::new(&env, &data.stable_token_client.address)
         .mint(&data.stable_token_issuer, &90000000000000000000);
 
     // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
@@ -969,45 +969,41 @@ fn test_pay_debt() {
     // Check the function is requiring the sender approved this operation
     assert_eq!(
         env.auths(),
-        std::vec![
-            (
-                vault.account.clone(),
-                AuthorizedInvocation {
-                    function: AuthorizedFunction::Contract((
-                        data.contract_client.address.clone(),
-                        symbol_short!("pay_debt"),
-                        (
-                            OptionalVaultKey::None,
-                            VaultKey {
-                                index: vault.index.clone(),
-                                account: vault.account.clone(),
-                                denomination: vault.denomination.clone(),
-                            },
-                            OptionalVaultKey::None,
-                            base_variables.initial_debt.clone(),
-                        )
-                            .into_val(&env),
-                    )),
-                    sub_invocations: std::vec![],
-                }
-            ),
-            (
-                vault.account.clone(),
-                AuthorizedInvocation {
-                    function: AuthorizedFunction::Contract((
-                        data.stable_token_client.address.clone(),
-                        symbol_short!("transfer"),
-                        (
-                            vault.account.clone(),
-                            data.contract_client.address.clone(),
-                            base_variables.initial_debt.clone() as i128,
-                        )
-                            .into_val(&env),
-                    )),
-                    sub_invocations: std::vec![],
-                }
-            )
-        ]
+        std::vec![(
+            vault.account.clone(),
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    data.contract_client.address.clone(),
+                    symbol_short!("pay_debt"),
+                    (
+                        OptionalVaultKey::None,
+                        VaultKey {
+                            index: vault.index.clone(),
+                            account: vault.account.clone(),
+                            denomination: vault.denomination.clone(),
+                        },
+                        OptionalVaultKey::None,
+                        base_variables.initial_debt.clone(),
+                    )
+                        .into_val(&env),
+                )),
+                sub_invocations: std::vec![
+                    (AuthorizedInvocation {
+                        function: AuthorizedFunction::Contract((
+                            data.stable_token_client.address.clone(),
+                            symbol_short!("transfer"),
+                            (
+                                vault.account.clone(),
+                                data.contract_client.address.clone(),
+                                base_variables.initial_debt.clone() as i128,
+                            )
+                                .into_val(&env),
+                        )),
+                        sub_invocations: std::vec![],
+                    })
+                ],
+            }
+        ),]
     );
 
     let updated_vaults_info: VaultsInfo = data

@@ -1,12 +1,13 @@
 pub const INSTANCE_BUMP_CONSTANT: u32 = 507904;
+pub const INSTANCE_BUMP_CONSTANT_THRESHOLD: u32 = 253952;
 
 use crate::storage::core::{CoreDataKeys, CoreState};
-use soroban_sdk::{Address, Env};
+use soroban_sdk::Env;
 
 pub fn bump_instance(env: &Env) {
     env.storage()
         .instance()
-        .bump(env.ledger().sequence() + INSTANCE_BUMP_CONSTANT)
+        .bump(INSTANCE_BUMP_CONSTANT_THRESHOLD, INSTANCE_BUMP_CONSTANT);
 }
 
 pub fn is_core_created(env: &Env) -> bool {

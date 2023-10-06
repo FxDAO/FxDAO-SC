@@ -14,16 +14,20 @@ use num_integer::div_floor;
 use soroban_sdk::{panic_with_error, vec, Address, Env, Symbol, Vec};
 
 pub const PERSISTENT_BUMP_CONSTANT: u32 = 1036800;
+pub const PERSISTENT_BUMP_CONSTANT_THRESHOLD: u32 = 518400;
 
 pub fn bump_vault(env: &Env, vault_key: VaultKey) {
-    env.storage()
-        .persistent()
-        .bump(&VaultsDataKeys::Vault(vault_key), PERSISTENT_BUMP_CONSTANT);
+    env.storage().persistent().bump(
+        &VaultsDataKeys::Vault(vault_key),
+        PERSISTENT_BUMP_CONSTANT_THRESHOLD,
+        PERSISTENT_BUMP_CONSTANT,
+    );
 }
 
 pub fn bump_vault_index(env: &Env, vault_index_key: VaultIndexKey) {
     env.storage().persistent().bump(
         &VaultsDataKeys::VaultIndex(vault_index_key),
+        PERSISTENT_BUMP_CONSTANT_THRESHOLD,
         PERSISTENT_BUMP_CONSTANT,
     );
 }

@@ -6,8 +6,8 @@ use crate::utils::core::{
     set_core_state, set_last_governance_token_distribution_time,
 };
 use crate::utils::deposits::{
-    bump_deposit, bump_depositors, get_deposit, get_depositors, is_depositor_listed, make_deposit,
-    make_withdrawal, remove_deposit, remove_depositor_from_depositors, save_deposit,
+    bump_deposit, bump_depositors, get_deposit, get_depositors, has_deposit, is_depositor_listed,
+    make_deposit, make_withdrawal, remove_deposit, remove_depositor_from_depositors, save_deposit,
     save_depositors, validate_deposit_asset,
 };
 use num_integer::div_floor;
@@ -187,6 +187,7 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         if shares_to_redeem < deposit.shares {
             deposit.shares = deposit.shares - shares_to_redeem;
             save_deposit(&env, &deposit);
+            bump_deposit(&env, caller);
         } else {
             remove_deposit(&env, &caller);
             let mut depositors: Vec<Address> = get_depositors(&env);
@@ -201,14 +202,14 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         }
         set_core_state(&env, &core_state);
 
-        bump_deposit(&env, caller);
-
         bump_depositors(&env);
     }
 
     fn get_deposit(env: Env, caller: Address) -> Deposit {
         bump_instance(&env);
-        bump_deposit(&env, caller.clone());
+        if has_deposit(&env, &caller) {
+            bump_deposit(&env, caller.clone());
+        }
         bump_depositors(&env);
 
         get_deposit(&env, &caller)
