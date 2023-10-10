@@ -18,20 +18,24 @@ pub struct CoreState {
 #[contracttype]
 #[derive(PartialEq, Debug, Clone)]
 pub struct CoreStats {
-    /// total amount of value deposited since inception
+    // The amount of open deposits in the pool
+    pub total_deposits: u128,
+
+    // total amount of value deposited since inception
     pub lifetime_deposited: u128,
     pub current_deposited: u128,
 
-    /// collateral profited since inception (value between the amount paid for and the amount received)
+    // collateral profited since inception (value between the amount paid for and the amount received)
     pub lifetime_profit: u128,
 
-    /// collateral liquidated overtime since inception
+    // collateral liquidated overtime since inception
     pub lifetime_liquidated: u128,
-    pub current_liquidated: u128,
 
-    /// The collateral factor is the value used to keep track of the collateral each depositor
-    /// owns and should be able to withdraw.
-    pub collateral_factor: u128,
+    // Liquidation index if the current index new deposits will save once created
+    pub liquidation_index: u64,
+
+    // The rewards factor is used to calculate the amount of gov tokens a depositor has earned
+    pub rewards_factor: u128,
 
     pub total_shares: u128,
     pub share_price: u128,

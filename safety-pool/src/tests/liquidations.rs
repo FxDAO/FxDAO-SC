@@ -189,8 +189,6 @@ fn test_simple_liquidations_flow() {
     assert_eq!(updated_stats.current_deposited, 80_0000000);
     assert_eq!(updated_stats.lifetime_profit, 545_3925613);
     assert_eq!(updated_stats.lifetime_liquidated, 5727_3037194);
-    assert_eq!(updated_stats.current_liquidated, 5727_3037194);
-    assert_eq!(updated_stats.collateral_factor, 14_3182592);
 
     assert_eq!(
         collateral_token_client.balance(&treasury_contract) + 1,

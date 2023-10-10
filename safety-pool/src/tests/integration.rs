@@ -7,11 +7,13 @@ use num_integer::div_floor;
 use soroban_sdk::arbitrary::std::println;
 use soroban_sdk::iter::UnwrappedEnumerable;
 use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo};
-use soroban_sdk::{symbol_short, vec, Address, Env, Vec};
+use soroban_sdk::{symbol_short, vec, Address, Env, IntoVal, Vec};
 
 use crate::contract::{SafetyPoolContract, SafetyPoolContractClient};
+use crate::errors::SCErrors;
 use crate::storage::core::CoreStats;
 use crate::storage::deposits::Deposit;
+use crate::storage::liquidations::Liquidation;
 
 #[test]
 fn fully_test_complex_liquidations_rewards_flow() {
@@ -124,19 +126,20 @@ fn fully_test_complex_liquidations_rewards_flow() {
     usd_token_client_admin.mint(&depositor_3, &(depositor_3_mint as i128));
     pool_contract_client.deposit(&depositor_3, &depositor_3_mint);
 
-    // assert_eq!(
-    //     pool_contract_client.get_core_stats(),
-    //     CoreStats {
-    //         lifetime_deposited: 16225_0000000,
-    //         current_deposited: 16225_0000000,
-    //         lifetime_profit: 0,
-    //         lifetime_liquidated: 0,
-    //         current_liquidated: 0,
-    //         collateral_factor: 0,
-    //         total_shares: 16225_0000000,
-    //         share_price: 1_0000000,
-    //     }
-    // );
+    assert_eq!(
+        pool_contract_client.get_core_stats(),
+        CoreStats {
+            total_deposits: 3,
+            lifetime_deposited: 16225_0000000,
+            current_deposited: 16225_0000000,
+            lifetime_profit: 0,
+            lifetime_liquidated: 0,
+            liquidation_index: 0,
+            total_shares: 16225_0000000,
+            share_price: 1_0000000,
+            rewards_factor: 0,
+        }
+    );
 
     // Phase 2: We liquidate the vault
 
@@ -146,19 +149,39 @@ fn fully_test_complex_liquidations_rewards_flow() {
     let liquidator_1: Address = Address::random(&env);
     pool_contract_client.liquidate(&liquidator_1);
 
-    // assert_eq!(
-    //     pool_contract_client.get_core_stats(),
-    //     CoreStats {
-    //         lifetime_deposited: 16225_0000000,
-    //         current_deposited: 10725_0000000,
-    //         lifetime_profit: 5749_9555682,
-    //         lifetime_liquidated: 60375_0222159,
-    //         current_liquidated: 60375_0222159,
-    //         collateral_factor: 3_7211107,
-    //         total_shares: 16225_0000000,
-    //         share_price: 0_6610169,
-    //     }
-    // );
+    assert_eq!(
+        pool_contract_client.get_core_stats(),
+        CoreStats {
+            total_deposits: 3,
+            lifetime_deposited: 16225_0000000,
+            current_deposited: 10725_0000000,
+            lifetime_profit: 5749_9555682,
+            lifetime_liquidated: 60375_0222159,
+            liquidation_index: 1,
+            rewards_factor: 0,
+            total_shares: 16225_0000000,
+            share_price: 0_6610169,
+        }
+    );
+
+    let liquidation_1: Liquidation = pool_contract_client
+        .get_liquidations(&(vec![&env, 0u64] as Vec<u64>))
+        .get(0)
+        .unwrap();
+
+    assert_eq!(
+        liquidation_1,
+        Liquidation {
+            index: 0,
+            total_deposits: 3,
+            total_debt_paid: 5500_0000000,
+            total_col_liquidated: 60375_0222159,
+            col_to_withdraw: 60375_0222159,
+            share_price: 1_0000000,
+            total_shares: 16225_0000000,
+            shares_redeemed: 0,
+        }
+    );
 
     // Phase 3: 2 new depositors in the pool
     let depositor_4: Address = Address::random(&env);
@@ -169,19 +192,20 @@ fn fully_test_complex_liquidations_rewards_flow() {
     usd_token_client_admin.mint(&depositor_5, &6000_0000000);
     pool_contract_client.deposit(&depositor_5, &6000_0000000);
 
-    // assert_eq!(
-    //     pool_contract_client.get_core_stats(),
-    //     CoreStats {
-    //         lifetime_deposited: 30225_0000000,
-    //         current_deposited: 24725_0000000,
-    //         lifetime_profit: 5749_9555682,
-    //         lifetime_liquidated: 60375_0222159,
-    //         current_liquidated: 60375_0222159,
-    //         collateral_factor: 3_7211107,
-    //         total_shares: 37404_4887542,
-    //         share_price: 0_6610169,
-    //     }
-    // );
+    assert_eq!(
+        pool_contract_client.get_core_stats(),
+        CoreStats {
+            total_deposits: 5,
+            lifetime_deposited: 30225_0000000,
+            current_deposited: 24725_0000000,
+            lifetime_profit: 5749_9555682,
+            lifetime_liquidated: 60375_0222159,
+            liquidation_index: 1,
+            rewards_factor: 0,
+            total_shares: 37404_4887542,
+            share_price: 0_6610169,
+        }
+    );
 
     // Phase 4: We make another liquidation
 
@@ -209,19 +233,39 @@ fn fully_test_complex_liquidations_rewards_flow() {
     let liquidator_2: Address = Address::random(&env);
     pool_contract_client.liquidate(&liquidator_2);
 
-    // assert_eq!(
-    //     pool_contract_client.get_core_stats(),
-    //     CoreStats {
-    //         lifetime_deposited: 30225_0000000,
-    //         current_deposited: 16725_0000000,
-    //         lifetime_profit: 14113_5273037,
-    //         lifetime_liquidated: 148193_2363482,
-    //         current_liquidated: 148193_2363482,
-    //         collateral_factor: 6_6265933,
-    //         total_shares: 37404_4887542,
-    //         share_price: 0_4471388,
-    //     }
-    // );
+    assert_eq!(
+        pool_contract_client.get_core_stats(),
+        CoreStats {
+            total_deposits: 5,
+            lifetime_deposited: 30225_0000000,
+            current_deposited: 16725_0000000,
+            lifetime_profit: 14113_5273037,
+            lifetime_liquidated: 148193_2363482,
+            liquidation_index: 2,
+            total_shares: 37404_4887542,
+            share_price: 0_4471388,
+            rewards_factor: 0,
+        }
+    );
+
+    let liquidation_2: Liquidation = pool_contract_client
+        .get_liquidations(&(vec![&env, 1u64] as Vec<u64>))
+        .get(0)
+        .unwrap();
+
+    assert_eq!(
+        liquidation_2,
+        Liquidation {
+            index: 1,
+            total_deposits: 5,
+            total_debt_paid: 8000_0000000,
+            total_col_liquidated: 87818_2141323,
+            col_to_withdraw: 87818_2141323,
+            share_price: 0_6610169,
+            total_shares: 37404_4887542,
+            shares_redeemed: 0,
+        }
+    );
 
     vaults_contract_client.set_currency_rate(&usd_token_denomination, &0_1000000);
 
@@ -241,32 +285,63 @@ fn fully_test_complex_liquidations_rewards_flow() {
         max_entry_expiration: u32::MAX,
     });
 
+    // We try to make the first withdraw.
+    let available_claim_error = pool_contract_client
+        .try_withdraw(&depositor_1)
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(
+        &available_claim_error,
+        &SCErrors::CollateralAvailable.into()
+    );
+
+    assert_eq!(xlm_token_client.balance(&depositor_1), 0);
+    pool_contract_client.withdraw_col(&depositor_1);
+    assert_eq!(xlm_token_client.balance(&depositor_1), 30344_5388565);
+
     pool_contract_client.withdraw(&depositor_1);
 
     let depositor_6: Address = Address::random(&env);
     usd_token_client_admin.mint(&depositor_6, &7500_0000000);
     pool_contract_client.deposit(&depositor_6, &7500_0000000);
 
-    // assert_eq!(
-    //     pool_contract_client.get_core_stats(),
-    //     CoreStats {
-    //         lifetime_deposited: 30225_0000000,
-    //         current_deposited: 16725_0000000,
-    //         lifetime_profit: 14113_5273037,
-    //         lifetime_liquidated: 148193_2363482,
-    //         current_liquidated: 148193_2363482,
-    //         collateral_factor: 7_2729090,
-    //         total_shares: 37404_4887542,
-    //         share_price: 0_4471388,
-    //     }
-    // );
+    assert_eq!(
+        pool_contract_client.get_core_stats(),
+        CoreStats {
+            total_deposits: 5,
+            lifetime_deposited: 37725_0000000,
+            current_deposited: 21989_3057616,
+            lifetime_profit: 14113_5273037,
+            lifetime_liquidated: 148193_2363482,
+            liquidation_index: 2,
+            total_shares: 49177_8038858,
+            share_price: 0_4471388,
+            rewards_factor: 0,
+        }
+    );
 
     // Phase 6: Everybody withdraws the funds
 
-    pool_contract_client.withdraw(&depositor_2);
-    pool_contract_client.withdraw(&depositor_3);
-    pool_contract_client.withdraw(&depositor_4);
+    assert_eq!(xlm_token_client.balance(&depositor_5), 0);
+    pool_contract_client.withdraw_col(&depositor_5);
+    assert_eq!(xlm_token_client.balance(&depositor_5), 21310_7885468);
     pool_contract_client.withdraw(&depositor_5);
+
+    assert_eq!(xlm_token_client.balance(&depositor_3), 0);
+    pool_contract_client.withdraw_col(&depositor_3);
+    assert_eq!(xlm_token_client.balance(&depositor_3), 22606_6860860);
+    pool_contract_client.withdraw(&depositor_3);
+
+    assert_eq!(xlm_token_client.balance(&depositor_2), 0);
+    pool_contract_client.withdraw_col(&depositor_2);
+    assert_eq!(xlm_token_client.balance(&depositor_2), 45516_8243402);
+    pool_contract_client.withdraw(&depositor_2);
+
+    assert_eq!(xlm_token_client.balance(&depositor_4), 0);
+    pool_contract_client.withdraw_col(&depositor_4);
+    assert_eq!(xlm_token_client.balance(&depositor_4), 28414_3985187);
+    pool_contract_client.withdraw(&depositor_4);
 
     env.ledger().set(LedgerInfo {
         timestamp: 172801 * 100,
@@ -281,61 +356,21 @@ fn fully_test_complex_liquidations_rewards_flow() {
 
     pool_contract_client.withdraw(&depositor_6);
 
-    for depositor in (vec![
-        &env,
-        depositor_1.clone(),
-        depositor_2.clone(),
-        depositor_3.clone(),
-        depositor_4.clone(),
-        depositor_5.clone(),
-        depositor_6.clone(),
-    ] as Vec<Address>)
-        .iter()
-    {
-        println!(
-            "USD withdrew: {:?} (USD: {:?} and XLM: {:?})",
-            usd_token_client.balance(&depositor)
-                + div_floor(0_1000000 * xlm_token_client.balance(&depositor), 1_0000000),
-            usd_token_client.balance(&depositor),
-            xlm_token_client.balance(&depositor)
-        );
-    }
-
-    /*
-    depositor_1: 5000_0000000 - END with -> 5548_9906500 (USD: 2235_6940000 and XLM: 33132_9665000)
-    depositor_2: 7500_0000000 - END with -> 8323_4859750 (USD: 3353_5410000 and XLM: 49699_4497500)
-    depositor_3: 3725_0000000 - END with -> 4133_9980342 (USD: 1665_5920300 and XLM: 24684_0600425)
-    depositor_4: 8000_0000000 - END with -> 7735_9124721 (USD: 5411_5263921 and XLM: 23243_8608000)
-    depositor_5: 6000_0000000 - END with -> 5801_9343541 (USD: 4058_6447941 and XLM: 17432_8956000)
-    depositor_6: 7500_0000000 - END with -> 7500_0000000 (USD: 7500_0000000 and XLM: 0)
-    */
-
-    // assert_eq!(
-    //     pool_contract_client.get_core_stats(),
-    //     CoreStats {
-    //         lifetime_deposited: 37725_0000000,
-    //         current_deposited: 0,
-    //         lifetime_profit: 6060_6060634,
-    //         lifetime_liquidated: 115530_3030316,
-    //         current_liquidated: 115469_9573372,
-    //         collateral_factor: 4_6881906,
-    //         deposit_factor: 1_0000000,
-    //     }
-    // );
-
     assert_eq!(
-        usd_token_client.balance(&pool_contract_client.address),
-        0_0017838
-    );
-    assert_eq!(
-        xlm_token_client.balance(&pool_contract_client.address),
-        0_0036557
+        pool_contract_client.get_core_stats(),
+        CoreStats {
+            total_deposits: 0,
+            lifetime_deposited: 37725_0000000,
+            current_deposited: 0,
+            lifetime_profit: 14113_5273037,
+            lifetime_liquidated: 148193_2363482,
+            liquidation_index: 2,
+            rewards_factor: 0,
+            total_shares: 0,
+            share_price: 0_4471388,
+        }
     );
 
-    // assert_eq!(xlm_token_client.balance(&depositor_2), 38480_9730000);
-    // assert_eq!(xlm_token_client.balance(&depositor_3), 19112_2165900);
-    // assert_eq!(xlm_token_client.balance(&depositor_4), 18447_5016000);
-    // assert_eq!(xlm_token_client.balance(&depositor_5), 13835_6262000);
-    // assert_eq!(usd_token_client.balance(&depositor_5), 4058_6450793);
-    // assert_eq!(xlm_token_client.balance(&depositor_6), 0);
+    assert_eq!(usd_token_client.balance(&pool_contract_client.address), 0);
+    assert_eq!(xlm_token_client.balance(&pool_contract_client.address), 0);
 }
