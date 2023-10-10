@@ -1,6 +1,7 @@
 use crate::errors::SCErrors;
 use crate::storage::core::{CoreState, CoreStats};
 use crate::storage::deposits::Deposit;
+use crate::storage::liquidations::Liquidation;
 use crate::utils::core::{
     bump_instance, can_init_contract, get_core_state, get_core_stats,
     get_last_governance_token_distribution_time, set_core_state, set_core_stats,
@@ -10,6 +11,9 @@ use crate::utils::deposits::{
     bump_deposit, bump_depositors, get_contract_balance, get_deposit, get_depositors, has_deposit,
     is_depositor_listed, make_deposit, make_withdrawal, remove_deposit,
     remove_depositor_from_depositors, save_deposit, save_depositors,
+};
+use crate::utils::liquidations::{
+    bump_liquidation, check_liquidation_exist, get_liquidation, set_liquidation,
 };
 use crate::vaults;
 use crate::vaults::{Currency, OptionalVaultKey, Vault};
@@ -66,7 +70,11 @@ pub trait SafetyPoolContractTrait {
     // TODO: Improve the logic which distributes the earned collateral
     fn withdraw(env: Env, caller: Address);
 
+    fn withdraw_col(env: Env, caller: Address);
+
     fn liquidate(env: Env, liquidator: Address);
+
+    fn get_liquidations(env: Env, indexes: Vec<u64>) -> Vec<Liquidation>;
 
     // fn last_gov_distribution_time(env: Env) -> u64;
     //
@@ -112,12 +120,13 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         set_core_stats(
             &env,
             &CoreStats {
+                total_deposits: 0,
                 lifetime_deposited: 0,
                 current_deposited: 0,
                 lifetime_profit: 0,
                 lifetime_liquidated: 0,
-                current_liquidated: 0,
-                collateral_factor: 0,
+                liquidation_index: 0,
+                rewards_factor: 0,
                 total_shares: 0,
                 share_price: 1_0000000,
             },
@@ -219,7 +228,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
             last_deposit: env.ledger().timestamp(),
             shares: shares_to_issue,
             share_price_paid: core_stats.share_price,
-            current_collateral_factor: core_stats.collateral_factor,
+            liquidation_index: core_stats.liquidation_index,
         };
         save_deposit(&env, &deposit);
 
@@ -229,6 +238,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
             save_depositors(&env, &depositors)
         }
 
+        core_stats.total_deposits += 1;
         core_stats.lifetime_deposited += amount;
         core_stats.current_deposited += amount;
         core_stats.total_shares += shares_to_issue;
@@ -272,6 +282,10 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
 
         let deposit: Deposit = get_deposit(&env, &caller);
 
+        if deposit.liquidation_index < core_stats.liquidation_index {
+            panic_with_error!(&env, &SCErrors::CollateralAvailable);
+        }
+
         let min_timestamp: u64 = deposit.last_deposit + (3600 * 48);
 
         if env.ledger().timestamp() < min_timestamp {
@@ -282,43 +296,20 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
 
         // We first calculate the amount of stables to withdraw
         let calculated_stable_to_withdraw: u128 = div_floor(
-            // deposit.shares * core_stats.current_deposited,
-            // core_stats.total_shares,
-            deposit.amount * core_stats.share_price,
-            deposit.share_price_paid,
+            deposit.shares * core_stats.current_deposited,
+            core_stats.total_shares,
         );
 
         core_stats.current_deposited -= calculated_stable_to_withdraw;
         core_stats.total_shares -= deposit.shares;
+        core_stats.total_deposits -= 1;
+
         make_withdrawal(
             &env,
             &core_state.deposit_asset,
             &deposit.depositor,
             calculated_stable_to_withdraw as i128,
         );
-
-        // Then we withdraw the collateral
-        let mut calculated_collateral_to_withdraw: u128 = div_floor(
-            // div_floor(
-            deposit.amount * (core_stats.collateral_factor - deposit.current_collateral_factor),
-            // deposit.share_price_paid,
-            1_0000000,
-        );
-        // 1_0000000,
-        // );
-
-        if calculated_collateral_to_withdraw > 0 {
-            if calculated_collateral_to_withdraw > core_stats.current_liquidated {
-                calculated_collateral_to_withdraw = core_stats.current_liquidated;
-            }
-            core_stats.current_liquidated -= calculated_collateral_to_withdraw;
-            make_withdrawal(
-                &env,
-                &core_state.collateral_asset,
-                &deposit.depositor,
-                calculated_collateral_to_withdraw as i128,
-            );
-        }
 
         set_core_stats(&env, &core_stats);
 
@@ -327,6 +318,90 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         save_depositors(&env, &depositors);
 
         bump_depositors(&env);
+    }
+
+    fn withdraw_col(env: Env, caller: Address) {
+        bump_instance(&env);
+        caller.require_auth();
+
+        let core_state: CoreState = get_core_state(&env);
+        let core_stats: CoreStats = get_core_stats(&env);
+
+        if !has_deposit(&env, &caller) {
+            panic_with_error!(&env, &SCErrors::DepositDoesntExist);
+        }
+
+        let mut deposit: Deposit = get_deposit(&env, &caller);
+
+        if deposit.liquidation_index == core_stats.liquidation_index {
+            panic_with_error!(&env, &SCErrors::NoCollateralAvailable);
+        }
+
+        let target_index: u64 = if deposit.liquidation_index + 10 > core_stats.liquidation_index - 1
+        {
+            core_stats.liquidation_index - 1
+        } else {
+            deposit.liquidation_index + 10
+        };
+
+        let mut col_to_withdraw: u128 = 0;
+        let mut total_debt_covered: u128 = 0;
+        let mut current_index: u64 = deposit.liquidation_index.clone();
+        let mut finished: bool = false;
+
+        while !finished {
+            if current_index > target_index {
+                finished = true;
+                break;
+            }
+
+            let mut liquidation: Liquidation = get_liquidation(&env, current_index.clone());
+            let shares_left: u128 = liquidation.total_shares - liquidation.shares_redeemed;
+
+            if shares_left == 0 {
+                // We shouldn't be able to reach this line but just in case we generate an error so we can debug later
+                panic_with_error!(&env, &SCErrors::UnexpectedError);
+            }
+
+            let percentage_of_debt_paid: u128 =
+                div_floor(deposit.shares * 1_0000000, liquidation.total_shares);
+            let percentage_col_owned: u128 = div_floor(deposit.shares * 1_0000000, shares_left);
+
+            let share_of_col_liquidated: u128 = div_floor(
+                liquidation.col_to_withdraw * percentage_col_owned,
+                1_0000000,
+            );
+
+            let share_of_debt_paid: u128 = div_floor(
+                liquidation.total_debt_paid * percentage_of_debt_paid,
+                1_0000000,
+            );
+
+            liquidation.shares_redeemed += deposit.shares;
+            liquidation.col_to_withdraw -= share_of_col_liquidated;
+            set_liquidation(&env, &liquidation);
+
+            col_to_withdraw += share_of_col_liquidated;
+            total_debt_covered += share_of_debt_paid;
+            current_index += 1;
+
+            if total_debt_covered >= deposit.amount
+                || (deposit.amount - total_debt_covered) < 1_0000000
+            {
+                finished = true;
+            }
+        }
+
+        deposit.liquidation_index = core_stats.liquidation_index;
+
+        save_deposit(&env, &deposit);
+
+        make_withdrawal(
+            &env,
+            &core_state.collateral_asset,
+            &deposit.depositor,
+            col_to_withdraw as i128,
+        );
     }
 
     /// The liquidation process goes this way:
@@ -426,22 +501,57 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         }
 
         let end_collateral: u128 = total_collateral_received - shareable_profit;
-        core_stats.collateral_factor +=
-            div_floor(end_collateral * 1_0000000, core_stats.lifetime_deposited);
+
+        // We set a record of the liquidation
+        set_liquidation(
+            &env,
+            &Liquidation {
+                index: core_stats.liquidation_index,
+                total_deposits: core_stats.total_deposits,
+                total_debt_paid,
+                total_col_liquidated: end_collateral,
+                col_to_withdraw: end_collateral,
+                share_price: core_stats.share_price,
+                total_shares: core_stats.total_shares,
+                shares_redeemed: 0,
+            },
+        );
+
+        bump_liquidation(&env, core_stats.liquidation_index);
 
         let new_total_deposited: u128 = core_stats.current_deposited - total_debt_paid;
+
         core_stats.share_price = div_floor(
             new_total_deposited * core_stats.share_price,
             core_stats.current_deposited,
         );
-
         core_stats.current_deposited -= total_debt_paid;
         core_stats.lifetime_profit += collateral_gained;
         core_stats.lifetime_liquidated += end_collateral;
-        core_stats.current_liquidated += end_collateral;
+        core_stats.liquidation_index += 1;
 
         set_core_stats(&env, &core_stats);
         bump_depositors(&env);
+    }
+
+    fn get_liquidations(env: Env, indexes: Vec<u64>) -> Vec<Liquidation> {
+        bump_instance(&env);
+
+        if indexes.len() > 10 {
+            panic_with_error!(&env, &SCErrors::CantGetMoreThanTenLiquidations);
+        }
+
+        let mut liquidations: Vec<Liquidation> = vec![&env] as Vec<Liquidation>;
+        for index in indexes.iter() {
+            if check_liquidation_exist(&env, index.clone()) {
+                bump_liquidation(&env, index.clone());
+                liquidations.push_back(get_liquidation(&env, index));
+            } else {
+                panic_with_error!(&env, &SCErrors::LiquidationDoesntExist);
+            }
+        }
+
+        liquidations
     }
 
     // fn last_gov_distribution_time(env: Env) -> u64 {

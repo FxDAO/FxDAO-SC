@@ -9,25 +9,15 @@ test-optimized: build-optimized
 	cargo test --features testutils
 
 build:
-	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package vaults
-	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package safety-pool
-	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package governance
-	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package stable-liquidity-pool
-	cd target/wasm32-unknown-unknown/release/ && \
-		for i in *.wasm ; do \
-			ls -l "$$i"; \
-		done
+	soroban contract build --package vaults
+	soroban contract build
 
 build-optimized:
-	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p vaults
-	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p safety-pool
-	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p governance
-	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p stable-liquidity-pool
-	cd target/wasm32-unknown-unknown/release/ && \
-		for i in *.wasm ; do \
-			wasm-opt -Oz "$$i" -o "$$i.tmp" && mv "$$i.tmp" "$$i"; \
-			ls -l "$$i"; \
-		done
+	soroban contract build --package vaults
+	soroban contract build
+	soroban contract optimize --wasm ./target/wasm32-unknown-unknown/release/vaults.wasm --wasm-out ./target/wasm32-unknown-unknown/release/vaults.wasm
+	soroban contract optimize --wasm ./target/wasm32-unknown-unknown/release/safety_pool.wasm --wasm-out ./target/wasm32-unknown-unknown/release/safety_pool.wasm
+	soroban contract optimize --wasm ./target/wasm32-unknown-unknown/release/stable_liquidity_pool.wasm --wasm-out ./target/wasm32-unknown-unknown/release/stable_liquidity_pool.wasm
 
 watch:
 	cargo watch --clear --watch-when-idle --shell '$(MAKE)'

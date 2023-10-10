@@ -3,6 +3,8 @@ use soroban_sdk::contracterror;
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum SCErrors {
+    UnexpectedError = 9,
+
     // Core Errors
     ContractAlreadyInitiated = 10001,
 
@@ -15,6 +17,10 @@ pub enum SCErrors {
 
     // Liquidations
     CantLiquidateVaults = 30000,
+    LiquidationDoesntExist = 31000,
+    CantGetMoreThanTenLiquidations = 32000,
+    NoCollateralAvailable = 35000,
+    CollateralAvailable = 36000,
 
     // Distributions
     RecentDistribution = 40000,

@@ -31,16 +31,15 @@ fn test_deposit_funds() {
             .mint(&depositor, &mint_amount);
     }
 
-    // TODO: FIX THIS ONE SOROBAN FIX IT
-    // let invalid_amount_error_result = test_data
-    //     .contract_client
-    //     .try_deposit(&depositor_1, &100000000)
-    //     .unwrap_err();
+    let invalid_amount_error_result = test_data
+        .contract_client
+        .try_deposit(&depositor_1, &100000000)
+        .unwrap_err();
 
-    // assert_eq!(
-    //     invalid_amount_error_result.unwrap(),
-    //     SCErrors::BelowMinDeposit.into(),
-    // );
+    assert_eq!(
+        invalid_amount_error_result.unwrap(),
+        SCErrors::BelowMinDeposit.into(),
+    );
 
     let mut counter: u64 = 0;
     for depositor in [&depositor_1, &depositor_2, &depositor_3] {
@@ -109,17 +108,16 @@ fn test_deposit_funds() {
 
     // Confirm you can't deposit twice
     for depositor in [&depositor_1, &depositor_2, &depositor_3] {
-        // TODO: FIX THIS ONCE SOROBAN FIX IT
-        // let cant_deposit_twice_error = test_data
-        //     .contract_client
-        //     .try_deposit(&depositor, &5000000000)
-        //     .unwrap_err()
-        //     .unwrap();
-        //
-        // assert_eq!(
-        //     cant_deposit_twice_error,
-        //     SCErrors::DepositAlreadyCreated.into()
-        // );
+        let cant_deposit_twice_error = test_data
+            .contract_client
+            .try_deposit(&depositor, &5000000000)
+            .unwrap_err()
+            .unwrap();
+
+        assert_eq!(
+            cant_deposit_twice_error,
+            SCErrors::DepositAlreadyCreated.into()
+        );
     }
 
     let mut depositors: Vec<Address> = test_data.contract_client.get_depositors();
@@ -133,14 +131,13 @@ fn test_deposit_funds() {
     );
     assert_eq!(depositors, target_depositors_value);
 
-    // TODO: FIX THIS ONCE SOROBAN FIX IT
-    // let error_lock_period = test_data
-    //     .contract_client
-    //     .try_withdraw(&depositor_1)
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(error_lock_period, SCErrors::LockedPeriodUncompleted.into());
+    let error_lock_period = test_data
+        .contract_client
+        .try_withdraw(&depositor_1)
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(error_lock_period, SCErrors::LockedPeriodUncompleted.into());
 
     // We increase the timestamp to comply with
     env.ledger().set(LedgerInfo {
@@ -180,13 +177,12 @@ fn test_deposit_funds() {
         assert_eq!(depositors, updated_depositors);
 
         // Check that the deposit gets updated (value is zero)
-        // TODO: UPDATE THIS ONCE SOROBAN FIX IT
-        // let no_deposit_error = test_data
-        //     .contract_client
-        //     .try_get_deposit(&address)
-        //     .unwrap_err()
-        //     .unwrap();
-        // assert_eq!(no_deposit_error, SCErrors::DepositDoesntExist.into());
+        let no_deposit_error = test_data
+            .contract_client
+            .try_get_deposit(&address)
+            .unwrap_err()
+            .unwrap();
+        assert_eq!(no_deposit_error, SCErrors::DepositDoesntExist.into());
 
         // We check the depositor got all its funds
         assert_eq!(
@@ -195,16 +191,15 @@ fn test_deposit_funds() {
         );
 
         // Test that if the user already withdrew its fund it should fail if try again
-        // TODO: UPDATE THIS ONCE SOROBAN FIX IT
-        // let already_withdrew_error_result = test_data
-        //     .contract_client
-        //     .try_withdraw(&depositor_1)
-        //     .unwrap_err();
+        let already_withdrew_error_result = test_data
+            .contract_client
+            .try_withdraw(&depositor_1)
+            .unwrap_err();
 
-        // assert_eq!(
-        //     already_withdrew_error_result.unwrap(),
-        //     SCErrors::NothingToWithdraw.into(),
-        // );
+        assert_eq!(
+            already_withdrew_error_result.unwrap(),
+            SCErrors::DepositDoesntExist.into(),
+        );
     }
 
     // we confirm the contract balance gets drained
@@ -223,6 +218,4 @@ fn test_deposit_funds() {
     assert_eq!(final_stats.current_deposited, 0);
     assert_eq!(final_stats.lifetime_profit, 0);
     assert_eq!(final_stats.lifetime_liquidated, 0);
-    assert_eq!(final_stats.current_liquidated, 0);
-    assert_eq!(final_stats.collateral_factor, 0);
 }
