@@ -4,8 +4,8 @@ use soroban_sdk::contracterror;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum SCErrors {
+    UnexpectedError = 500,
     CoreAlreadySet = 10000,
-    // Unauthorized = 10000,
     VaultsInfoHasNotStarted = 20000,
     ThereAreNoVaults = 20001,
     InvalidMinDebtAmount = 30000,

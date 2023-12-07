@@ -1,5 +1,6 @@
-pub const INSTANCE_BUMP_CONSTANT: u32 = 507904;
-pub const INSTANCE_BUMP_CONSTANT_THRESHOLD: u32 = 253952;
+pub const DAY_IN_LEDGERS: u32 = 17280;
+pub const INSTANCE_BUMP_CONSTANT: u32 = DAY_IN_LEDGERS * 28;
+pub const INSTANCE_BUMP_CONSTANT_THRESHOLD: u32 = DAY_IN_LEDGERS * 14;
 
 use crate::storage::core::{CoreDataKeys, CoreState};
 use soroban_sdk::Env;

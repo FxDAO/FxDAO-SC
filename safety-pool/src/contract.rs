@@ -18,9 +18,10 @@ use crate::utils::liquidations::{
 use crate::vaults;
 use crate::vaults::{Currency, OptionalVaultKey, Vault};
 use num_integer::div_floor;
+use soroban_sdk::auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation};
 use soroban_sdk::{
     contract, contractimpl, panic_with_error, symbol_short, token, vec, Address, BytesN, Env,
-    Symbol, Vec,
+    IntoVal, Symbol, Val, Vec,
 };
 use token::Client as TokenClient;
 
@@ -444,7 +445,23 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
             panic_with_error!(&env, SCErrors::CantLiquidateVaults);
         }
 
-        env.current_contract_address().require_auth();
+        env.authorize_as_current_contract(vec![
+            &env,
+            InvokerContractAuthEntry::Contract(SubContractInvocation {
+                context: ContractContext {
+                    contract: core_state.deposit_asset.clone(),
+                    fn_name: symbol_short!("transfer"),
+                    args: (
+                        env.current_contract_address(),
+                        core_state.vaults_contract.clone(),
+                        total_debt_to_pay.clone() as i128,
+                    )
+                        .into_val(&env),
+                },
+                sub_invocations: vec![&env] as Vec<InvokerContractAuthEntry>,
+            }),
+        ] as Vec<InvokerContractAuthEntry>);
+
         let vaults_liquidated: Vec<Vault> = vaults::Client::new(&env, &core_state.vaults_contract)
             .liquidate(
                 &env.current_contract_address(),

@@ -101,7 +101,7 @@ pub trait VaultsContractTrait {
         prev_key: OptionalVaultKey,
         vault_key: VaultKey,
         new_prev_key: OptionalVaultKey,
-        deposit_amount: u128,
+        amount: u128,
     );
 
     /// Redeeming
@@ -402,6 +402,10 @@ impl VaultsContractTrait for VaultsContract {
         let currency: Currency = get_currency(&env, &denomination);
         let vaults_info: VaultsInfo = get_vaults_info(&env, &denomination);
 
+        if OptionalVaultKey::None == prev_key && OptionalVaultKey::None == vaults_info.lowest_key {
+            return vec![&env] as Vec<Vault>;
+        }
+
         get_vaults(
             &env,
             &prev_key,
@@ -584,7 +588,7 @@ impl VaultsContractTrait for VaultsContract {
         prev_key: OptionalVaultKey,
         vault_key: VaultKey,
         new_prev_key: OptionalVaultKey,
-        deposit_amount: u128,
+        amount: u128,
     ) {
         bump_instance(&env);
         vault_key.account.require_auth();
@@ -616,7 +620,7 @@ impl VaultsContractTrait for VaultsContract {
 
         let currency: Currency = get_currency(&env, &target_vault.denomination);
 
-        if deposit_amount > target_vault.total_debt {
+        if amount > target_vault.total_debt {
             panic_with_error!(&env, SCErrors::DepositAmountIsMoreThanTotalDebt);
         }
 
@@ -627,10 +631,10 @@ impl VaultsContractTrait for VaultsContract {
             &core_state,
             &currency,
             &target_vault.account,
-            deposit_amount as i128,
+            amount as i128,
         );
 
-        if target_vault.total_debt == deposit_amount {
+        if target_vault.total_debt == amount {
             // If the amount is equal to the debt it means it is paid in full so we release the collateral and remove the vault
 
             // If new_prev_key is not None, we panic because we are removing the vault
@@ -656,7 +660,7 @@ impl VaultsContractTrait for VaultsContract {
             }
         } else {
             // If amount is not enough to pay all the debt, we check the debt value is not lower than the minimum and if is ok we just updated the stats of the user's vault
-            let new_vault_debt: u128 = target_vault.total_debt - deposit_amount;
+            let new_vault_debt: u128 = target_vault.total_debt - amount;
             if new_vault_debt < vaults_info.min_debt_creation {
                 panic_with_error!(&env, &SCErrors::InvalidMinDebtAmount);
             }
@@ -691,7 +695,7 @@ impl VaultsContractTrait for VaultsContract {
             bump_vault_index(&env, updated_target_vault_index_key);
         }
 
-        vaults_info.total_debt = vaults_info.total_debt - deposit_amount;
+        vaults_info.total_debt = vaults_info.total_debt - amount;
         set_vaults_info(&env, &vaults_info);
     }
 

@@ -13,8 +13,9 @@ use crate::utils::currencies::get_currency;
 use num_integer::div_floor;
 use soroban_sdk::{panic_with_error, vec, Address, Env, Symbol, Vec};
 
-pub const PERSISTENT_BUMP_CONSTANT: u32 = 1036800;
-pub const PERSISTENT_BUMP_CONSTANT_THRESHOLD: u32 = 518400;
+pub const DAY_IN_LEDGERS: u32 = 17280;
+pub const PERSISTENT_BUMP_CONSTANT: u32 = DAY_IN_LEDGERS * 28;
+pub const PERSISTENT_BUMP_CONSTANT_THRESHOLD: u32 = DAY_IN_LEDGERS * 14;
 
 pub fn bump_vault(env: &Env, vault_key: VaultKey) {
     env.storage().persistent().bump(
@@ -86,8 +87,8 @@ pub fn create_and_insert_vault(
 
         // Case 2: If the lowest key exists, it means the list is not empty and we need to consider some scenarios
         OptionalVaultKey::Some(current_lowest_key) => {
-            if new_vault_key.index < current_lowest_key.index {
-                // Case 2.1: If new index is lower than the lowest index, we continue like if the list was empty but using the old lowest as the next value for the new Vault
+            if new_vault_key.index <= current_lowest_key.index {
+                // Case 2.1: If new index is lower or equal than the lowest index, we continue like if the list was empty but using the old lowest as the next value for the new Vault
                 new_vault_next_key = OptionalVaultKey::Some(current_lowest_key);
                 updated_lowest_key = OptionalVaultKey::Some(new_vault_key.clone());
             } else {
@@ -205,7 +206,8 @@ pub fn get_vaults(
     } else {
         target_key = match vaults_info.lowest_key.clone() {
             OptionalVaultKey::None => {
-                panic_with_error!(&env, &SCErrors::NotEnoughVaultsToLiquidate);
+                // We can not pass a OptionalVaultKey::None to this function
+                panic_with_error!(&env, &SCErrors::UnexpectedError);
             }
             OptionalVaultKey::Some(key) => key,
         };
@@ -240,7 +242,7 @@ pub fn get_redeemable_vaults(
 
     let mut target_key: VaultKey = match vaults_info.lowest_key.clone() {
         OptionalVaultKey::None => {
-            panic_with_error!(&env, &SCErrors::NotEnoughVaultsToLiquidate);
+            panic_with_error!(&env, &SCErrors::UnexpectedError);
         }
         OptionalVaultKey::Some(key) => key,
     };

@@ -703,7 +703,11 @@ fn test_increase_collateral() {
     // );
 
     data.contract_client.increase_collateral(
-        &OptionalVaultKey::None,
+        &OptionalVaultKey::Some(VaultKey {
+            index: vault_3.index.clone(),
+            account: vault_3.account.clone(),
+            denomination: vault_3.denomination.clone(),
+        }),
         &VaultKey {
             index: vault_2.index.clone(),
             account: vault_2.account.clone(),

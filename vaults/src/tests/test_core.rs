@@ -33,19 +33,18 @@ fn test_init() {
     assert_eq!(&core_state.stable_issuer, &data.stable_token_issuer);
     assert_eq!(&core_state.panic_mode, &false);
 
-    // TODO: UPDATE THIS ONCE SOROBAN FIX IT
-    // let init_error = data
-    //     .contract_client
-    //     .try_init(
-    //         &data.contract_admin,
-    //         &data.oracle_admin,
-    //         &data.protocol_manager,
-    //         &data.collateral_token_client.address,
-    //         &data.stable_token_issuer,
-    //     )
-    //     .unwrap_err();
-    //
-    // assert_eq!(init_error.unwrap(), SCErrors::CoreAlreadySet.into());
+    let init_error = data
+        .contract_client
+        .try_init(
+            &data.contract_admin,
+            &data.oracle_admin,
+            &data.protocol_manager,
+            &data.collateral_token_client.address,
+            &data.stable_token_issuer,
+        )
+        .unwrap_err();
+
+    assert_eq!(init_error.unwrap(), SCErrors::CoreAlreadySet.into());
 }
 
 #[test]
