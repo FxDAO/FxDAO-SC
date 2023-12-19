@@ -14,7 +14,7 @@ pub const INDEXES_BUMP_CONSTANT: u32 = 120960;
 //     {
 //         env.storage()
 //             .persistent()
-//             .bump(vaults_data_types_with_index_key, INDEXES_BUMP_CONSTANT);
+//             .extend_ttl(vaults_data_types_with_index_key, INDEXES_BUMP_CONSTANT);
 //     }
 // }
 //
@@ -25,7 +25,7 @@ pub const INDEXES_BUMP_CONSTANT: u32 = 120960;
 //     if env.storage().persistent().has(vaults_indexes_list_key) {
 //         env.storage()
 //             .persistent()
-//             .bump(vaults_indexes_list_key, INDEXES_BUMP_CONSTANT);
+//             .extend_ttl(vaults_indexes_list_key, INDEXES_BUMP_CONSTANT);
 //     }
 // }
 //

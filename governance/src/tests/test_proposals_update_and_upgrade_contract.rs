@@ -62,17 +62,17 @@ struct TestData<'a> {
 }
 
 fn create_test_data(env: &Env) -> TestData {
-    let governance_contract_admin: Address = Address::random(&env);
+    let governance_contract_admin: Address = Address::generate(&env);
 
-    let collateral_token_admin: Address = Address::random(&env);
+    let collateral_token_admin: Address = Address::generate(&env);
     let (collateral_token_client, collateral_token_admin_client) =
         create_token_contract(&env, &collateral_token_admin);
 
-    let governance_token_admin: Address = Address::random(&env);
+    let governance_token_admin: Address = Address::generate(&env);
     let (governance_token_client, governance_token_admin_client) =
         create_token_contract(&env, &governance_token_admin);
 
-    let stablecoin_issuer_admin: Address = Address::random(&env);
+    let stablecoin_issuer_admin: Address = Address::generate(&env);
     let (usd_stable_token_client, usd_stable_token_admin_client) =
         create_token_contract(&env, &stablecoin_issuer_admin);
     let (eur_stable_token_client, eur_stable_token_admin_client) =
@@ -127,7 +127,7 @@ fn create_test_data(env: &Env) -> TestData {
     ]
         as Map<Address, Vec<Symbol>>;
 
-    let treasury_contract_address: Address = Address::random(&env);
+    let treasury_contract_address: Address = Address::generate(&env);
 
     TestData {
         governance_contract_admin,
@@ -266,13 +266,13 @@ pub fn test_create_update_proposal_wrong_params() {
     let test_data: TestData = create_test_data(&env);
     setup_contracts(&env, &test_data);
 
-    let proposer = Address::random(&env);
+    let proposer = Address::generate(&env);
     let voting_time: u64 = 3600 * 24 * 7;
 
     let no_options_error = test_data
         .governance_contract_client
         .try_create_proposal(
-            &BytesN::random(&env),
+            &BytesN::generate(&env),
             &ProposalType::UpdateContract,
             &(vec![
                 &env,
@@ -296,7 +296,7 @@ pub fn test_create_update_proposal_wrong_params() {
     let wrong_contract_error = test_data
         .governance_contract_client
         .try_create_proposal(
-            &BytesN::random(&env),
+            &BytesN::generate(&env),
             &ProposalType::UpdateContract,
             &(vec![
                 &env,
@@ -312,7 +312,7 @@ pub fn test_create_update_proposal_wrong_params() {
                 update_contract: UpdateContractProposalOption::Some(UpdateContractProposalParams {
                     params: vec![&env] as Vec<Val>,
                     function_name: Symbol::new(&env, "set_vault_conditions"),
-                    contract_id: Address::random(&env),
+                    contract_id: Address::generate(&env),
                 }),
             },
         )
@@ -327,7 +327,7 @@ pub fn test_create_update_proposal_wrong_params() {
     let wrong_function_name_error = test_data
         .governance_contract_client
         .try_create_proposal(
-            &BytesN::random(&env),
+            &BytesN::generate(&env),
             &ProposalType::UpdateContract,
             &(vec![
                 &env,
@@ -364,7 +364,7 @@ pub fn test_update_proposal_flow() {
     let test_data: TestData = create_test_data(&env);
     setup_contracts(&env, &test_data);
 
-    let proposer = Address::random(&env);
+    let proposer = Address::generate(&env);
 
     let proposers: Vec<ProposerStat> = vec![
         &env,
@@ -375,7 +375,7 @@ pub fn test_update_proposal_flow() {
     ] as Vec<ProposerStat>;
     let voting_time: u64 = 3600 * 24 * 7;
 
-    let voter: Address = Address::random(&env);
+    let voter: Address = Address::generate(&env);
 
     test_data
         .governance_token_admin_client
@@ -385,7 +385,7 @@ pub fn test_update_proposal_flow() {
         .governance_token_admin_client
         .mint(&voter, &(test_data.governance_proposals_fee as i128));
 
-    let proposal_id: BytesN<32> = BytesN::random(&env);
+    let proposal_id: BytesN<32> = BytesN::generate(&env);
     let usd_pool_core_state = test_data.usd_safety_pool_contract_client.get_core_state();
 
     assert_eq!(
@@ -428,12 +428,12 @@ pub fn test_update_proposal_flow() {
     env.ledger().set(LedgerInfo {
         timestamp: env.ledger().timestamp() + voting_time + 1,
         protocol_version: 1,
-        sequence_number: 10,
+        sequence_number: env.ledger().sequence(),
         network_id: Default::default(),
         base_reserve: 10,
-        min_temp_entry_expiration: 0,
-        min_persistent_entry_expiration: 0,
-        max_entry_expiration: u32::MAX,
+        min_temp_entry_ttl: 1,
+        min_persistent_entry_ttl: 1,
+        max_entry_ttl: u32::MAX,
     });
 
     test_data
@@ -443,12 +443,12 @@ pub fn test_update_proposal_flow() {
     env.ledger().set(LedgerInfo {
         timestamp: env.ledger().timestamp() + test_data.governance_cooldown_period,
         protocol_version: 1,
-        sequence_number: 10,
+        sequence_number: env.ledger().sequence(),
         network_id: Default::default(),
         base_reserve: 10,
-        min_temp_entry_expiration: 0,
-        min_persistent_entry_expiration: 0,
-        max_entry_expiration: u32::MAX,
+        min_temp_entry_ttl: 1,
+        min_persistent_entry_ttl: 1,
+        max_entry_ttl: u32::MAX,
     });
 
     test_data
@@ -470,7 +470,7 @@ pub fn test_create_upgrade_proposal_flow_wrong_params() {
     let test_data: TestData = create_test_data(&env);
     setup_contracts(&env, &test_data);
 
-    let proposer = Address::random(&env);
+    let proposer = Address::generate(&env);
 
     test_data
         .governance_token_admin_client
@@ -480,7 +480,7 @@ pub fn test_create_upgrade_proposal_flow_wrong_params() {
     let invalid_time_error = test_data
         .governance_contract_client
         .try_create_proposal(
-            &BytesN::random(&env),
+            &BytesN::generate(&env),
             &ProposalType::UpgradeContract,
             &(vec![
                 &env,
@@ -505,7 +505,7 @@ pub fn test_create_upgrade_proposal_flow_wrong_params() {
     let invalid_admin_time_error = test_data
         .governance_contract_client
         .try_create_proposal(
-            &BytesN::random(&env),
+            &BytesN::generate(&env),
             &ProposalType::UpgradeContract,
             &(vec![
                 &env,
@@ -533,7 +533,7 @@ pub fn test_create_upgrade_proposal_flow_wrong_params() {
     let invalid_target_contract = test_data
         .governance_contract_client
         .try_create_proposal(
-            &BytesN::random(&env),
+            &BytesN::generate(&env),
             &ProposalType::UpgradeContract,
             &(vec![
                 &env,
@@ -546,8 +546,8 @@ pub fn test_create_upgrade_proposal_flow_wrong_params() {
             &ProposalExecutionParams {
                 upgrade_contract: UpgradeContractProposalOption::Some(
                     UpgradeContractProposalParams {
-                        contract_id: Address::random(&env),
-                        new_contract_hash: BytesN::random(&env),
+                        contract_id: Address::generate(&env),
+                        new_contract_hash: BytesN::generate(&env),
                     },
                 ),
                 treasury_payment: TreasuryPaymentProposalOption::None,
@@ -571,8 +571,8 @@ pub fn test_upgrade_proposal_flow() {
     let test_data = create_test_data(&env);
     setup_contracts(&env, &test_data);
 
-    let proposer: Address = Address::random(&env);
-    let voter: Address = Address::random(&env);
+    let proposer: Address = Address::generate(&env);
+    let voter: Address = Address::generate(&env);
 
     test_data
         .governance_token_admin_client
@@ -585,7 +585,7 @@ pub fn test_upgrade_proposal_flow() {
     // We create a new governance contract instance, we will update the safety pool with this one
     let new_wasm = env.deployer().upload_contract_wasm(safety_pool::WASM);
 
-    let proposal_id: BytesN<32> = BytesN::random(&env);
+    let proposal_id: BytesN<32> = BytesN::generate(&env);
     test_data.governance_contract_client.create_proposal(
         &proposal_id,
         &ProposalType::UpgradeContract,
@@ -617,12 +617,12 @@ pub fn test_upgrade_proposal_flow() {
     env.ledger().set(LedgerInfo {
         timestamp: env.ledger().timestamp() + (3600 * 24 * 16),
         protocol_version: 1,
-        sequence_number: 10,
+        sequence_number: env.ledger().sequence(),
         network_id: Default::default(),
         base_reserve: 10,
-        min_temp_entry_expiration: 0,
-        min_persistent_entry_expiration: 0,
-        max_entry_expiration: u32::MAX,
+        min_temp_entry_ttl: 1,
+        min_persistent_entry_ttl: 1,
+        max_entry_ttl: u32::MAX,
     });
 
     test_data
@@ -632,12 +632,12 @@ pub fn test_upgrade_proposal_flow() {
     env.ledger().set(LedgerInfo {
         timestamp: env.ledger().timestamp() + test_data.governance_cooldown_period + 1,
         protocol_version: 1,
-        sequence_number: 10,
+        sequence_number: env.ledger().sequence(),
         network_id: Default::default(),
         base_reserve: 10,
-        min_temp_entry_expiration: 0,
-        min_persistent_entry_expiration: 0,
-        max_entry_expiration: u32::MAX,
+        min_temp_entry_ttl: 1,
+        min_persistent_entry_ttl: 1,
+        max_entry_ttl: u32::MAX,
     });
 
     test_data

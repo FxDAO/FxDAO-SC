@@ -4,7 +4,6 @@ use crate::tests::utils::{create_test_data, create_token_contract, init_contract
 use crate::vaults;
 use crate::vaults::{OptionalVaultKey, VaultKey};
 use num_integer::div_floor;
-use soroban_sdk::arbitrary::std::println;
 use soroban_sdk::iter::UnwrappedEnumerable;
 use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo};
 use soroban_sdk::{symbol_short, vec, Address, Env, IntoVal, Vec};
@@ -24,24 +23,24 @@ fn fully_test_complex_liquidations_rewards_flow() {
     let test_data: TestData = create_test_data(&env);
     init_contract(&test_data);
 
-    let treasury_contract: Address = Address::random(&env);
+    let treasury_contract: Address = Address::generate(&env);
 
-    let governance_token_admin: Address = Address::random(&env);
+    let governance_token_admin: Address = Address::generate(&env);
     let (governance_token_client, governance_token_client_admin) =
         create_token_contract(&env, &governance_token_admin);
 
     // Register and start vaults' contract
     let currency_price: u128 = 1_0958840;
-    let xlm_token_admin: Address = Address::random(&env);
+    let xlm_token_admin: Address = Address::generate(&env);
     let (xlm_token_client, xlm_token_client_admin) = create_token_contract(&env, &xlm_token_admin);
 
-    let usd_token_admin: Address = Address::random(&env);
+    let usd_token_admin: Address = Address::generate(&env);
     let (usd_token_client, usd_token_client_admin) = create_token_contract(&env, &usd_token_admin);
     let usd_token_denomination = symbol_short!("usd");
 
     let vaults_contract_address: Address = env.register_contract_wasm(None, vaults::WASM);
     let vaults_contract_client = vaults::Client::new(&env, &vaults_contract_address);
-    let vaults_contract_admin: Address = Address::random(&env);
+    let vaults_contract_admin: Address = Address::generate(&env);
     let min_collateral_rate: u128 = 1_1000000;
     let opening_debt_amount: u128 = 1_0000000;
     let opening_collateral_rate: u128 = 1_1500000;
@@ -79,7 +78,7 @@ fn fully_test_complex_liquidations_rewards_flow() {
     // Register the pool contract
     let pool_contract_id: Address = env.register_contract(None, SafetyPoolContract);
     let pool_contract_client = SafetyPoolContractClient::new(&env, &pool_contract_id);
-    let pool_contract_admin: Address = Address::random(&env);
+    let pool_contract_admin: Address = Address::generate(&env);
     let min_pool_deposit: u128 = 100_0000000;
     let profit_share: Vec<u32> = vec![&env, 1u32, 2u32] as Vec<u32>;
     let liquidator_share: Vec<u32> = vec![&env, 1u32, 2u32] as Vec<u32>;
@@ -98,7 +97,7 @@ fn fully_test_complex_liquidations_rewards_flow() {
     );
 
     // We create the first vault depositor
-    let vault_depositor_1: Address = Address::random(&env);
+    let vault_depositor_1: Address = Address::generate(&env);
     xlm_token_client_admin.mint(&vault_depositor_1, &63250_0000000);
     usd_token_client_admin.mint(&vault_depositor_1, &5500_0000000);
 
@@ -111,17 +110,17 @@ fn fully_test_complex_liquidations_rewards_flow() {
     );
 
     // Phase 1: 3 depositors with different values each
-    let depositor_1: Address = Address::random(&env);
+    let depositor_1: Address = Address::generate(&env);
     let depositor_1_mint: u128 = 5000_0000000;
     usd_token_client_admin.mint(&depositor_1, &(depositor_1_mint as i128));
     pool_contract_client.deposit(&depositor_1, &depositor_1_mint);
 
-    let depositor_2: Address = Address::random(&env);
+    let depositor_2: Address = Address::generate(&env);
     let depositor_2_mint: u128 = 7500_0000000;
     usd_token_client_admin.mint(&depositor_2, &(depositor_2_mint as i128));
     pool_contract_client.deposit(&depositor_2, &depositor_2_mint);
 
-    let depositor_3: Address = Address::random(&env);
+    let depositor_3: Address = Address::generate(&env);
     let depositor_3_mint: u128 = 3725_0000000;
     usd_token_client_admin.mint(&depositor_3, &(depositor_3_mint as i128));
     pool_contract_client.deposit(&depositor_3, &depositor_3_mint);
@@ -146,7 +145,7 @@ fn fully_test_complex_liquidations_rewards_flow() {
     // We drop the collateral price so it can be liquidated
     vaults_contract_client.set_currency_rate(&usd_token_denomination, &0_0956521);
 
-    let liquidator_1: Address = Address::random(&env);
+    let liquidator_1: Address = Address::generate(&env);
     pool_contract_client.liquidate(&liquidator_1);
 
     assert_eq!(
@@ -184,11 +183,11 @@ fn fully_test_complex_liquidations_rewards_flow() {
     );
 
     // Phase 3: 2 new depositors in the pool
-    let depositor_4: Address = Address::random(&env);
+    let depositor_4: Address = Address::generate(&env);
     usd_token_client_admin.mint(&depositor_4, &8000_0000000);
     pool_contract_client.deposit(&depositor_4, &8000_0000000);
 
-    let depositor_5: Address = Address::random(&env);
+    let depositor_5: Address = Address::generate(&env);
     usd_token_client_admin.mint(&depositor_5, &6000_0000000);
     pool_contract_client.deposit(&depositor_5, &6000_0000000);
 
@@ -212,7 +211,7 @@ fn fully_test_complex_liquidations_rewards_flow() {
     // First let's set the new currency price (this time we want to have a profit from the liquidation)
     vaults_contract_client.set_currency_rate(&usd_token_denomination, &0_1000000);
 
-    let vault_depositor_2: Address = Address::random(&env);
+    let vault_depositor_2: Address = Address::generate(&env);
     let vault_depositor_2_debt: u128 = 8000_0000000;
     let vault_depositor_2_collateral: u128 = 92000_0000000;
     xlm_token_client_admin.mint(&vault_depositor_2, &(vault_depositor_2_collateral as i128));
@@ -230,7 +229,7 @@ fn fully_test_complex_liquidations_rewards_flow() {
     vaults_contract_client.set_currency_rate(&usd_token_denomination, &0_0956521);
 
     // We liquidate the second vault
-    let liquidator_2: Address = Address::random(&env);
+    let liquidator_2: Address = Address::generate(&env);
     pool_contract_client.liquidate(&liquidator_2);
 
     assert_eq!(
@@ -277,12 +276,12 @@ fn fully_test_complex_liquidations_rewards_flow() {
     env.ledger().set(LedgerInfo {
         timestamp: 172801,
         protocol_version: 1,
-        sequence_number: 10,
+        sequence_number: env.ledger().sequence(),
         network_id: Default::default(),
         base_reserve: 10,
-        min_temp_entry_expiration: 0,
-        min_persistent_entry_expiration: 0,
-        max_entry_expiration: u32::MAX,
+        min_temp_entry_ttl: 1,
+        min_persistent_entry_ttl: 1,
+        max_entry_ttl: u32::MAX,
     });
 
     // We try to make the first withdraw.
@@ -302,7 +301,7 @@ fn fully_test_complex_liquidations_rewards_flow() {
 
     pool_contract_client.withdraw(&depositor_1);
 
-    let depositor_6: Address = Address::random(&env);
+    let depositor_6: Address = Address::generate(&env);
     usd_token_client_admin.mint(&depositor_6, &7500_0000000);
     pool_contract_client.deposit(&depositor_6, &7500_0000000);
 
@@ -346,12 +345,12 @@ fn fully_test_complex_liquidations_rewards_flow() {
     env.ledger().set(LedgerInfo {
         timestamp: 172801 * 100,
         protocol_version: 1,
-        sequence_number: 10,
+        sequence_number: env.ledger().sequence(),
         network_id: Default::default(),
         base_reserve: 10,
-        min_temp_entry_expiration: 0,
-        min_persistent_entry_expiration: 0,
-        max_entry_expiration: u32::MAX,
+        min_temp_entry_ttl: 1,
+        min_persistent_entry_ttl: 1,
+        max_entry_ttl: u32::MAX,
     });
 
     pool_contract_client.withdraw(&depositor_6);

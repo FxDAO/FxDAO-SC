@@ -21,28 +21,28 @@ fn test_simple_liquidations_flow() {
     // Set up the contracts
 
     // Shared variables
-    let treasury_contract: Address = Address::random(&env);
+    let treasury_contract: Address = Address::generate(&env);
 
-    let governance_token_admin: Address = Address::random(&env);
+    let governance_token_admin: Address = Address::generate(&env);
     let (governance_token_client, governance_token_client_admin) =
         create_token_contract(&env, &governance_token_admin);
 
     let currency_price: u128 = 0_0958840;
-    let collateral_token_admin: Address = Address::random(&env);
+    let collateral_token_admin: Address = Address::generate(&env);
     let (collateral_token_client, collateral_token_client_admin) =
         create_token_contract(&env, &collateral_token_admin);
 
-    let stable_token_admin: Address = Address::random(&env);
+    let stable_token_admin: Address = Address::generate(&env);
     let (stable_token_client, stable_token_client_admin) =
         create_token_contract(&env, &stable_token_admin);
     let stable_token_denomination = symbol_short!("usd");
 
-    let depositor_1: Address = Address::random(&env);
-    let depositor_2: Address = Address::random(&env);
-    let depositor_3: Address = Address::random(&env);
-    let depositor_4: Address = Address::random(&env);
-    let depositor_5: Address = Address::random(&env);
-    let depositor_6: Address = Address::random(&env);
+    let depositor_1: Address = Address::generate(&env);
+    let depositor_2: Address = Address::generate(&env);
+    let depositor_3: Address = Address::generate(&env);
+    let depositor_4: Address = Address::generate(&env);
+    let depositor_5: Address = Address::generate(&env);
+    let depositor_6: Address = Address::generate(&env);
     let depositors: [Address; 6] = [
         depositor_1.clone(),
         depositor_2.clone(),
@@ -56,7 +56,7 @@ fn test_simple_liquidations_flow() {
     // Register and start vaults' contract
     let vaults_contract_address: Address = env.register_contract_wasm(None, vaults::WASM);
     let vaults_contract_client = vaults::Client::new(&env, &vaults_contract_address);
-    let vaults_contract_admin: Address = Address::random(&env);
+    let vaults_contract_admin: Address = Address::generate(&env);
     let min_collateral_rate: u128 = 1_1000000;
     let opening_debt_amount: u128 = 1_0000000;
     let opening_collateral_rate: u128 = 1_1500000;
@@ -96,7 +96,7 @@ fn test_simple_liquidations_flow() {
     let pool_contract_id: Address = env.register_contract(None, SafetyPoolContract);
     // let pool_contract_address: Address = Address::from_contract_id(&env, &pool_contract_id);
     let pool_contract_client = SafetyPoolContractClient::new(&env, &pool_contract_id);
-    let pool_contract_admin: Address = Address::random(&env);
+    let pool_contract_admin: Address = Address::generate(&env);
     let min_pool_deposit: u128 = 100_0000000;
     let profit_share: Vec<u32> = vec![&env, 1u32, 2u32] as Vec<u32>;
     let liquidator_share: Vec<u32> = vec![&env, 1u32, 2u32] as Vec<u32>;
@@ -156,7 +156,7 @@ fn test_simple_liquidations_flow() {
         }
     }
 
-    let liquidator: Address = Address::random(&env);
+    let liquidator: Address = Address::generate(&env);
 
     // We test that it should fail because there is no vault to liquidate yet
     let no_vaults_error_result = pool_contract_client.try_liquidate(&liquidator).unwrap_err();

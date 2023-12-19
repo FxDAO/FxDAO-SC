@@ -36,19 +36,19 @@ pub struct TestData<'a> {
 }
 
 pub fn create_test_data(env: &Env) -> TestData {
-    let contract_admin: Address = Address::random(&env);
-    let vaults_contract: Address = Address::random(&env);
-    let treasury_contract: Address = Address::random(&env);
+    let contract_admin: Address = Address::generate(&env);
+    let vaults_contract: Address = Address::generate(&env);
+    let treasury_contract: Address = Address::generate(&env);
 
-    let deposit_asset_admin = Address::random(&env);
+    let deposit_asset_admin = Address::generate(&env);
     let (deposit_asset_client, deposit_asset_client_admin) =
         create_token_contract(&env, &deposit_asset_admin);
 
-    let collateral_asset_admin = Address::random(&env);
+    let collateral_asset_admin = Address::generate(&env);
     let (collateral_asset_client, collateral_asset_client_admin) =
         create_token_contract(&env, &deposit_asset_admin);
 
-    let governance_asset_admin = Address::random(&env);
+    let governance_asset_admin = Address::generate(&env);
     let (governance_asset_client, governance_asset_client_admin) =
         create_token_contract(&env, &governance_asset_admin);
 

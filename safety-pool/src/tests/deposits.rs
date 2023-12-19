@@ -21,9 +21,9 @@ fn test_deposit_funds() {
 
     let mint_amount: i128 = 10000000000;
 
-    let depositor_1: Address = Address::random(&env);
-    let depositor_2: Address = Address::random(&env);
-    let depositor_3: Address = Address::random(&env);
+    let depositor_1: Address = Address::generate(&env);
+    let depositor_2: Address = Address::generate(&env);
+    let depositor_3: Address = Address::generate(&env);
 
     for depositor in [&depositor_1, &depositor_2, &depositor_3] {
         test_data
@@ -47,12 +47,12 @@ fn test_deposit_funds() {
         env.ledger().set(LedgerInfo {
             timestamp: counter,
             protocol_version: 1,
-            sequence_number: 10,
+            sequence_number: env.ledger().sequence(),
             network_id: Default::default(),
             base_reserve: 10,
-            min_temp_entry_expiration: 0,
-            min_persistent_entry_expiration: 0,
-            max_entry_expiration: u32::MAX,
+            min_temp_entry_ttl: 1,
+            min_persistent_entry_ttl: 1,
+            max_entry_ttl: u32::MAX,
         });
 
         test_data
@@ -143,12 +143,12 @@ fn test_deposit_funds() {
     env.ledger().set(LedgerInfo {
         timestamp: env.ledger().timestamp() + (3600 * 50),
         protocol_version: 1,
-        sequence_number: 10,
+        sequence_number: env.ledger().sequence(),
         network_id: Default::default(),
         base_reserve: 10,
-        min_temp_entry_expiration: 0,
-        min_persistent_entry_expiration: 0,
-        max_entry_expiration: u32::MAX,
+        min_temp_entry_ttl: 1,
+        min_persistent_entry_ttl: 1,
+        max_entry_ttl: u32::MAX,
     });
 
     // Check that withdrawing deposits works ok

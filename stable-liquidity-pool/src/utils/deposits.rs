@@ -4,7 +4,7 @@ pub const PERSISTENT_BUMP_CONSTANT: u32 = 1036800;
 pub const PERSISTENT_BUMP_CONSTANT_THRESHOLD: u32 = 518400;
 
 pub fn bump_deposit(env: &Env, depositor: Address) {
-    env.storage().persistent().bump(
+    env.storage().persistent().extend_ttl(
         &DepositsDataKeys::Deposit(depositor),
         PERSISTENT_BUMP_CONSTANT_THRESHOLD,
         PERSISTENT_BUMP_CONSTANT,
@@ -12,7 +12,7 @@ pub fn bump_deposit(env: &Env, depositor: Address) {
 }
 
 pub fn bump_depositors(env: &Env) {
-    env.storage().persistent().bump(
+    env.storage().persistent().extend_ttl(
         &DepositsDataKeys::Depositors,
         PERSISTENT_BUMP_CONSTANT_THRESHOLD,
         PERSISTENT_BUMP_CONSTANT,

@@ -53,25 +53,25 @@ pub fn create_base_data(env: &Env) -> TestData {
     env.mock_all_auths();
 
     // Set up the collateral token
-    let collateral_token_admin = Address::random(&env);
+    let collateral_token_admin = Address::generate(&env);
     let (collateral_token_client, collateral_token_admin_client) =
         create_token_contract(&env, &collateral_token_admin);
 
     // Set up the native token
-    let native_token_admin = Address::random(&env);
+    let native_token_admin = Address::generate(&env);
     let (native_token_client, native_token_admin_client) =
         create_token_contract(&env, &native_token_admin);
 
     // Set up the stable token
     let stable_token_denomination: Symbol = symbol_short!("usd");
-    let stable_token_issuer = Address::random(&env);
+    let stable_token_issuer = Address::generate(&env);
     let (stable_token_client, stable_token_admin_client) =
         create_token_contract(&env, &stable_token_issuer);
 
     // Create the contract
-    let contract_admin = Address::random(&env);
-    let oracle_admin = Address::random(&env);
-    let protocol_manager = Address::random(&env);
+    let contract_admin = Address::generate(&env);
+    let oracle_admin = Address::generate(&env);
+    let protocol_manager = Address::generate(&env);
     let contract_client =
         VaultsContractClient::new(&env, &env.register_contract(None, VaultsContract));
 
@@ -96,7 +96,7 @@ pub fn create_base_data(env: &Env) -> TestData {
 pub fn create_base_variables(env: &Env, data: &TestData) -> InitialVariables {
     InitialVariables {
         currency_price: 830124,
-        depositor: Address::random(&env),
+        depositor: Address::generate(&env),
         initial_debt: 5000_0000000,
         collateral_amount: 90_347_8867088,
         contract_address: data.contract_client.address.clone(),

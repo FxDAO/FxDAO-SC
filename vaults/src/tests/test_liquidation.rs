@@ -24,14 +24,14 @@ fn test_liquidation() {
     data.contract_client
         .set_currency_rate(&data.stable_token_denomination, &first_rate);
 
-    let depositor: Address = Address::random(&env);
+    let depositor: Address = Address::generate(&env);
     let depositor_debt: u128 = 5_000_0000000;
     let depositor_collateral: u128 = 100_000_0000000;
 
     token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor, &(depositor_collateral as i128));
 
-    let liquidator: Address = Address::random(&env);
+    let liquidator: Address = Address::generate(&env);
     let liquidator_debt: u128 = 5_000_0000000;
     let liquidator_collateral: u128 = 500_000_0000000;
 
@@ -209,11 +209,11 @@ fn test_vaults_to_liquidate() {
     data.contract_client
         .set_currency_rate(&data.stable_token_denomination, &first_rate);
 
-    let depositor_1: Address = Address::random(&env);
-    let depositor_2: Address = Address::random(&env);
-    let depositor_3: Address = Address::random(&env);
-    let depositor_4: Address = Address::random(&env);
-    let depositor_5: Address = Address::random(&env);
+    let depositor_1: Address = Address::generate(&env);
+    let depositor_2: Address = Address::generate(&env);
+    let depositor_3: Address = Address::generate(&env);
+    let depositor_4: Address = Address::generate(&env);
+    let depositor_5: Address = Address::generate(&env);
     let depositor_collateral: u128 = 3000_0000000;
     let first_debt_amount: u128 = 100_0000000;
     let second_debt_amount: u128 = 160_0000000;

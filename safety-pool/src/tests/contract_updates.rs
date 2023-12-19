@@ -32,7 +32,7 @@ fn update_contract_core_state() {
     );
 
     // Update admin
-    let new_admin: Address = Address::random(&env);
+    let new_admin: Address = Address::generate(&env);
     test_data.contract_client.update_contract_admin(&new_admin);
     assert_eq!(
         env.auths().first().unwrap(),
@@ -56,7 +56,7 @@ fn update_contract_core_state() {
     );
 
     // Update vaults contract
-    let new_vaults_contract: Address = Address::random(&env);
+    let new_vaults_contract: Address = Address::generate(&env);
     test_data
         .contract_client
         .update_vaults_contract(&new_vaults_contract);
@@ -82,7 +82,7 @@ fn update_contract_core_state() {
     );
 
     // Update treasury contract
-    let new_treasury_contract: Address = Address::random(&env);
+    let new_treasury_contract: Address = Address::generate(&env);
     test_data
         .contract_client
         .update_treasury_contract(&new_treasury_contract);

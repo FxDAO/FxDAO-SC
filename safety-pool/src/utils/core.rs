@@ -9,7 +9,7 @@ pub const INSTANCE_BUMP_CONSTANT_THRESHOLD: u32 = DAY_IN_LEDGERS * 20;
 pub fn bump_instance(env: &Env) {
     env.storage()
         .instance()
-        .bump(INSTANCE_BUMP_CONSTANT_THRESHOLD, INSTANCE_BUMP_CONSTANT)
+        .extend_ttl(INSTANCE_BUMP_CONSTANT_THRESHOLD, INSTANCE_BUMP_CONSTANT)
 }
 
 pub fn can_init_contract(env: &Env) {

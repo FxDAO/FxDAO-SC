@@ -36,11 +36,11 @@ pub struct TestData<'a> {
 }
 
 pub fn create_test_data(env: &Env) -> TestData {
-    let governance_token_admin = Address::random(&env);
+    let governance_token_admin = Address::generate(&env);
     let (governance_token_client, governance_token_admin_client) =
         create_token_contract(&env, &governance_token_admin);
 
-    let contract_admin: Address = Address::random(&env);
+    let contract_admin: Address = Address::generate(&env);
     let contract_client =
         GovernanceContractClient::new(&env, &env.register_contract(None, GovernanceContract));
 

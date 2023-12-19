@@ -80,7 +80,7 @@ fn test_new_vault() {
     );
 
     let currency_price: u128 = 830124; // 0.0830124
-    let depositor = Address::random(&env);
+    let depositor = Address::generate(&env);
     let initial_debt: u128 = 5_000_0000000; // USD 5000
     let collateral_amount: u128 = 90_347_8867088; // 90,347.8867088 XLM
     let contract_address: Address = data.contract_client.address.clone();
@@ -217,7 +217,7 @@ fn test_new_vault() {
     //     .try_new_vault(
     //         &OptionalVaultKey::Some(VaultKey {
     //             index: u128::MAX,
-    //             account: Address::random(&env),
+    //             account: Address::generate(&env),
     //             denomination: symbol_short!("usd"),
     //         }),
     //         &depositor,
@@ -342,7 +342,7 @@ fn test_new_vault() {
     //     &SCErrors::UserAlreadyHasDenominationVault.into()
     // );
 
-    let depositor_2 = Address::random(&env);
+    let depositor_2 = Address::generate(&env);
 
     data.collateral_token_admin_client
         .mint(&depositor_2, &(collateral_amount as i128 * 2));
@@ -374,7 +374,7 @@ fn test_new_vault() {
     //         &OptionalVaultKey::Some(VaultKey {
     //             denomination: data.stable_token_denomination.clone(),
     //             index: 1,
-    //             account: Address::random(&env),
+    //             account: Address::generate(&env),
     //         }),
     //         &depositor_2,
     //         &initial_debt,
@@ -454,7 +454,7 @@ fn test_increase_collateral() {
         &base_variables.currency_price,
     );
 
-    let depositor: Address = Address::random(&env);
+    let depositor: Address = Address::generate(&env);
 
     data.collateral_token_admin_client
         .mint(&depositor, &(base_variables.collateral_amount as i128 * 2));
@@ -576,7 +576,7 @@ fn test_increase_collateral() {
         &(base_variables.collateral_amount + collateral_to_add)
     );
 
-    let depositor_2: Address = Address::random(&env);
+    let depositor_2: Address = Address::generate(&env);
 
     data.collateral_token_admin_client.mint(
         &depositor_2,
@@ -591,7 +591,7 @@ fn test_increase_collateral() {
         &data.stable_token_denomination,
     );
 
-    let depositor_3: Address = Address::random(&env);
+    let depositor_3: Address = Address::generate(&env);
 
     data.collateral_token_admin_client.mint(
         &depositor_3,

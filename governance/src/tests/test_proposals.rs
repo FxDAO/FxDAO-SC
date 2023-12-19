@@ -18,8 +18,8 @@ pub fn test_creating_new_proposal_single_proposer() {
     init_contract(&test_data);
 
     let voting_time: u64 = 3600 * 24 * 7;
-    let proposer: Address = Address::random(&env);
-    let id: BytesN<32> = BytesN::random(&env);
+    let proposer: Address = Address::generate(&env);
+    let id: BytesN<32> = BytesN::generate(&env);
     let proposal_type: ProposalType = ProposalType::Simple;
     let proposers: Vec<ProposerStat> = vec![
         &env,
@@ -106,7 +106,7 @@ pub fn test_creating_new_proposal_single_proposer() {
     let not_funds_fail = test_data
         .contract_client
         .try_create_proposal(
-            &BytesN::random(&env),
+            &BytesN::generate(&env),
             &proposal_type,
             &proposers,
             &voting_time,
@@ -145,23 +145,23 @@ pub fn test_create_new_proposal_multiple_proposers() {
     init_contract(&test_data);
 
     let proposer_stat_1: ProposerStat = ProposerStat {
-        id: Address::random(&env),
+        id: Address::generate(&env),
         amount: 2_00_000_0000000,
     };
     let proposer_stat_2: ProposerStat = ProposerStat {
-        id: Address::random(&env),
+        id: Address::generate(&env),
         amount: 4_00_000_0000000,
     };
     let proposer_stat_3: ProposerStat = ProposerStat {
-        id: Address::random(&env),
+        id: Address::generate(&env),
         amount: 5_00_000_0000000,
     };
     let proposer_stat_4: ProposerStat = ProposerStat {
-        id: Address::random(&env),
+        id: Address::generate(&env),
         amount: 1_00_000_0000000,
     };
 
-    let id: BytesN<32> = BytesN::random(&env);
+    let id: BytesN<32> = BytesN::generate(&env);
     let proposal_type: ProposalType = ProposalType::Simple;
     let proposers: Vec<ProposerStat> = vec![
         &env,
@@ -246,7 +246,7 @@ pub fn test_proposals_ids() {
     init_contract(&test_data);
 
     let voting_time: u64 = 3600 * 24 * 7;
-    let proposer: Address = Address::random(&env);
+    let proposer: Address = Address::generate(&env);
     let proposal_type: ProposalType = ProposalType::Simple;
     let proposers: Vec<ProposerStat> = vec![
         &env,
@@ -255,10 +255,10 @@ pub fn test_proposals_ids() {
             id: proposer.clone(),
         },
     ] as Vec<ProposerStat>;
-    let id_1: BytesN<32> = BytesN::random(&env);
-    let id_2: BytesN<32> = BytesN::random(&env);
-    let id_3: BytesN<32> = BytesN::random(&env);
-    let id_4: BytesN<32> = BytesN::random(&env);
+    let id_1: BytesN<32> = BytesN::generate(&env);
+    let id_2: BytesN<32> = BytesN::generate(&env);
+    let id_3: BytesN<32> = BytesN::generate(&env);
+    let id_4: BytesN<32> = BytesN::generate(&env);
 
     let ids: [BytesN<32>; 4] = [id_1, id_2, id_3, id_4];
 

@@ -42,7 +42,7 @@ fn test_indexes_orders() {
 
     // First deposit
     // This deposit should have an index of: 2000_0000000
-    let depositor_1 = Address::random(&env);
+    let depositor_1 = Address::generate(&env);
     let depositor_1_debt: u128 = 150_0000000;
     let depositor_1_collateral_amount: u128 = 3000_0000000;
 
@@ -59,7 +59,7 @@ fn test_indexes_orders() {
 
     // Second depositor
     // This deposit should have an index of: 1857_1428571
-    let depositor_2 = Address::random(&env);
+    let depositor_2 = Address::generate(&env);
     let depositor_2_debt: u128 = 140_0000000;
     let depositor_2_collateral_amount: u128 = 2600_0000000;
 
@@ -76,7 +76,7 @@ fn test_indexes_orders() {
 
     // Third depositor
     // This deposit should have an index of: 3250_0000000
-    let depositor_3 = Address::random(&env);
+    let depositor_3 = Address::generate(&env);
     let depositor_3_debt: u128 = 100_0000000;
     let depositor_3_collateral_amount: u128 = 3250_0000000;
 
@@ -97,7 +97,7 @@ fn test_indexes_orders() {
 
     // fourth depositor
     // This deposit should have an index of: 3250_0000000
-    let depositor_4 = Address::random(&env);
+    let depositor_4 = Address::generate(&env);
     let depositor_4_debt: u128 = 100_0000000;
     let depositor_4_collateral_amount: u128 = 3250_0000000;
 
@@ -118,7 +118,7 @@ fn test_indexes_orders() {
 
     // fifth depositor
     // This deposit should have an index of: 1756_4285710
-    let depositor_5 = Address::random(&env);
+    let depositor_5 = Address::generate(&env);
     let depositor_5_debt: u128 = 140_0000000;
     let depositor_5_collateral_amount: u128 = 2459_0000000;
 
@@ -135,7 +135,7 @@ fn test_indexes_orders() {
 
     // Sixth depositor
     // This deposit should have an index of: 6000_0000000
-    let depositor_6 = Address::random(&env);
+    let depositor_6 = Address::generate(&env);
     let depositor_6_debt: u128 = 150_0000000;
     let depositor_6_collateral_amount: u128 = 9000_0000000;
 

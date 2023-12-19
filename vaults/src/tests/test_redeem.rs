@@ -42,19 +42,19 @@ fn test_redeem() {
 
     // Prepare and test the index of all depositors
 
-    let depositor_1: Address = Address::random(&env);
+    let depositor_1: Address = Address::generate(&env);
     let depositor_1_collateral: u128 = 30000000000;
     let depositor_1_debt: u128 = 100_0000000;
     let depositor_1_index: u128 = 30000000000;
-    let depositor_2: Address = Address::random(&env);
+    let depositor_2: Address = Address::generate(&env);
     let depositor_2_collateral: u128 = 30000000000;
     let depositor_2_debt: u128 = 1500000000;
     let depositor_2_index: u128 = 200_00000000;
-    let depositor_3: Address = Address::random(&env);
+    let depositor_3: Address = Address::generate(&env);
     let depositor_3_collateral: u128 = 30000000000;
     let depositor_3_debt: u128 = 1250000000;
     let depositor_3_index: u128 = 240_00000000;
-    let depositor_4: Address = Address::random(&env);
+    let depositor_4: Address = Address::generate(&env);
     let depositor_4_collateral: u128 = 30000000000;
     let depositor_4_debt: u128 = 1200000000;
     let depositor_4_index: u128 = 250_00000000;
@@ -137,7 +137,7 @@ fn test_redeem() {
 
     // Send all stable tokens to one single account which is the one that will redeem collateral
 
-    let redeem_user: Address = Address::random(&env);
+    let redeem_user: Address = Address::generate(&env);
 
     token::Client::new(&env, &data.stable_token_client.address).transfer(
         &depositor_1,

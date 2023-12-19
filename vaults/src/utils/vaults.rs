@@ -18,7 +18,7 @@ pub const PERSISTENT_BUMP_CONSTANT: u32 = DAY_IN_LEDGERS * 28;
 pub const PERSISTENT_BUMP_CONSTANT_THRESHOLD: u32 = DAY_IN_LEDGERS * 14;
 
 pub fn bump_vault(env: &Env, vault_key: VaultKey) {
-    env.storage().persistent().bump(
+    env.storage().persistent().extend_ttl(
         &VaultsDataKeys::Vault(vault_key),
         PERSISTENT_BUMP_CONSTANT_THRESHOLD,
         PERSISTENT_BUMP_CONSTANT,
@@ -26,7 +26,7 @@ pub fn bump_vault(env: &Env, vault_key: VaultKey) {
 }
 
 pub fn bump_vault_index(env: &Env, vault_index_key: VaultIndexKey) {
-    env.storage().persistent().bump(
+    env.storage().persistent().extend_ttl(
         &VaultsDataKeys::VaultIndex(vault_index_key),
         PERSISTENT_BUMP_CONSTANT_THRESHOLD,
         PERSISTENT_BUMP_CONSTANT,

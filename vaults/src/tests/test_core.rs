@@ -65,7 +65,7 @@ fn test_site_updates() {
     let core_state: CoreState = data.contract_client.get_core_state();
     assert_eq!(&core_state.admin, &data.contract_admin);
 
-    let new_admin: Address = Address::random(&env);
+    let new_admin: Address = Address::generate(&env);
     data.contract_client.set_admin(&new_admin);
 
     assert_eq!(
@@ -86,7 +86,7 @@ fn test_site_updates() {
     let updated_core_state: CoreState = data.contract_client.get_core_state();
     assert_eq!(&updated_core_state.admin, &new_admin);
 
-    let new_protocol_manager: Address = Address::random(&env);
+    let new_protocol_manager: Address = Address::generate(&env);
     data.contract_client
         .set_protocol_manager(&new_protocol_manager);
 

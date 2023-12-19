@@ -10,7 +10,7 @@ pub const PERSISTENT_BUMP_CONSTANT: u32 = DAY_IN_LEDGERS * 30;
 pub const PERSISTENT_BUMP_CONSTANT_THRESHOLD: u32 = DAY_IN_LEDGERS * 20;
 
 pub fn bump_liquidation(env: &Env, index: u64) {
-    env.storage().persistent().bump(
+    env.storage().persistent().extend_ttl(
         &LiquidationsDataKeys::Liquidation(index),
         PERSISTENT_BUMP_CONSTANT_THRESHOLD,
         PERSISTENT_BUMP_CONSTANT,

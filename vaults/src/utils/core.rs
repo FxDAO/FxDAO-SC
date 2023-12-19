@@ -8,7 +8,7 @@ use soroban_sdk::Env;
 pub fn bump_instance(env: &Env) {
     env.storage()
         .instance()
-        .bump(INSTANCE_BUMP_CONSTANT_THRESHOLD, INSTANCE_BUMP_CONSTANT);
+        .extend_ttl(INSTANCE_BUMP_CONSTANT_THRESHOLD, INSTANCE_BUMP_CONSTANT);
 }
 
 pub fn is_core_created(env: &Env) -> bool {

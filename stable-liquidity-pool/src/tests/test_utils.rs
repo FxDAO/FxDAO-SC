@@ -39,24 +39,24 @@ pub struct TestData<'a> {
 }
 
 pub fn create_test_data(env: &Env) -> TestData {
-    let admin = Address::random(&env);
-    let manager = Address::random(&env);
-    let governance_token = Address::random(&env);
+    let admin = Address::generate(&env);
+    let manager = Address::generate(&env);
+    let governance_token = Address::generate(&env);
 
-    let usdc_token_admin = Address::random(&env);
+    let usdc_token_admin = Address::generate(&env);
     let (usdc_token_client, usdc_token_admin_client) =
         create_token_contract(&env, &usdc_token_admin);
 
-    let usdt_token_admin = Address::random(&env);
+    let usdt_token_admin = Address::generate(&env);
     let (usdt_token_client, usdt_token_admin_client) =
         create_token_contract(&env, &usdt_token_admin);
 
-    let usdx_token_admin = Address::random(&env);
+    let usdx_token_admin = Address::generate(&env);
     let (usdx_token_client, usdx_token_admin_client) =
         create_token_contract(&env, &usdx_token_admin);
 
     let fee_percentage = 30000;
-    let treasury = Address::random(&env);
+    let treasury = Address::generate(&env);
 
     TestData {
         stable_liquidity_pool_contract_client: StableLiquidityPoolContractClient::new(
