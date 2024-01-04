@@ -7,6 +7,7 @@ use crate::tests::test_utils::{
     TestData,
 };
 use crate::utils::indexes::calculate_user_vault_index;
+use crate::utils::payments::calc_fee;
 use num_integer::div_floor;
 use soroban_sdk::testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation};
 use soroban_sdk::{symbol_short, token, Address, Env, IntoVal, Symbol};
@@ -43,21 +44,21 @@ fn test_redeem() {
     // Prepare and test the index of all depositors
 
     let depositor_1: Address = Address::generate(&env);
-    let depositor_1_collateral: u128 = 30000000000;
+    let depositor_1_collateral: u128 = 3000_0000000;
     let depositor_1_debt: u128 = 100_0000000;
-    let depositor_1_index: u128 = 30000000000;
+    let depositor_1_index: u128 = 2985_0000000;
     let depositor_2: Address = Address::generate(&env);
-    let depositor_2_collateral: u128 = 30000000000;
-    let depositor_2_debt: u128 = 1500000000;
-    let depositor_2_index: u128 = 200_00000000;
+    let depositor_2_collateral: u128 = 3000_0000000;
+    let depositor_2_debt: u128 = 150_0000000;
+    let depositor_2_index: u128 = 1990_0000000;
     let depositor_3: Address = Address::generate(&env);
-    let depositor_3_collateral: u128 = 30000000000;
-    let depositor_3_debt: u128 = 1250000000;
-    let depositor_3_index: u128 = 240_00000000;
+    let depositor_3_collateral: u128 = 3000_0000000;
+    let depositor_3_debt: u128 = 125_0000000;
+    let depositor_3_index: u128 = 2388_0000000;
     let depositor_4: Address = Address::generate(&env);
-    let depositor_4_collateral: u128 = 30000000000;
+    let depositor_4_collateral: u128 = 3000_0000000;
     let depositor_4_debt: u128 = 1200000000;
-    let depositor_4_index: u128 = 250_00000000;
+    let depositor_4_index: u128 = 2487_5000000;
 
     token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
         .mint(&depositor_1, &(depositor_1_collateral as i128));
@@ -175,10 +176,10 @@ fn test_redeem() {
     );
     assert_eq!(
         vaults_info.total_col,
-        depositor_1_collateral
-            + depositor_2_collateral
-            + depositor_3_collateral
-            + depositor_4_collateral
+        (depositor_1_collateral - calc_fee(&data.fee, &depositor_1_collateral))
+            + (depositor_2_collateral - calc_fee(&data.fee, &depositor_2_collateral))
+            + (depositor_3_collateral - calc_fee(&data.fee, &depositor_3_collateral))
+            + (depositor_4_collateral - calc_fee(&data.fee, &depositor_4_collateral))
     );
 
     data.contract_client
@@ -221,11 +222,16 @@ fn test_redeem() {
     assert_eq!(
         data.collateral_token_client.balance(&redeem_user) as u128,
         collateral_withdrew
+            - calc_fee(
+                &data.fee,
+                &(depositor_2_collateral - calc_fee(&data.fee, &depositor_2_collateral))
+            )
     );
 
     assert_eq!(
         data.collateral_token_client.balance(&depositor_2) as u128,
-        depositor_2_collateral - collateral_withdrew,
+        (depositor_2_collateral - calc_fee(&data.fee, &depositor_2_collateral))
+            - collateral_withdrew,
     );
 
     // After redeeming
@@ -240,6 +246,8 @@ fn test_redeem() {
     );
     assert_eq!(
         vaults_info.total_col,
-        depositor_1_collateral + depositor_3_collateral + depositor_4_collateral
+        (depositor_1_collateral - calc_fee(&data.fee, &depositor_1_collateral))
+            + (depositor_3_collateral - calc_fee(&data.fee, &depositor_3_collateral))
+            + (depositor_4_collateral - calc_fee(&data.fee, &depositor_4_collateral))
     );
 }

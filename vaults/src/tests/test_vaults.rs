@@ -10,6 +10,7 @@ use crate::tests::test_utils::{
 
 use crate::errors::SCErrors;
 use crate::utils::indexes::calculate_user_vault_index;
+use crate::utils::payments::calc_fee;
 use num_integer::div_floor;
 use soroban_sdk::testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation};
 use soroban_sdk::{symbol_short, token, Address, Env, IntoVal, Symbol, Vec};
@@ -26,6 +27,8 @@ fn test_set_vault_conditions() {
         &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
+        &data.treasury,
+        &data.fee,
     );
 
     data.contract_client.set_vault_conditions(
@@ -77,6 +80,8 @@ fn test_new_vault() {
         &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
+        &data.treasury,
+        &data.fee,
     );
 
     let currency_price: u128 = 830124; // 0.0830124
@@ -269,26 +274,42 @@ fn test_new_vault() {
                     )
                         .into_val(&env)
                 )),
-                sub_invocations: std::vec![AuthorizedInvocation {
-                    function: AuthorizedFunction::Contract((
-                        data.collateral_token_client.address.clone(),
-                        symbol_short!("transfer"),
-                        (
-                            depositor.clone(),
-                            data.contract_client.address.clone(),
-                            collateral_amount.clone() as i128,
-                        )
-                            .into_val(&env),
-                    )),
-                    sub_invocations: std::vec![],
-                }],
+                sub_invocations: std::vec![
+                    AuthorizedInvocation {
+                        function: AuthorizedFunction::Contract((
+                            data.collateral_token_client.address.clone(),
+                            symbol_short!("transfer"),
+                            (
+                                depositor.clone(),
+                                data.contract_client.address.clone(),
+                                (collateral_amount - calc_fee(&data.fee, &collateral_amount))
+                                    .clone() as i128,
+                            )
+                                .into_val(&env),
+                        )),
+                        sub_invocations: std::vec![],
+                    },
+                    AuthorizedInvocation {
+                        function: AuthorizedFunction::Contract((
+                            data.collateral_token_client.address.clone(),
+                            symbol_short!("transfer"),
+                            (
+                                depositor.clone(),
+                                data.treasury.clone(),
+                                calc_fee(&data.fee, &collateral_amount) as i128,
+                            )
+                                .into_val(&env),
+                        )),
+                        sub_invocations: std::vec![],
+                    },
+                ],
             }
         )
     );
 
     assert_eq!(
         data.collateral_token_client.balance(&contract_address),
-        collateral_amount as i128
+        (collateral_amount - calc_fee(&data.fee, &collateral_amount)) as i128
     );
 
     assert_eq!(
@@ -314,13 +335,22 @@ fn test_new_vault() {
         })
     );
     assert_eq!(vault_info.total_debt, initial_debt);
-    assert_eq!(vault_info.total_col, collateral_amount);
+    assert_eq!(
+        vault_info.total_col,
+        collateral_amount - calc_fee(&data.fee, &collateral_amount)
+    );
 
     assert_eq!(
         user_vault.index,
-        div_floor(1000000000 * collateral_amount, initial_debt)
+        div_floor(
+            1000000000 * (collateral_amount - calc_fee(&data.fee, &collateral_amount)),
+            initial_debt
+        )
     );
-    assert_eq!(user_vault.total_collateral, collateral_amount);
+    assert_eq!(
+        user_vault.total_collateral,
+        collateral_amount - calc_fee(&data.fee, &collateral_amount)
+    );
     assert_eq!(user_vault.total_debt, initial_debt);
 
     // Should fail if user tries to create a new vault but already have one
@@ -412,13 +442,22 @@ fn test_new_vault() {
 
     assert_eq!(updated_vaults_info.total_vaults, 2);
     assert_eq!(updated_vaults_info.total_debt, initial_debt * 2);
-    assert_eq!(updated_vaults_info.total_col, collateral_amount * 2);
+    assert_eq!(
+        updated_vaults_info.total_col,
+        (collateral_amount - calc_fee(&data.fee, &collateral_amount)) * 2
+    );
 
     assert_eq!(
         second_user_vault.index,
-        div_floor(1000000000 * collateral_amount, initial_debt)
+        div_floor(
+            1000000000 * (collateral_amount - calc_fee(&data.fee, &collateral_amount)),
+            initial_debt
+        )
     );
-    assert_eq!(second_user_vault.total_collateral, collateral_amount);
+    assert_eq!(
+        second_user_vault.total_collateral,
+        collateral_amount - calc_fee(&data.fee, &collateral_amount)
+    );
     assert_eq!(second_user_vault.total_debt, initial_debt);
 }
 
@@ -502,7 +541,7 @@ fn test_increase_collateral() {
 
     assert_eq!(
         &current_vault.total_collateral,
-        &base_variables.collateral_amount,
+        &base_variables.collateral_amount_minus_fee,
     );
 
     let collateral_to_add: u128 = 100_0000000;
@@ -538,19 +577,35 @@ fn test_increase_collateral() {
                     )
                         .into_val(&env),
                 )),
-                sub_invocations: std::vec![AuthorizedInvocation {
-                    function: AuthorizedFunction::Contract((
-                        data.collateral_token_client.address.clone(),
-                        symbol_short!("transfer"),
-                        (
-                            depositor.clone(),
-                            data.contract_client.address.clone(),
-                            collateral_to_add as i128,
-                        )
-                            .into_val(&env)
-                    )),
-                    sub_invocations: std::vec![],
-                }],
+                sub_invocations: std::vec![
+                    AuthorizedInvocation {
+                        function: AuthorizedFunction::Contract((
+                            data.collateral_token_client.address.clone(),
+                            symbol_short!("transfer"),
+                            (
+                                depositor.clone(),
+                                data.contract_client.address.clone(),
+                                (collateral_to_add - calc_fee(&data.fee, &collateral_to_add))
+                                    as i128,
+                            )
+                                .into_val(&env)
+                        )),
+                        sub_invocations: std::vec![],
+                    },
+                    AuthorizedInvocation {
+                        function: AuthorizedFunction::Contract((
+                            data.collateral_token_client.address.clone(),
+                            symbol_short!("transfer"),
+                            (
+                                depositor.clone(),
+                                data.treasury.clone(),
+                                calc_fee(&data.fee, &collateral_to_add) as i128,
+                            )
+                                .into_val(&env)
+                        )),
+                        sub_invocations: std::vec![],
+                    }
+                ],
             }
         )
     );
@@ -562,7 +617,8 @@ fn test_increase_collateral() {
     assert_ne!(&current_vault.index, &updated_vault.index);
     assert_eq!(
         &updated_vault.total_collateral,
-        &(current_vault.total_collateral + collateral_to_add)
+        &(current_vault.total_collateral
+            + (collateral_to_add - calc_fee(&data.fee, &collateral_to_add)))
     );
 
     let vaults_info: VaultsInfo = data
@@ -573,7 +629,8 @@ fn test_increase_collateral() {
     assert_eq!(&vaults_info.total_debt, &base_variables.initial_debt);
     assert_eq!(
         &vaults_info.total_col,
-        &(base_variables.collateral_amount + collateral_to_add)
+        &(base_variables.collateral_amount_minus_fee
+            + (collateral_to_add - calc_fee(&data.fee, &collateral_to_add)))
     );
 
     let depositor_2: Address = Address::generate(&env);
@@ -602,7 +659,7 @@ fn test_increase_collateral() {
         &OptionalVaultKey::Some(VaultKey {
             index: calculate_user_vault_index(
                 base_variables.initial_debt,
-                base_variables.collateral_amount,
+                base_variables.collateral_amount_minus_fee,
             ),
             denomination: data.stable_token_denomination.clone(),
             account: depositor_2.clone(),
@@ -732,7 +789,8 @@ fn test_increase_collateral() {
     );
     assert_eq!(
         &updated_vaults_info.total_col,
-        &((base_variables.collateral_amount * 3) + (collateral_to_add * 4))
+        &((base_variables.collateral_amount_minus_fee * 3)
+            + ((collateral_to_add - calc_fee(&data.fee, &collateral_to_add)) * 4))
     );
 }
 
@@ -808,7 +866,8 @@ fn test_increase_debt() {
     assert_eq!(current_vaults_info.total_debt, base_variables.initial_debt);
     assert_eq!(
         current_vaults_info.total_col,
-        base_variables.collateral_amount * 2
+        (base_variables.collateral_amount * 2)
+            - calc_fee(&data.fee, &(base_variables.collateral_amount * 2))
     );
     assert_eq!(
         data.stable_token_client.balance(&base_variables.depositor),
@@ -820,7 +879,9 @@ fn test_increase_debt() {
         &VaultKey {
             index: calculate_user_vault_index(
                 base_variables.initial_debt.clone(),
-                (base_variables.collateral_amount * 2).clone(),
+                ((base_variables.collateral_amount * 2)
+                    - calc_fee(&data.fee, &(base_variables.collateral_amount * 2)))
+                .clone(),
             ),
             account: base_variables.depositor.clone(),
             denomination: data.stable_token_denomination.clone(),
@@ -843,7 +904,9 @@ fn test_increase_debt() {
                         VaultKey {
                             index: calculate_user_vault_index(
                                 base_variables.initial_debt.clone(),
-                                (base_variables.collateral_amount * 2).clone(),
+                                ((base_variables.collateral_amount * 2)
+                                    - calc_fee(&data.fee, &(base_variables.collateral_amount * 2)))
+                                .clone(),
                             ),
                             account: base_variables.depositor.clone(),
                             denomination: data.stable_token_denomination.clone(),
@@ -869,7 +932,8 @@ fn test_increase_debt() {
     );
     assert_eq!(
         updated_vaults_info.total_col,
-        base_variables.collateral_amount * 2
+        (base_variables.collateral_amount * 2)
+            - calc_fee(&data.fee, &(base_variables.collateral_amount * 2))
     );
 
     assert_eq!(
@@ -949,6 +1013,7 @@ fn test_pay_debt() {
     assert_eq!(
         current_vaults_info.total_col,
         (base_variables.collateral_amount * 2)
+            - calc_fee(&data.fee, &(base_variables.collateral_amount * 2))
     );
     assert_eq!(
         data.stable_token_client.balance(&base_variables.depositor),
@@ -1018,7 +1083,8 @@ fn test_pay_debt() {
     assert_eq!(updated_vaults_info.total_debt, base_variables.initial_debt,);
     assert_eq!(
         updated_vaults_info.total_col,
-        base_variables.collateral_amount * 2,
+        (base_variables.collateral_amount * 2)
+            - calc_fee(&data.fee, &(base_variables.collateral_amount * 2)),
     );
 
     assert_eq!(
@@ -1028,7 +1094,8 @@ fn test_pay_debt() {
     assert_eq!(
         data.collateral_token_client
             .balance(&base_variables.contract_address),
-        (base_variables.collateral_amount * 2) as i128
+        ((base_variables.collateral_amount * 2)
+            - calc_fee(&data.fee, &(base_variables.collateral_amount * 2))) as i128
     );
 
     vault = data
@@ -1137,12 +1204,14 @@ fn get_vaults() {
     let vault_to_validate: Vault = Vault {
         index: calculate_user_vault_index(
             base_variables.initial_debt * 2,
-            base_variables.collateral_amount * 2,
+            (base_variables.collateral_amount * 2)
+                - calc_fee(&data.fee, &(base_variables.collateral_amount * 2)),
         ),
         next_key: OptionalVaultKey::None,
         account: base_variables.depositor.clone(),
         total_debt: base_variables.initial_debt * 2,
-        total_collateral: base_variables.collateral_amount * 2,
+        total_collateral: (base_variables.collateral_amount * 2)
+            - calc_fee(&data.fee, &(base_variables.collateral_amount * 2)),
         denomination: data.stable_token_denomination.clone(),
     };
 

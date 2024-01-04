@@ -8,6 +8,8 @@ pub struct CoreState {
     pub oracle_admin: Address,
     pub protocol_manager: Address,
     pub panic_mode: bool,
+    pub treasury: Address,
+    pub fee: u128,
 }
 
 #[contracttype]

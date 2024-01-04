@@ -1,5 +1,6 @@
 #![cfg(test)]
 use crate::contract::VaultsContract;
+use crate::utils::payments::calc_fee;
 use crate::VaultsContractClient;
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{symbol_short, token, Address, Env, IntoVal, Symbol};
@@ -20,6 +21,8 @@ pub struct TestData<'a> {
     pub oracle_admin: Address,
     pub protocol_manager: Address,
     pub contract_client: VaultsContractClient<'a>,
+    pub treasury: Address,
+    pub fee: u128,
 
     // Collateral token data
     pub collateral_token_admin: Address,
@@ -43,6 +46,7 @@ pub struct InitialVariables {
     pub depositor: Address,
     pub initial_debt: u128,
     pub collateral_amount: u128,
+    pub collateral_amount_minus_fee: u128,
     pub contract_address: Address,
     pub min_col_rate: u128,
     pub min_debt_creation: u128,
@@ -80,6 +84,8 @@ pub fn create_base_data(env: &Env) -> TestData {
         oracle_admin,
         protocol_manager,
         contract_client,
+        treasury: Address::generate(&env),
+        fee: 50000,
         collateral_token_admin,
         collateral_token_client,
         collateral_token_admin_client,
@@ -99,6 +105,7 @@ pub fn create_base_variables(env: &Env, data: &TestData) -> InitialVariables {
         depositor: Address::generate(&env),
         initial_debt: 5000_0000000,
         collateral_amount: 90_347_8867088,
+        collateral_amount_minus_fee: 90_347_8867088 - calc_fee(&data.fee, &90_347_8867088),
         contract_address: data.contract_client.address.clone(),
         min_col_rate: 1_1000000,
         min_debt_creation: 5000_0000000,
@@ -113,6 +120,8 @@ pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVar
         &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
+        &data.treasury,
+        &data.fee,
     );
 
     data.contract_client.create_currency(

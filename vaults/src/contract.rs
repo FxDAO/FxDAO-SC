@@ -1,7 +1,5 @@
 use crate::errors::SCErrors;
-// use crate::storage::vaults::*;
 use crate::utils::core::*;
-// use crate::utils::vaults::*;
 
 use crate::storage::core::CoreState;
 use crate::storage::currencies::{CurrenciesDataKeys, Currency};
@@ -11,13 +9,13 @@ use crate::utils::currencies::{
 };
 use crate::utils::indexes::calculate_user_vault_index;
 use crate::utils::payments::{
-    deposit_collateral, deposit_stablecoin, withdraw_collateral, withdraw_stablecoin,
+    calc_fee, deposit_collateral, deposit_stablecoin, pay_fee, withdraw_collateral,
+    withdraw_stablecoin,
 };
 use crate::utils::vaults::{
     bump_vault, bump_vault_index, calculate_deposit_ratio, can_be_liquidated,
-    create_and_insert_vault, get_redeemable_vaults, get_vault, get_vault_index, get_vaults,
-    get_vaults_info, has_vault, is_vaults_info_started, search_vault, set_vault, set_vault_index,
-    set_vaults_info, validate_user_vault, vault_spot_available, withdraw_vault,
+    create_and_insert_vault, get_vault, get_vaults, get_vaults_info, is_vaults_info_started,
+    search_vault, set_vaults_info, validate_user_vault, vault_spot_available, withdraw_vault,
 };
 use num_integer::div_floor;
 use soroban_sdk::{
@@ -38,6 +36,8 @@ pub trait VaultsContractTrait {
         protocol_manager: Address,
         col_token: Address,
         stable_issuer: Address,
+        treasury: Address,
+        fee: u128,
     );
 
     fn get_core_state(env: Env) -> CoreState;
@@ -129,6 +129,8 @@ impl VaultsContractTrait for VaultsContract {
         protocol_manager: Address,
         col_token: Address,
         stable_issuer: Address,
+        treasury: Address,
+        fee: u128,
     ) {
         bump_instance(&env);
         if is_core_created(&env) {
@@ -142,6 +144,8 @@ impl VaultsContractTrait for VaultsContract {
             oracle_admin,
             protocol_manager,
             panic_mode: false,
+            treasury,
+            fee,
         };
 
         save_core_state(&env, &core_state);
@@ -303,7 +307,10 @@ impl VaultsContractTrait for VaultsContract {
         vault_spot_available(&env, caller.clone(), &denomination);
 
         // TODO: check if collateral price has been updated lately
-        // TODO: Add fee logic
+
+        let core_state: CoreState = get_core_state(&env);
+        let fee: u128 = calc_fee(&core_state.fee, &collateral_amount);
+        let vault_col: u128 = collateral_amount - fee;
 
         if !is_vaults_info_started(&env, &denomination) {
             panic_with_error!(&env, &SCErrors::VaultsInfoHasNotStarted);
@@ -317,13 +324,13 @@ impl VaultsContractTrait for VaultsContract {
 
         let currency: Currency = get_currency(&env, &denomination);
         let deposit_collateral_rate: u128 =
-            calculate_deposit_ratio(&currency.rate, &collateral_amount, &initial_debt);
+            calculate_deposit_ratio(&currency.rate, &vault_col, &initial_debt);
 
         if deposit_collateral_rate < vaults_info.opening_col_rate {
             panic_with_error!(&env, &SCErrors::InvalidOpeningCollateralRatio);
         }
 
-        let new_vault_index: u128 = calculate_user_vault_index(initial_debt, collateral_amount);
+        let new_vault_index: u128 = calculate_user_vault_index(initial_debt, vault_col);
         let new_vault_key: VaultKey = VaultKey {
             index: new_vault_index.clone(),
             account: caller.clone(),
@@ -346,18 +353,18 @@ impl VaultsContractTrait for VaultsContract {
             &new_vault_key,
             &prev_key,
             initial_debt.clone(),
-            collateral_amount.clone(),
+            vault_col.clone(),
         );
 
         vaults_info.lowest_key = updated_lowest_key;
         vaults_info.total_vaults = vaults_info.total_vaults + 1;
         vaults_info.total_debt = vaults_info.total_debt + initial_debt;
-        vaults_info.total_col = vaults_info.total_col + collateral_amount;
+        vaults_info.total_col = vaults_info.total_col + vault_col;
         set_vaults_info(&env, &vaults_info);
 
-        let core_state: CoreState = get_core_state(&env);
-        deposit_collateral(&env, &core_state, &caller, collateral_amount as i128);
+        deposit_collateral(&env, &core_state, &caller, vault_col as i128);
         withdraw_stablecoin(&env, &core_state, &currency, &caller, initial_debt as i128);
+        pay_fee(&env, &core_state, &caller, fee as i128);
 
         bump_vault(&env, new_vault_key);
         bump_vault_index(&env, new_vault_index_key);
@@ -428,9 +435,13 @@ impl VaultsContractTrait for VaultsContract {
         validate_currency(&env, &vault_key.denomination);
         is_currency_active(&env, &vault_key.denomination);
 
-        // TODO: Add fee logic
         let core_state: CoreState = get_core_state(&env);
-        deposit_collateral(&env, &core_state, &vault_key.account, amount as i128);
+
+        let fee: u128 = calc_fee(&core_state.fee, &amount);
+        let collateral: u128 = amount - fee;
+
+        deposit_collateral(&env, &core_state, &vault_key.account, collateral as i128);
+        pay_fee(&env, &core_state, &vault_key.account, fee as i128);
 
         let (target_vault, target_vault_key, _) =
             search_vault(&env, &vault_key.account, &vault_key.denomination);
@@ -461,7 +472,7 @@ impl VaultsContractTrait for VaultsContract {
         }
 
         let new_vault_initial_debt: u128 = target_vault.total_debt.clone();
-        let new_vault_collateral_amount: u128 = target_vault.total_collateral.clone() + amount;
+        let new_vault_collateral_amount: u128 = target_vault.total_collateral.clone() + collateral;
         let new_vault_key: VaultKey = VaultKey {
             index: calculate_user_vault_index(
                 new_vault_initial_debt.clone(),
@@ -482,7 +493,7 @@ impl VaultsContractTrait for VaultsContract {
             );
 
         vaults_info.lowest_key = updated_lowest_key;
-        vaults_info.total_col = vaults_info.total_col + amount;
+        vaults_info.total_col = vaults_info.total_col + collateral;
         set_vaults_info(&env, &vaults_info);
 
         bump_vault(&env, updated_target_vault_key);
@@ -510,7 +521,6 @@ impl VaultsContractTrait for VaultsContract {
             panic_with_error!(&env, &SCErrors::IndexProvidedIsNotTheOneSaved);
         }
 
-        // TODO: Add fee logic
         // TODO: check if we are in panic mode once is implemented
         // TODO: check if collateral price has been updated lately
 
@@ -616,8 +626,6 @@ impl VaultsContractTrait for VaultsContract {
             panic_with_error!(&env, &SCErrors::PrevVaultCantBeNone);
         }
 
-        // TODO: Add fee logic
-
         let currency: Currency = get_currency(&env, &target_vault.denomination);
 
         if amount > target_vault.total_debt {
@@ -645,11 +653,20 @@ impl VaultsContractTrait for VaultsContract {
             vaults_info.total_vaults = vaults_info.total_vaults - 1;
             vaults_info.total_col = vaults_info.total_col - target_vault.total_collateral;
 
+            let fee: u128 = calc_fee(&core_state.fee, &target_vault.total_collateral);
+
             withdraw_collateral(
                 &env,
                 &core_state,
                 &target_vault.account,
-                target_vault.total_collateral as i128,
+                (target_vault.total_collateral - fee) as i128,
+            );
+
+            pay_fee(
+                &env,
+                &core_state,
+                &env.current_contract_address(),
+                fee as i128,
             );
 
             withdraw_vault(&env, &target_vault, &prev_key);
@@ -706,8 +723,6 @@ impl VaultsContractTrait for VaultsContract {
         validate_currency(&env, &denomination);
         is_currency_active(&env, &denomination);
 
-        // TODO: Add fee logic
-
         let core_state: CoreState = get_core_state(&env);
         let currency: Currency = get_currency(&env, &denomination);
         let mut vaults_info: VaultsInfo = get_vaults_info(&env, &denomination);
@@ -729,8 +744,9 @@ impl VaultsContractTrait for VaultsContract {
         );
 
         // Update the redeemable vaults information
+        let fee: u128 = calc_fee(&core_state.fee, &lowest_vault.total_collateral);
         let collateral_to_withdraw: u128 =
-            div_floor(lowest_vault.total_debt * 10000000, currency.rate);
+            div_floor(lowest_vault.total_debt * 10000000, currency.rate) - fee;
 
         vaults_info.total_vaults = vaults_info.total_vaults - 1;
         vaults_info.total_col = vaults_info.total_col - lowest_vault.total_collateral;
@@ -742,12 +758,20 @@ impl VaultsContractTrait for VaultsContract {
             &env,
             &core_state,
             &lowest_vault.account,
-            (lowest_vault.total_collateral - collateral_to_withdraw) as i128,
+            (lowest_vault.total_collateral - collateral_to_withdraw - fee) as i128,
         );
 
         withdraw_vault(&env, &lowest_vault, &OptionalVaultKey::None);
 
         withdraw_collateral(&env, &core_state, &caller, collateral_to_withdraw as i128);
+
+        pay_fee(
+            &env,
+            &core_state,
+            &env.current_contract_address(),
+            fee as i128,
+        );
+
         set_vaults_info(&env, &vaults_info);
     }
 
@@ -759,8 +783,6 @@ impl VaultsContractTrait for VaultsContract {
     ) -> Vec<Vault> {
         bump_instance(&env);
         liquidator.require_auth();
-
-        // TODO: Add fee logic
 
         let core_state: CoreState = get_core_state(&env);
         let currency: Currency = get_currency(&env, &denomination);
@@ -805,12 +827,10 @@ impl VaultsContractTrait for VaultsContract {
             &liquidator,
             amount_to_deposit as i128,
         );
-        withdraw_collateral(
-            &env,
-            &core_state,
-            &liquidator,
-            collateral_to_withdraw as i128,
-        );
+
+        let end_collateral: u128 =
+            collateral_to_withdraw - calc_fee(&core_state.fee, &collateral_to_withdraw);
+        withdraw_collateral(&env, &core_state, &liquidator, end_collateral as i128);
 
         vaults_to_liquidate
     }

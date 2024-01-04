@@ -7,6 +7,8 @@ use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
 };
 use crate::utils::indexes::calculate_user_vault_index;
+use crate::utils::payments::calc_fee;
+use soroban_sdk::testutils::arbitrary::std::println;
 use soroban_sdk::testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation};
 use soroban_sdk::{symbol_short, token, vec, Address, Env, Error, IntoVal, Symbol, Vec};
 
@@ -55,7 +57,10 @@ fn test_liquidation() {
     // Create both vaults
 
     let depositor_key: VaultKey = VaultKey {
-        index: calculate_user_vault_index(depositor_debt.clone(), depositor_collateral.clone()),
+        index: calculate_user_vault_index(
+            depositor_debt.clone(),
+            (depositor_collateral - calc_fee(&data.fee, &depositor_collateral)).clone(),
+        ),
         account: depositor.clone(),
         denomination: data.stable_token_denomination.clone(),
     };
@@ -66,12 +71,10 @@ fn test_liquidation() {
         &depositor_collateral,
         &data.stable_token_denomination,
     );
+    let depositor_vault: Vault = data
+        .contract_client
+        .get_vault(&depositor, &data.stable_token_denomination);
 
-    let liquidator_key: VaultKey = VaultKey {
-        index: calculate_user_vault_index(liquidator_debt.clone(), liquidator_collateral.clone()),
-        account: liquidator.clone(),
-        denomination: data.stable_token_denomination.clone(),
-    };
     data.contract_client.new_vault(
         &OptionalVaultKey::Some(depositor_key.clone()),
         &liquidator,
@@ -157,7 +160,13 @@ fn test_liquidation() {
         token::Client::new(&env, &data.collateral_token_client.address).balance(&liquidator)
             as u128;
 
-    assert_eq!(liquidator_collateral_balance, depositor_collateral);
+    let deposited_collateral: u128 =
+        depositor_collateral - calc_fee(&data.fee, &depositor_collateral);
+
+    assert_eq!(
+        liquidator_collateral_balance,
+        deposited_collateral - calc_fee(&data.fee, &deposited_collateral)
+    );
 
     // The liquidator should have 0 stablecoins
     let liquidator_debt_balance =
@@ -170,7 +179,10 @@ fn test_liquidation() {
         .contract_client
         .get_vaults_info(&data.stable_token_denomination);
 
-    assert_eq!(updated_vaults_info.total_col, liquidator_collateral);
+    assert_eq!(
+        updated_vaults_info.total_col,
+        liquidator_collateral - calc_fee(&data.fee, &liquidator_collateral)
+    );
     assert_eq!(updated_vaults_info.total_debt, liquidator_debt);
     assert_eq!(updated_vaults_info.total_vaults, 1);
 

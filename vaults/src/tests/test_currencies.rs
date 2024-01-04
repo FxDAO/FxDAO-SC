@@ -19,6 +19,8 @@ fn test_create_new_currency() {
         &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
+        &data.treasury,
+        &data.fee,
     );
 
     data.contract_client.create_currency(

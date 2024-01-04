@@ -22,6 +22,8 @@ fn test_init() {
         &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
+        &data.treasury,
+        &data.fee,
     );
 
     let core_state: CoreState = data.contract_client.get_core_state();
@@ -41,6 +43,8 @@ fn test_init() {
             &data.protocol_manager,
             &data.collateral_token_client.address,
             &data.stable_token_issuer,
+            &data.treasury,
+            &data.fee,
         )
         .unwrap_err();
 
@@ -60,6 +64,8 @@ fn test_site_updates() {
         &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
+        &data.treasury,
+        &data.fee,
     );
 
     let core_state: CoreState = data.contract_client.get_core_state();
