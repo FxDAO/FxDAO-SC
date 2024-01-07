@@ -40,20 +40,6 @@ fn test_liquidation() {
     token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
         .mint(&liquidator, &(liquidator_collateral as i128));
 
-    token::Client::new(&env, &data.collateral_token_client.address).approve(
-        &depositor,
-        &data.contract_client.address,
-        &9000000000000000,
-        &200_000,
-    );
-
-    token::Client::new(&env, &data.collateral_token_client.address).approve(
-        &liquidator,
-        &data.contract_client.address,
-        &9000000000000000,
-        &200_000,
-    );
-
     // Create both vaults
 
     let depositor_key: VaultKey = VaultKey {
@@ -129,13 +115,8 @@ fn test_liquidation() {
                 sub_invocations: std::vec![AuthorizedInvocation {
                     function: AuthorizedFunction::Contract((
                         data.stable_token_admin_client.address.clone(),
-                        symbol_short!("transfer"),
-                        (
-                            liquidator.clone(),
-                            data.contract_client.address.clone(),
-                            depositor_debt as i128
-                        )
-                            .into_val(&env),
+                        symbol_short!("burn"),
+                        (liquidator.clone(), depositor_debt as i128).into_val(&env),
                     )),
                     sub_invocations: std::vec![],
                 }],

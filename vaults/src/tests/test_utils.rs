@@ -144,28 +144,9 @@ pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVar
         &data.stable_token_denomination,
     );
 
-    token::Client::new(&env, &data.stable_token_client.address).approve(
-        &data.stable_token_issuer,
-        &data.contract_client.address,
-        &9000000000000000,
-        &200_000,
-    );
+    token::StellarAssetClient::new(&env, &data.stable_token_client.address)
+        .set_admin(&base_variables.contract_address);
 
     token::StellarAssetClient::new(&env, &data.stable_token_client.address)
         .mint(&data.stable_token_issuer, &90000000000000000000);
-}
-
-pub fn set_allowance(env: &Env, data: &TestData, depositor: &Address) {
-    token::Client::new(&env, &data.collateral_token_client.address).approve(
-        &depositor,
-        &data.contract_client.address,
-        &9000000000000000,
-        &200_000,
-    );
-    token::Client::new(&env, &data.stable_token_client.address).approve(
-        &depositor,
-        &data.contract_client.address,
-        &9000000000000000,
-        &200_000,
-    );
 }

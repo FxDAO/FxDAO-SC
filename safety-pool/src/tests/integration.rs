@@ -44,6 +44,7 @@ fn fully_test_complex_liquidations_rewards_flow() {
     let min_collateral_rate: u128 = 1_1000000;
     let opening_debt_amount: u128 = 1_0000000;
     let opening_collateral_rate: u128 = 1_1500000;
+    let vaults_contract_fee: u128 = 0;
 
     vaults_contract_client.init(
         &vaults_contract_admin,
@@ -51,6 +52,8 @@ fn fully_test_complex_liquidations_rewards_flow() {
         &vaults_contract_admin,
         &xlm_token_client.address,
         &usd_token_admin,
+        &treasury_contract,
+        &vaults_contract_fee,
     );
 
     vaults_contract_client.create_currency(&usd_token_denomination, &usd_token_client.address);
@@ -66,12 +69,7 @@ fn fully_test_complex_liquidations_rewards_flow() {
         &usd_token_denomination,
     );
 
-    usd_token_client.approve(
-        &usd_token_admin,
-        &vaults_contract_address,
-        &90000000000000000000,
-        &200_000,
-    );
+    usd_token_client_admin.set_admin(&vaults_contract_address);
 
     usd_token_client_admin.mint(&usd_token_admin, &90000000000000000000);
 
@@ -98,8 +96,7 @@ fn fully_test_complex_liquidations_rewards_flow() {
 
     // We create the first vault depositor
     let vault_depositor_1: Address = Address::generate(&env);
-    xlm_token_client_admin.mint(&vault_depositor_1, &63250_0000000);
-    usd_token_client_admin.mint(&vault_depositor_1, &5500_0000000);
+    xlm_token_client_admin.mint(&vault_depositor_1, &63629_0000000);
 
     vaults_contract_client.new_vault(
         &OptionalVaultKey::None,

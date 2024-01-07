@@ -36,7 +36,7 @@ launch_standalone:
 	docker run -d -it \
       -p 8000:8000 \
       --name stellar-soroban-network \
-      stellar/quickstart:testing \
+      stellar/quickstart:pr-540-testing \
       --standalone \
       --enable-soroban-rpc
 

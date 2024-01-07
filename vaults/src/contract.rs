@@ -9,8 +9,7 @@ use crate::utils::currencies::{
 };
 use crate::utils::indexes::calculate_user_vault_index;
 use crate::utils::payments::{
-    calc_fee, deposit_collateral, deposit_stablecoin, pay_fee, withdraw_collateral,
-    withdraw_stablecoin,
+    burn_stablecoin, calc_fee, deposit_collateral, mint_stablecoin, pay_fee, withdraw_collateral,
 };
 use crate::utils::vaults::{
     bump_vault, bump_vault_index, calculate_deposit_ratio, can_be_liquidated,
@@ -363,7 +362,7 @@ impl VaultsContractTrait for VaultsContract {
         set_vaults_info(&env, &vaults_info);
 
         deposit_collateral(&env, &core_state, &caller, vault_col as i128);
-        withdraw_stablecoin(&env, &core_state, &currency, &caller, initial_debt as i128);
+        mint_stablecoin(&env, &currency, &caller, initial_debt as i128);
         pay_fee(&env, &core_state, &caller, fee as i128);
 
         bump_vault(&env, new_vault_key);
@@ -558,13 +557,7 @@ impl VaultsContractTrait for VaultsContract {
             panic_with_error!(&env, SCErrors::CollateralRateUnderMinimum);
         }
 
-        withdraw_stablecoin(
-            &env,
-            &core_state,
-            &currency,
-            &target_vault.account,
-            amount as i128,
-        );
+        mint_stablecoin(&env, &currency, &target_vault.account, amount as i128);
 
         let new_vault_key: VaultKey = VaultKey {
             index: calculate_user_vault_index(
@@ -634,13 +627,7 @@ impl VaultsContractTrait for VaultsContract {
 
         let core_state: CoreState = get_core_state(&env);
 
-        deposit_stablecoin(
-            &env,
-            &core_state,
-            &currency,
-            &target_vault.account,
-            amount as i128,
-        );
+        burn_stablecoin(&env, &currency, &target_vault.account, amount as i128);
 
         if target_vault.total_debt == amount {
             // If the amount is equal to the debt it means it is paid in full so we release the collateral and remove the vault
@@ -735,13 +722,7 @@ impl VaultsContractTrait for VaultsContract {
 
         let lowest_vault: Vault = get_vault(&env, lowest_key);
 
-        deposit_stablecoin(
-            &env,
-            &core_state,
-            &currency,
-            &caller,
-            lowest_vault.total_debt as i128,
-        );
+        burn_stablecoin(&env, &currency, &caller, lowest_vault.total_debt as i128);
 
         // Update the redeemable vaults information
         let fee: u128 = calc_fee(&core_state.fee, &lowest_vault.total_collateral);
@@ -820,13 +801,7 @@ impl VaultsContractTrait for VaultsContract {
         }
 
         set_vaults_info(&env, &vaults_info);
-        deposit_stablecoin(
-            &env,
-            &core_state,
-            &currency,
-            &liquidator,
-            amount_to_deposit as i128,
-        );
+        burn_stablecoin(&env, &currency, &liquidator, amount_to_deposit as i128);
 
         let end_collateral: u128 =
             collateral_to_withdraw - calc_fee(&core_state.fee, &collateral_to_withdraw);

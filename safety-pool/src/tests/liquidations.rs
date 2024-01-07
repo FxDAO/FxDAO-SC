@@ -60,6 +60,7 @@ fn test_simple_liquidations_flow() {
     let min_collateral_rate: u128 = 1_1000000;
     let opening_debt_amount: u128 = 1_0000000;
     let opening_collateral_rate: u128 = 1_1500000;
+    let vaults_contract_fee: u128 = 0;
 
     vaults_contract_client.init(
         &vaults_contract_admin,
@@ -67,6 +68,8 @@ fn test_simple_liquidations_flow() {
         &vaults_contract_admin,
         &collateral_token_client.address,
         &stable_token_admin,
+        &treasury_contract,
+        &vaults_contract_fee,
     );
 
     vaults_contract_client
@@ -83,12 +86,7 @@ fn test_simple_liquidations_flow() {
         &stable_token_denomination,
     );
 
-    stable_token_client.approve(
-        &stable_token_admin,
-        &vaults_contract_address,
-        &90000000000000000000,
-        &200_000,
-    );
+    stable_token_client_admin.set_admin(&vaults_contract_address);
 
     stable_token_client_admin.mint(&stable_token_admin, &90000000000000000000);
 

@@ -91,14 +91,3 @@ pub fn init_contract(test_data: &TestData) {
         &test_data.governance_asset_client.address,
     );
 }
-
-pub fn set_allowance(env: &Env, assets: &Vec<Address>, contract: &Address, depositor: &Address) {
-    for asset in assets.iter() {
-        token::Client::new(&env, &asset).approve(
-            &depositor,
-            &contract,
-            &9000000000000000,
-            &200_000,
-        );
-    }
-}

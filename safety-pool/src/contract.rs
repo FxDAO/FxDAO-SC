@@ -450,10 +450,9 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
             InvokerContractAuthEntry::Contract(SubContractInvocation {
                 context: ContractContext {
                     contract: core_state.deposit_asset.clone(),
-                    fn_name: symbol_short!("transfer"),
+                    fn_name: symbol_short!("burn"),
                     args: (
                         env.current_contract_address(),
-                        core_state.vaults_contract.clone(),
                         total_debt_to_pay.clone() as i128,
                     )
                         .into_val(&env),

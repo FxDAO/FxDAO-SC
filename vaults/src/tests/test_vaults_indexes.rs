@@ -17,13 +17,6 @@ fn test_indexes_orders() {
     set_initial_state(&env, &data, &base_variables);
     let contract_address: Address = data.contract_client.address.clone();
 
-    token::Client::new(&env, &data.stable_token_client.address).approve(
-        &data.stable_token_issuer,
-        &contract_address,
-        &90000000000000000000,
-        &200_000,
-    );
-
     let currency_price: u128 = 920330;
     let min_col_rate: u128 = 11000000;
     let min_debt_creation: u128 = 1000000000;

@@ -3,8 +3,7 @@ extern crate std;
 
 use crate::storage::vaults::*;
 use crate::tests::test_utils::{
-    create_base_data, create_base_variables, set_allowance, set_initial_state, InitialVariables,
-    TestData,
+    create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
 };
 use crate::utils::indexes::calculate_user_vault_index;
 use crate::utils::payments::calc_fee;
@@ -199,13 +198,8 @@ fn test_redeem() {
                 sub_invocations: std::vec![AuthorizedInvocation {
                     function: AuthorizedFunction::Contract((
                         data.stable_token_client.address.clone(),
-                        symbol_short!("transfer"),
-                        (
-                            redeem_user.clone(),
-                            data.contract_client.address.clone(),
-                            depositor_2_debt.clone() as i128,
-                        )
-                            .into_val(&env),
+                        symbol_short!("burn"),
+                        (redeem_user.clone(), depositor_2_debt.clone() as i128,).into_val(&env),
                     )),
                     sub_invocations: std::vec![],
                 }],

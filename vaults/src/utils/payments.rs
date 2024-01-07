@@ -1,7 +1,7 @@
 use crate::storage::core::CoreState;
 use crate::storage::currencies::Currency;
 use num_integer::{div_ceil, div_floor};
-use soroban_sdk::{panic_with_error, token, Address, Env, Symbol};
+use soroban_sdk::{self, panic_with_error, token, Address, Env, Symbol};
 
 pub fn calc_fee(fee: &u128, amount: &u128) -> u128 {
     div_ceil(amount * fee, 1_0000000)
@@ -19,21 +19,6 @@ pub fn deposit_collateral(env: &Env, core_state: &CoreState, depositor: &Address
     );
 }
 
-pub fn withdraw_stablecoin(
-    env: &Env,
-    core_state: &CoreState,
-    currency: &Currency,
-    recipient: &Address,
-    amount: i128,
-) {
-    token::Client::new(&env, &currency.contract).transfer_from(
-        &env.current_contract_address(),
-        &core_state.stable_issuer,
-        recipient,
-        &amount,
-    );
-}
-
 pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Address, amount: i128) {
     token::Client::new(&env, &core_state.col_token).transfer(
         &env.current_contract_address(),
@@ -42,22 +27,10 @@ pub fn withdraw_collateral(env: &Env, core_state: &CoreState, requester: &Addres
     );
 }
 
-pub fn deposit_stablecoin(
-    env: &Env,
-    core_state: &CoreState,
-    currency: &Currency,
-    depositor: &Address,
-    amount: i128,
-) {
-    token::Client::new(&env, &currency.contract).transfer(
-        depositor,
-        &env.current_contract_address(),
-        &amount,
-    );
+pub fn mint_stablecoin(env: &Env, currency: &Currency, recipient: &Address, amount: i128) {
+    token::StellarAssetClient::new(&env, &currency.contract).mint(&recipient, &amount);
+}
 
-    token::Client::new(&env, &currency.contract).transfer(
-        &env.current_contract_address(),
-        &core_state.stable_issuer,
-        &amount,
-    );
+pub fn burn_stablecoin(env: &Env, currency: &Currency, depositor: &Address, amount: i128) {
+    token::Client::new(&env, &currency.contract).burn(depositor, &amount);
 }

@@ -4,8 +4,7 @@ extern crate std;
 
 use crate::storage::vaults::*;
 use crate::tests::test_utils::{
-    create_base_data, create_base_variables, set_allowance, set_initial_state, InitialVariables,
-    TestData,
+    create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
 };
 
 use crate::errors::SCErrors;
@@ -94,15 +93,8 @@ fn test_new_vault() {
     let min_debt_creation: u128 = 5000_0000000;
     let opening_col_rate: u128 = 1_1500000;
 
-    token::Client::new(&env, &data.stable_token_client.address).approve(
-        &data.stable_token_issuer,
-        &contract_address,
-        &90000000000000000000,
-        &200_000,
-    );
-
     token::StellarAssetClient::new(&env, &data.stable_token_client.address)
-        .mint(&data.stable_token_issuer, &90000000000000000000);
+        .set_admin(&contract_address);
 
     // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
     // let inactive_currency = data
@@ -474,13 +466,6 @@ fn test_increase_collateral() {
     set_initial_state(&env, &data, &base_variables);
     let contract_address: Address = data.contract_client.address.clone();
 
-    token::Client::new(&env, &data.stable_token_client.address).approve(
-        &data.stable_token_issuer,
-        &contract_address,
-        &90000000000000000000,
-        &200_000,
-    );
-
     data.contract_client.set_vault_conditions(
         &base_variables.min_col_rate,
         &base_variables.min_debt_creation,
@@ -802,13 +787,6 @@ fn test_increase_debt() {
     set_initial_state(&env, &data, &base_variables);
     let contract_address: Address = data.contract_client.address.clone();
 
-    token::Client::new(&env, &data.stable_token_client.address).approve(
-        &data.stable_token_issuer,
-        &contract_address,
-        &90000000000000000000,
-        &200_000,
-    );
-
     data.contract_client.set_vault_conditions(
         &base_variables.min_col_rate,
         &base_variables.min_debt_creation,
@@ -1060,10 +1038,9 @@ fn test_pay_debt() {
                     (AuthorizedInvocation {
                         function: AuthorizedFunction::Contract((
                             data.stable_token_client.address.clone(),
-                            symbol_short!("transfer"),
+                            symbol_short!("burn"),
                             (
                                 vault.account.clone(),
-                                data.contract_client.address.clone(),
                                 base_variables.initial_debt.clone() as i128,
                             )
                                 .into_val(&env),
