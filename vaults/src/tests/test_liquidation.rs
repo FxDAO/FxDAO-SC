@@ -4,7 +4,8 @@ extern crate std;
 use crate::errors::SCErrors;
 use crate::storage::vaults::*;
 use crate::tests::test_utils::{
-    create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
+    create_base_data, create_base_variables, set_initial_state, update_oracle_price,
+    InitialVariables, TestData,
 };
 use crate::utils::indexes::calculate_user_vault_index;
 use crate::utils::payments::calc_fee;
@@ -23,8 +24,12 @@ fn test_liquidation() {
     set_initial_state(&env, &data, &base_variables);
 
     let first_rate: u128 = 931953;
-    data.contract_client
-        .set_currency_rate(&data.stable_token_denomination, &first_rate);
+    update_oracle_price(
+        &env,
+        &data.oracle_contract_client,
+        &data.stable_token_denomination,
+        &(first_rate as i128),
+    );
 
     let depositor: Address = Address::generate(&env);
     let depositor_debt: u128 = 5_000_0000000;
@@ -84,8 +89,12 @@ fn test_liquidation() {
 
     // We update the collateral price in order to put the depositor's vault below the min collateral ratio
     let second_rate: u128 = 531953;
-    data.contract_client
-        .set_currency_rate(&data.stable_token_denomination, &second_rate);
+    update_oracle_price(
+        &env,
+        &data.oracle_contract_client,
+        &data.stable_token_denomination,
+        &(second_rate as i128),
+    );
 
     let current_vaults_info: VaultsInfo = data
         .contract_client
@@ -175,7 +184,7 @@ fn test_liquidation() {
         &true,
     );
 
-    assert_eq!(current_vaults, vec![&env] as Vec<Vault>);
+    assert_eq!(current_vaults, Vec::new(&env));
 }
 
 #[test]
@@ -199,8 +208,12 @@ fn test_vaults_to_liquidate() {
     let first_rate: u128 = 0_0958840;
     let second_rate: u128 = 0_0586660;
 
-    data.contract_client
-        .set_currency_rate(&data.stable_token_denomination, &first_rate);
+    update_oracle_price(
+        &env,
+        &data.oracle_contract_client,
+        &data.stable_token_denomination,
+        &(first_rate as i128),
+    );
 
     let depositor_1: Address = Address::generate(&env);
     let depositor_2: Address = Address::generate(&env);
@@ -284,8 +297,12 @@ fn test_vaults_to_liquidate() {
 
     assert_eq!(current_vaults_to_liquidate, vec![&env]);
 
-    data.contract_client
-        .set_currency_rate(&data.stable_token_denomination, &second_rate);
+    update_oracle_price(
+        &env,
+        &data.oracle_contract_client,
+        &data.stable_token_denomination,
+        &(second_rate as i128),
+    );
 
     current_vaults_to_liquidate = data.contract_client.get_vaults(
         &OptionalVaultKey::None,

@@ -1,8 +1,8 @@
 #![cfg(test)]
 
 use crate::tests::utils::{create_test_data, create_token_contract, init_contract, TestData};
-use crate::vaults;
 use crate::vaults::{OptionalVaultKey, VaultKey};
+use crate::{oracle, vaults};
 use num_integer::div_floor;
 use soroban_sdk::iter::UnwrappedEnumerable;
 use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo};
@@ -13,6 +13,10 @@ use crate::errors::SCErrors;
 use crate::storage::core::CoreStats;
 use crate::storage::deposits::Deposit;
 use crate::storage::liquidations::Liquidation;
+
+use crate::oracle::{
+    Asset, AssetsData, Client as OracleClient, CoreData, CustomerQuota, PriceData,
+};
 
 #[test]
 fn fully_test_complex_liquidations_rewards_flow() {
@@ -46,19 +50,54 @@ fn fully_test_complex_liquidations_rewards_flow() {
     let opening_collateral_rate: u128 = 1_1500000;
     let vaults_contract_fee: u128 = 0;
 
+    // Oracle contract
+    let oracle: Address = env.register_contract_wasm(None, oracle::WASM);
+    let oracle_contract_client: OracleClient = OracleClient::new(&env, &oracle);
+    let oracle_contract_admin: Address = Address::generate(&env);
+
     vaults_contract_client.init(
-        &vaults_contract_admin,
         &vaults_contract_admin,
         &vaults_contract_admin,
         &xlm_token_client.address,
         &usd_token_admin,
         &treasury_contract,
         &vaults_contract_fee,
+        &oracle,
+    );
+
+    oracle_contract_client.init(
+        &CoreData {
+            adm: oracle_contract_admin.clone(),
+            tick: 60,
+            dp: 7,
+        },
+        &AssetsData {
+            base: Asset::Stellar(xlm_token_client.address.clone()),
+            assets: Vec::from_array(&env, [Asset::Other(usd_token_denomination.clone())]),
+        },
+    );
+
+    oracle_contract_client.set_quota(
+        &vaults_contract_client.address,
+        &CustomerQuota {
+            max: 0,
+            current: 0,
+            exp: u64::MAX,
+        },
     );
 
     vaults_contract_client.create_currency(&usd_token_denomination, &usd_token_client.address);
 
-    vaults_contract_client.set_currency_rate(&usd_token_denomination, &0_1000000);
+    oracle_contract_client.set_records(
+        &Vec::from_array(&env, [Asset::Other(usd_token_denomination.clone())]),
+        &Vec::from_array(
+            &env,
+            [PriceData {
+                price: 0_1000000,
+                timestamp: 1,
+            }],
+        ),
+    );
 
     vaults_contract_client.toggle_currency(&usd_token_denomination, &true);
 
@@ -78,8 +117,8 @@ fn fully_test_complex_liquidations_rewards_flow() {
     let pool_contract_client = SafetyPoolContractClient::new(&env, &pool_contract_id);
     let pool_contract_admin: Address = Address::generate(&env);
     let min_pool_deposit: u128 = 100_0000000;
-    let profit_share: Vec<u32> = vec![&env, 1u32, 2u32] as Vec<u32>;
-    let liquidator_share: Vec<u32> = vec![&env, 1u32, 2u32] as Vec<u32>;
+    let profit_share: Vec<u32> = Vec::from_array(&env, [1u32, 2u32]);
+    let liquidator_share: Vec<u32> = Vec::from_array(&env, [1u32, 2u32]);
 
     pool_contract_client.init(
         &pool_contract_admin,
@@ -89,9 +128,17 @@ fn fully_test_complex_liquidations_rewards_flow() {
         &usd_token_client.address,
         &usd_token_denomination,
         &min_pool_deposit,
-        &profit_share,
-        &liquidator_share,
         &governance_token_client.address,
+        &oracle,
+    );
+
+    oracle_contract_client.set_quota(
+        &pool_contract_client.address,
+        &CustomerQuota {
+            max: 0,
+            current: 0,
+            exp: u64::MAX,
+        },
     );
 
     // We create the first vault depositor
@@ -140,7 +187,16 @@ fn fully_test_complex_liquidations_rewards_flow() {
     // Phase 2: We liquidate the vault
 
     // We drop the collateral price so it can be liquidated
-    vaults_contract_client.set_currency_rate(&usd_token_denomination, &0_0956521);
+    oracle_contract_client.set_records(
+        &Vec::from_array(&env, [Asset::Other(usd_token_denomination.clone())]),
+        &Vec::from_array(
+            &env,
+            [PriceData {
+                price: 0_0956521,
+                timestamp: 1,
+            }],
+        ),
+    );
 
     let liquidator_1: Address = Address::generate(&env);
     pool_contract_client.liquidate(&liquidator_1);
@@ -161,7 +217,7 @@ fn fully_test_complex_liquidations_rewards_flow() {
     );
 
     let liquidation_1: Liquidation = pool_contract_client
-        .get_liquidations(&(vec![&env, 0u64] as Vec<u64>))
+        .get_liquidations(&(Vec::from_array(&env, [0u64])))
         .get(0)
         .unwrap();
 
@@ -206,7 +262,16 @@ fn fully_test_complex_liquidations_rewards_flow() {
     // Phase 4: We make another liquidation
 
     // First let's set the new currency price (this time we want to have a profit from the liquidation)
-    vaults_contract_client.set_currency_rate(&usd_token_denomination, &0_1000000);
+    oracle_contract_client.set_records(
+        &Vec::from_array(&env, [Asset::Other(usd_token_denomination.clone())]),
+        &Vec::from_array(
+            &env,
+            [PriceData {
+                price: 0_1000000,
+                timestamp: 1,
+            }],
+        ),
+    );
 
     let vault_depositor_2: Address = Address::generate(&env);
     let vault_depositor_2_debt: u128 = 8000_0000000;
@@ -223,7 +288,16 @@ fn fully_test_complex_liquidations_rewards_flow() {
     );
 
     // We set the new currency price so it can be liquidated
-    vaults_contract_client.set_currency_rate(&usd_token_denomination, &0_0956521);
+    oracle_contract_client.set_records(
+        &Vec::from_array(&env, [Asset::Other(usd_token_denomination.clone())]),
+        &Vec::from_array(
+            &env,
+            [PriceData {
+                price: 0_0956521,
+                timestamp: 1,
+            }],
+        ),
+    );
 
     // We liquidate the second vault
     let liquidator_2: Address = Address::generate(&env);
@@ -245,7 +319,7 @@ fn fully_test_complex_liquidations_rewards_flow() {
     );
 
     let liquidation_2: Liquidation = pool_contract_client
-        .get_liquidations(&(vec![&env, 1u64] as Vec<u64>))
+        .get_liquidations(&(Vec::from_array(&env, [1u64])))
         .get(0)
         .unwrap();
 
@@ -263,7 +337,16 @@ fn fully_test_complex_liquidations_rewards_flow() {
         }
     );
 
-    vaults_contract_client.set_currency_rate(&usd_token_denomination, &0_1000000);
+    oracle_contract_client.set_records(
+        &Vec::from_array(&env, [Asset::Other(usd_token_denomination.clone())]),
+        &Vec::from_array(
+            &env,
+            [PriceData {
+                price: 0_1000000,
+                timestamp: 1,
+            }],
+        ),
+    );
 
     // Phase 5: Another new depositor and one depositor leaving
 

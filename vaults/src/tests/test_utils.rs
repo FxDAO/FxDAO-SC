@@ -1,9 +1,12 @@
 #![cfg(test)]
 use crate::contract::VaultsContract;
+use crate::oracle::{
+    Asset, AssetsData, Client as OracleClient, CoreData, CustomerQuota, PriceData,
+};
 use crate::utils::payments::calc_fee;
-use crate::VaultsContractClient;
+use crate::{oracle, VaultsContractClient};
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{symbol_short, token, Address, Env, IntoVal, Symbol};
+use soroban_sdk::{symbol_short, token, Address, Env, IntoVal, Symbol, Vec};
 use token::Client as TokenClient;
 use token::StellarAssetClient as TokenAdminClient;
 
@@ -18,7 +21,6 @@ fn create_token_contract<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, Toke
 pub struct TestData<'a> {
     // Contract data
     pub contract_admin: Address,
-    pub oracle_admin: Address,
     pub protocol_manager: Address,
     pub contract_client: VaultsContractClient<'a>,
     pub treasury: Address,
@@ -39,6 +41,10 @@ pub struct TestData<'a> {
     pub stable_token_issuer: Address,
     pub stable_token_client: TokenClient<'a>,
     pub stable_token_admin_client: TokenAdminClient<'a>,
+
+    pub oracle: Address,
+    pub oracle_contract_client: OracleClient<'a>,
+    pub oracle_contract_admin: Address,
 }
 
 pub struct InitialVariables {
@@ -73,15 +79,18 @@ pub fn create_base_data(env: &Env) -> TestData {
         create_token_contract(&env, &stable_token_issuer);
 
     // Create the contract
-    let contract_admin = Address::generate(&env);
-    let oracle_admin = Address::generate(&env);
-    let protocol_manager = Address::generate(&env);
+    let contract_admin: Address = Address::generate(&env);
+    let protocol_manager: Address = Address::generate(&env);
     let contract_client =
         VaultsContractClient::new(&env, &env.register_contract(None, VaultsContract));
 
+    // Oracle contract
+    let oracle: Address = env.register_contract_wasm(None, oracle::WASM);
+    let oracle_contract_client: OracleClient = OracleClient::new(&env, &oracle);
+    let oracle_contract_admin: Address = Address::generate(&env);
+
     return TestData {
         contract_admin,
-        oracle_admin,
         protocol_manager,
         contract_client,
         treasury: Address::generate(&env),
@@ -96,6 +105,10 @@ pub fn create_base_data(env: &Env) -> TestData {
         stable_token_issuer,
         stable_token_client,
         stable_token_admin_client,
+
+        oracle,
+        oracle_contract_client,
+        oracle_contract_admin,
     };
 }
 
@@ -116,12 +129,12 @@ pub fn create_base_variables(env: &Env, data: &TestData) -> InitialVariables {
 pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVariables) {
     data.contract_client.init(
         &data.contract_admin,
-        &data.oracle_admin,
         &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
         &data.treasury,
         &data.fee,
+        &data.oracle,
     );
 
     data.contract_client.create_currency(
@@ -129,10 +142,7 @@ pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVar
         &data.stable_token_client.address,
     );
 
-    data.contract_client.set_currency_rate(
-        &data.stable_token_denomination,
-        &base_variables.currency_price,
-    );
+    init_oracle_contract(&env, &data, &(base_variables.currency_price as i128));
 
     data.contract_client
         .toggle_currency(&data.stable_token_denomination, &true);
@@ -149,4 +159,47 @@ pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVar
 
     token::StellarAssetClient::new(&env, &data.stable_token_client.address)
         .mint(&data.stable_token_issuer, &90000000000000000000);
+}
+
+pub fn init_oracle_contract(env: &Env, data: &TestData, rate: &i128) {
+    data.oracle_contract_client.init(
+        &CoreData {
+            adm: data.oracle_contract_admin.clone(),
+            tick: 60,
+            dp: 7,
+        },
+        &AssetsData {
+            base: Asset::Stellar(data.collateral_token_client.address.clone()),
+            assets: Vec::from_array(&env, [Asset::Other(data.stable_token_denomination.clone())]),
+        },
+    );
+
+    update_oracle_price(
+        &env,
+        &data.oracle_contract_client,
+        &data.stable_token_denomination,
+        rate,
+    );
+
+    data.oracle_contract_client.set_quota(
+        &data.contract_client.address,
+        &CustomerQuota {
+            max: 0,
+            current: 0,
+            exp: u64::MAX,
+        },
+    );
+}
+
+pub fn update_oracle_price(env: &Env, client: &OracleClient, denomination: &Symbol, price: &i128) {
+    client.set_records(
+        &Vec::from_array(&env, [Asset::Other(denomination.clone())]),
+        &Vec::from_array(
+            &env,
+            [PriceData {
+                price: price.clone(),
+                timestamp: 1,
+            }],
+        ),
+    );
 }

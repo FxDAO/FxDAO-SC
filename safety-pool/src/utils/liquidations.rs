@@ -3,7 +3,7 @@ use crate::storage::deposits::Deposit;
 use crate::storage::liquidations::{Liquidation, LiquidationsDataKeys};
 use crate::utils::deposits::make_withdrawal;
 use num_integer::div_floor;
-use soroban_sdk::{vec, Address, Env, Vec};
+use soroban_sdk::{Address, Env};
 
 pub const DAY_IN_LEDGERS: u32 = 17280;
 pub const PERSISTENT_BUMP_CONSTANT: u32 = DAY_IN_LEDGERS * 30;

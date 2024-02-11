@@ -18,18 +18,18 @@ fn test_init() {
 
     data.contract_client.init(
         &data.contract_admin,
-        &data.oracle_admin,
         &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
         &data.treasury,
         &data.fee,
+        &data.oracle,
     );
 
     let core_state: CoreState = data.contract_client.get_core_state();
 
     assert_eq!(&core_state.col_token, &data.collateral_token_client.address);
-    assert_eq!(&core_state.oracle_admin, &data.oracle_admin);
+    assert_eq!(&core_state.oracle, &data.oracle);
     assert_eq!(&core_state.protocol_manager, &data.protocol_manager);
     assert_eq!(&core_state.admin, &data.contract_admin);
     assert_eq!(&core_state.stable_issuer, &data.stable_token_issuer);
@@ -39,12 +39,12 @@ fn test_init() {
         .contract_client
         .try_init(
             &data.contract_admin,
-            &data.oracle_admin,
             &data.protocol_manager,
             &data.collateral_token_client.address,
             &data.stable_token_issuer,
             &data.treasury,
             &data.fee,
+            &data.oracle,
         )
         .unwrap_err();
 
@@ -60,12 +60,12 @@ fn test_site_updates() {
 
     data.contract_client.init(
         &data.contract_admin,
-        &data.oracle_admin,
         &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
         &data.treasury,
         &data.fee,
+        &data.oracle,
     );
 
     let core_state: CoreState = data.contract_client.get_core_state();

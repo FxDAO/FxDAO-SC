@@ -3,7 +3,8 @@ extern crate std;
 
 use crate::storage::vaults::*;
 use crate::tests::test_utils::{
-    create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
+    create_base_data, create_base_variables, set_initial_state, update_oracle_price,
+    InitialVariables, TestData,
 };
 use crate::utils::indexes::calculate_user_vault_index;
 use crate::utils::payments::calc_fee;
@@ -30,8 +31,12 @@ fn test_redeem() {
     set_initial_state(&env, &data, &base_variables);
 
     let rate: u128 = 931953;
-    data.contract_client
-        .set_currency_rate(&data.stable_token_denomination, &rate);
+    update_oracle_price(
+        &env,
+        &data.oracle_contract_client,
+        &data.stable_token_denomination,
+        &(rate as i128),
+    );
 
     data.contract_client.set_vault_conditions(
         &base_variables.min_col_rate,

@@ -28,6 +28,7 @@ fn update_contract_core_state() {
             treasury_share: target_core_state.clone().treasury_share,
             liquidator_share: target_core_state.clone().liquidator_share,
             governance_token: target_core_state.clone().governance_token,
+            oracle_contract: target_core_state.clone().oracle_contract
         }
     );
 
@@ -134,7 +135,7 @@ fn update_contract_core_state() {
     );
 
     // Update treasury share
-    let new_treasury_share: Vec<u32> = vec![&env, 2u32, 3u32] as Vec<u32>;
+    let new_treasury_share: Vec<u32> = Vec::from_array(&env, [2u32, 3u32]);
     test_data
         .contract_client
         .update_treasury_share(&new_treasury_share);
@@ -160,7 +161,7 @@ fn update_contract_core_state() {
     );
 
     // Update liquidator share
-    let new_liquidator_share: Vec<u32> = vec![&env, 2u32, 3u32] as Vec<u32>;
+    let new_liquidator_share: Vec<u32> = Vec::from_array(&env, [2u32, 3u32]);
     test_data
         .contract_client
         .update_liquidator_share(&new_liquidator_share);

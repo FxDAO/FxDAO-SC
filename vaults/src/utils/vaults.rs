@@ -193,10 +193,10 @@ pub fn search_vault(
 pub fn get_vaults(
     env: &Env,
     prev_key: &OptionalVaultKey,
-    currency: &Currency,
     vaults_info: &VaultsInfo,
     total: u32,
     only_to_liquidate: bool,
+    rate: u128,
 ) -> Vec<Vault> {
     let mut vaults: Vec<Vault> = vec![&env] as Vec<Vault>;
 
@@ -216,7 +216,7 @@ pub fn get_vaults(
     for _ in 0..total {
         let vault: Vault = get_vault(&env, target_key.clone());
 
-        if !can_be_liquidated(&vault, &currency, &vaults_info) && only_to_liquidate {
+        if !can_be_liquidated(&vault, &vaults_info, &rate) && only_to_liquidate {
             break;
         }
 
@@ -238,7 +238,7 @@ pub fn get_redeemable_vaults(
     total_to_redeem: &u128,
 ) -> (u128, Vec<Vault>) {
     let mut total_can_be_redeemed: u128 = 0u128;
-    let mut vaults: Vec<Vault> = vec![&env] as Vec<Vault>;
+    let mut vaults: Vec<Vault> = Vec::new(&env);
 
     let mut target_key: VaultKey = match vaults_info.lowest_key.clone() {
         OptionalVaultKey::None => {
@@ -617,12 +617,8 @@ pub fn validate_user_vault(env: &Env, vault_key: VaultKey) {
     }
 }
 
-pub fn can_be_liquidated(
-    user_vault: &Vault,
-    currency: &Currency,
-    vaults_info: &VaultsInfo,
-) -> bool {
-    let collateral_value: u128 = currency.rate * user_vault.total_collateral;
+pub fn can_be_liquidated(user_vault: &Vault, vaults_info: &VaultsInfo, rate: &u128) -> bool {
+    let collateral_value: u128 = rate * user_vault.total_collateral;
     let deposit_rate: u128 = div_floor(collateral_value, user_vault.total_debt);
     deposit_rate < vaults_info.min_col_rate
 }

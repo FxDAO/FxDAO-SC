@@ -3,14 +3,13 @@ use crate::storage::core::{CoreState, CoreStats};
 use crate::storage::deposits::Deposit;
 use crate::storage::liquidations::Liquidation;
 use crate::utils::core::{
-    bump_instance, can_init_contract, get_core_state, get_core_stats,
-    get_last_governance_token_distribution_time, set_core_state, set_core_stats,
-    set_last_governance_token_distribution_time,
+    bump_instance, can_init_contract, get_core_state, get_core_stats, set_core_state,
+    set_core_stats,
 };
 use crate::utils::deposits::{
-    bump_deposit, bump_depositors, get_contract_balance, get_deposit, get_depositors, has_deposit,
-    is_depositor_listed, make_deposit, make_withdrawal, remove_deposit,
-    remove_depositor_from_depositors, save_deposit, save_depositors,
+    bump_deposit, bump_depositors, get_deposit, get_depositors, has_deposit, is_depositor_listed,
+    make_deposit, make_withdrawal, remove_deposit, remove_depositor_from_depositors, save_deposit,
+    save_depositors,
 };
 use crate::utils::liquidations::{
     bump_liquidation, check_liquidation_exist, get_liquidation, set_liquidation,
@@ -20,10 +19,11 @@ use crate::vaults::{Currency, OptionalVaultKey, Vault};
 use num_integer::div_floor;
 use soroban_sdk::auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation};
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, symbol_short, token, vec, Address, BytesN, Env,
-    IntoVal, Symbol, Val, Vec,
+    contract, contractimpl, panic_with_error, symbol_short, vec, Address, BytesN, Env, IntoVal,
+    Symbol, Vec,
 };
-use token::Client as TokenClient;
+
+use crate::oracle::{Asset, Client as OracleClient, PriceData};
 
 pub const CONTRACT_DESCRIPTION: Symbol = symbol_short!("SafetyP");
 pub const CONTRACT_VERSION: Symbol = symbol_short!("0_3_0");
@@ -38,9 +38,8 @@ pub trait SafetyPoolContractTrait {
         deposit_asset: Address,
         denomination_asset: Symbol,
         min_deposit: u128,
-        treasury_share: Vec<u32>,
-        liquidator_share: Vec<u32>,
         governance_token: Address,
+        oracle_contract: Address,
     );
 
     fn get_core_state(env: Env) -> CoreState;
@@ -97,11 +96,12 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         deposit_asset: Address,
         denomination_asset: Symbol,
         min_deposit: u128,
-        treasury_share: Vec<u32>,
-        liquidator_share: Vec<u32>,
         governance_token: Address,
+        oracle_contract: Address,
     ) {
         can_init_contract(&env);
+
+        let share: Vec<u32> = Vec::from_array(&env, [1, 2]);
         set_core_state(
             &env,
             &CoreState {
@@ -112,9 +112,10 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
                 treasury_contract,
                 denomination_asset,
                 min_deposit,
-                treasury_share,
-                liquidator_share,
+                treasury_share: share.clone(),
+                liquidator_share: share.clone(),
                 governance_token,
+                oracle_contract,
             },
         );
 
@@ -445,9 +446,9 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
             panic_with_error!(&env, SCErrors::CantLiquidateVaults);
         }
 
-        env.authorize_as_current_contract(vec![
+        env.authorize_as_current_contract(Vec::from_array(
             &env,
-            InvokerContractAuthEntry::Contract(SubContractInvocation {
+            [InvokerContractAuthEntry::Contract(SubContractInvocation {
                 context: ContractContext {
                     contract: core_state.deposit_asset.clone(),
                     fn_name: symbol_short!("burn"),
@@ -457,16 +458,17 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
                     )
                         .into_val(&env),
                 },
-                sub_invocations: vec![&env] as Vec<InvokerContractAuthEntry>,
-            }),
-        ] as Vec<InvokerContractAuthEntry>);
+                sub_invocations: Vec::new(&env),
+            })],
+        ));
 
-        let vaults_liquidated: Vec<Vault> = vaults::Client::new(&env, &core_state.vaults_contract)
-            .liquidate(
-                &env.current_contract_address(),
-                &core_state.denomination_asset,
-                &total_vaults,
-            );
+        let vaults_contract = vaults::Client::new(&env, &core_state.vaults_contract);
+
+        let vaults_liquidated: Vec<Vault> = vaults_contract.liquidate(
+            &env.current_contract_address(),
+            &core_state.denomination_asset,
+            &total_vaults,
+        );
 
         let mut total_debt_paid: u128 = 0;
         let mut total_collateral_received: u128 = 0;
@@ -475,8 +477,14 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
             total_collateral_received += vault.total_collateral;
         }
 
-        let collateral_paid_for: u128 =
-            div_floor(total_debt_paid * 1_0000000, currency.rate as u128);
+        let rate: PriceData = OracleClient::new(&env, &core_state.oracle_contract)
+            .lastprice(
+                &env.current_contract_address(),
+                &Asset::Other(core_state.denomination_asset.clone()),
+            )
+            .unwrap();
+
+        let collateral_paid_for: u128 = div_floor(total_debt_paid * 1_0000000, rate.price as u128);
 
         // If collateral paid for is higher than the amount received it means there was a lost in the liquidation.
         let collateral_gained: u128 = if collateral_paid_for > total_collateral_received {
@@ -557,7 +565,7 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
             panic_with_error!(&env, &SCErrors::CantGetMoreThanTenLiquidations);
         }
 
-        let mut liquidations: Vec<Liquidation> = vec![&env] as Vec<Liquidation>;
+        let mut liquidations: Vec<Liquidation> = Vec::new(&env);
         for index in indexes.iter() {
             if check_liquidation_exist(&env, index.clone()) {
                 bump_liquidation(&env, index.clone());

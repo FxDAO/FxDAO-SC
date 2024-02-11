@@ -1,9 +1,14 @@
 #![cfg(test)]
 use crate::contract::{SafetyPoolContract, SafetyPoolContractClient};
+use crate::oracle;
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{symbol_short, token, vec, Address, Env, Symbol, Vec};
 use token::Client as TokenClient;
 use token::StellarAssetClient as TokenAdminClient;
+
+use crate::oracle::{
+    Asset, AssetsData, Client as OracleClient, CoreData, CustomerQuota, PriceData,
+};
 
 pub fn create_token_contract<'a>(
     e: &Env,
@@ -33,6 +38,10 @@ pub struct TestData<'a> {
     pub liquidator_share: Vec<u32>,
     pub governance_asset_client: TokenClient<'a>,
     pub governance_asset_client_admin: TokenAdminClient<'a>,
+
+    pub oracle: Address,
+    pub oracle_contract_client: OracleClient<'a>,
+    pub oracle_contract_admin: Address,
 }
 
 pub fn create_test_data(env: &Env) -> TestData {
@@ -57,6 +66,11 @@ pub fn create_test_data(env: &Env) -> TestData {
     let contract_client =
         SafetyPoolContractClient::new(&env, &env.register_contract(None, SafetyPoolContract));
 
+    // Oracle contract
+    let oracle: Address = env.register_contract_wasm(None, oracle::WASM);
+    let oracle_contract_client: OracleClient = OracleClient::new(&env, &oracle);
+    let oracle_contract_admin: Address = Address::generate(&env);
+
     TestData {
         contract_admin,
         vaults_contract,
@@ -70,10 +84,14 @@ pub fn create_test_data(env: &Env) -> TestData {
         denomination_asset: symbol_short!("usd"),
         min_deposit,
         contract_client,
-        profit_share: vec![&env, 1u32, 2u32] as Vec<u32>,
-        liquidator_share: vec![&env, 1u32, 2u32] as Vec<u32>,
+        profit_share: Vec::from_array(&env, [1u32, 2u32]),
+        liquidator_share: Vec::from_array(&env, [1u32, 2u32]),
         governance_asset_client,
         governance_asset_client_admin,
+
+        oracle,
+        oracle_contract_client,
+        oracle_contract_admin,
     }
 }
 
@@ -86,8 +104,7 @@ pub fn init_contract(test_data: &TestData) {
         &test_data.deposit_asset_client.address,
         &test_data.denomination_asset,
         &test_data.min_deposit,
-        &test_data.profit_share,
-        &test_data.liquidator_share,
         &test_data.governance_asset_client.address,
+        &test_data.oracle,
     );
 }

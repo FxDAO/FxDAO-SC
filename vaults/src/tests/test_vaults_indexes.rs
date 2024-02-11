@@ -3,7 +3,10 @@
 extern crate std;
 
 use crate::storage::vaults::{OptionalVaultKey, Vault, VaultKey, VaultsInfo};
-use crate::tests::test_utils::{create_base_data, create_base_variables, set_initial_state};
+use crate::tests::test_utils::{
+    create_base_data, create_base_variables, init_oracle_contract, set_initial_state,
+    update_oracle_price,
+};
 use crate::utils::indexes::calculate_user_vault_index;
 use crate::utils::payments::calc_fee;
 use soroban_sdk::testutils::Address as _;
@@ -29,8 +32,12 @@ fn test_indexes_orders() {
         &data.stable_token_denomination,
     );
 
-    data.contract_client
-        .set_currency_rate(&data.stable_token_denomination, &currency_price);
+    update_oracle_price(
+        &env,
+        &data.oracle_contract_client,
+        &data.stable_token_denomination,
+        &(currency_price as i128),
+    );
 
     // 1st Set of tests
     // This section includes and checks that every time we create a new vault the values are updated

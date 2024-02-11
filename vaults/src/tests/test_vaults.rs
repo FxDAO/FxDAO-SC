@@ -4,7 +4,8 @@ extern crate std;
 
 use crate::storage::vaults::*;
 use crate::tests::test_utils::{
-    create_base_data, create_base_variables, set_initial_state, InitialVariables, TestData,
+    create_base_data, create_base_variables, init_oracle_contract, set_initial_state,
+    update_oracle_price, InitialVariables, TestData,
 };
 
 use crate::errors::SCErrors;
@@ -22,12 +23,12 @@ fn test_set_vault_conditions() {
 
     data.contract_client.init(
         &data.contract_admin,
-        &data.oracle_admin,
         &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
         &data.treasury,
         &data.fee,
+        &data.oracle,
     );
 
     data.contract_client.set_vault_conditions(
@@ -75,12 +76,12 @@ fn test_new_vault() {
 
     data.contract_client.init(
         &data.contract_admin,
-        &data.oracle_admin,
         &data.protocol_manager,
         &data.collateral_token_client.address,
         &data.stable_token_issuer,
         &data.treasury,
         &data.fee,
+        &data.oracle,
     );
 
     let currency_price: u128 = 830124; // 0.0830124
@@ -116,8 +117,7 @@ fn test_new_vault() {
         &data.stable_token_client.address,
     );
 
-    data.contract_client
-        .set_currency_rate(&data.stable_token_denomination, &currency_price);
+    init_oracle_contract(&env, &data, &(currency_price as i128));
 
     // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
     // let inactive_currency = data
@@ -473,9 +473,11 @@ fn test_increase_collateral() {
         &data.stable_token_denomination,
     );
 
-    data.contract_client.set_currency_rate(
+    update_oracle_price(
+        &env,
+        &data.oracle_contract_client,
         &data.stable_token_denomination,
-        &base_variables.currency_price,
+        &(base_variables.currency_price as i128),
     );
 
     let depositor: Address = Address::generate(&env);
@@ -794,9 +796,11 @@ fn test_increase_debt() {
         &data.stable_token_denomination,
     );
 
-    data.contract_client.set_currency_rate(
+    update_oracle_price(
+        &env,
+        &data.oracle_contract_client,
         &data.stable_token_denomination,
-        &base_variables.currency_price,
+        &(base_variables.currency_price as i128),
     );
 
     data.collateral_token_admin_client.mint(
@@ -934,9 +938,11 @@ fn test_pay_debt() {
         &data.stable_token_denomination,
     );
 
-    data.contract_client.set_currency_rate(
+    update_oracle_price(
+        &env,
+        &data.oracle_contract_client,
         &data.stable_token_denomination,
-        &base_variables.currency_price,
+        &(base_variables.currency_price as i128),
     );
 
     data.collateral_token_admin_client.mint(
@@ -1155,9 +1161,11 @@ fn get_vaults() {
         &data.stable_token_denomination,
     );
 
-    data.contract_client.set_currency_rate(
+    update_oracle_price(
+        &env,
+        &data.oracle_contract_client,
         &data.stable_token_denomination,
-        &base_variables.currency_price,
+        &(base_variables.currency_price as i128),
     );
 
     data.collateral_token_admin_client.mint(

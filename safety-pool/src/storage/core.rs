@@ -13,6 +13,7 @@ pub struct CoreState {
     pub treasury_share: Vec<u32>,
     pub liquidator_share: Vec<u32>,
     pub governance_token: Address,
+    pub oracle_contract: Address,
 }
 
 #[contracttype]
