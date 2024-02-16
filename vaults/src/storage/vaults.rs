@@ -1,4 +1,8 @@
-use soroban_sdk::{contracttype, Address, Symbol};
+use soroban_sdk::{contracttype, Address, Env, Symbol};
+
+pub const DAY_IN_LEDGERS: u32 = 17280;
+pub const PERSISTENT_BUMP_CONSTANT: u32 = DAY_IN_LEDGERS * 28;
+pub const PERSISTENT_BUMP_CONSTANT_THRESHOLD: u32 = DAY_IN_LEDGERS * 14;
 
 #[contracttype]
 #[derive(Clone, PartialEq, Debug)]
@@ -59,4 +63,93 @@ pub enum VaultsDataKeys {
     /// By using the combination of the denomination and the address (VaultIndexKey) we can get
     /// the index of the vault so the user doesn't need to know the index of its own vault at all time
     VaultIndex(VaultIndexKey),
+}
+
+pub trait VaultsFunc {
+    fn bump_vault(&self, vault_key: &VaultKey);
+    fn bump_vault_index(&self, vault_index_key: &VaultIndexKey);
+    fn vaults_info(&self, denomination: &Symbol) -> Option<VaultsInfo>;
+    fn set_vaults_info(&self, vaults_info: &VaultsInfo);
+    fn vault(&self, vault_key: &VaultKey) -> Option<Vault>;
+    fn set_vault(&self, vault: &Vault);
+    fn remove_vault(&self, vault_key: &VaultKey);
+    fn set_vault_index(&self, vault_key: &VaultKey);
+    fn remove_vault_index(&self, vault_index_key: &VaultIndexKey);
+    fn vault_index(&self, vault_index_key: &VaultIndexKey) -> Option<u128>;
+}
+
+impl VaultsFunc for Env {
+    fn bump_vault(&self, vault_key: &VaultKey) {
+        self.storage().persistent().extend_ttl(
+            &VaultsDataKeys::Vault(vault_key.clone()),
+            PERSISTENT_BUMP_CONSTANT_THRESHOLD,
+            PERSISTENT_BUMP_CONSTANT,
+        );
+    }
+
+    fn bump_vault_index(&self, vault_index_key: &VaultIndexKey) {
+        self.storage().persistent().extend_ttl(
+            &VaultsDataKeys::VaultIndex(vault_index_key.clone()),
+            PERSISTENT_BUMP_CONSTANT_THRESHOLD,
+            PERSISTENT_BUMP_CONSTANT,
+        );
+    }
+
+    fn vaults_info(&self, denomination: &Symbol) -> Option<VaultsInfo> {
+        self.storage()
+            .instance()
+            .get(&VaultsDataKeys::VaultsInfo(denomination.clone()))
+    }
+
+    fn set_vaults_info(&self, vaults_info: &VaultsInfo) {
+        self.storage().instance().set(
+            &VaultsDataKeys::VaultsInfo(vaults_info.denomination.clone()),
+            vaults_info,
+        );
+    }
+
+    fn vault(&self, vault_key: &VaultKey) -> Option<Vault> {
+        self.storage()
+            .persistent()
+            .get(&VaultsDataKeys::Vault(vault_key.clone()))
+    }
+
+    fn set_vault(&self, vault: &Vault) {
+        self.storage().persistent().set(
+            &VaultsDataKeys::Vault(VaultKey {
+                index: vault.index.clone(),
+                account: vault.account.clone(),
+                denomination: vault.denomination.clone(),
+            }),
+            vault,
+        );
+    }
+
+    fn remove_vault(&self, vault_key: &VaultKey) {
+        self.storage()
+            .persistent()
+            .remove(&VaultsDataKeys::Vault(vault_key.clone()));
+    }
+
+    fn set_vault_index(&self, vault_key: &VaultKey) {
+        self.storage().persistent().set(
+            &VaultsDataKeys::VaultIndex(VaultIndexKey {
+                user: vault_key.account.clone(),
+                denomination: vault_key.denomination.clone(),
+            }),
+            &vault_key.index,
+        );
+    }
+
+    fn remove_vault_index(&self, vault_index_key: &VaultIndexKey) {
+        self.storage()
+            .persistent()
+            .remove(&VaultsDataKeys::VaultIndex(vault_index_key.clone()));
+    }
+
+    fn vault_index(&self, vault_index_key: &VaultIndexKey) -> Option<u128> {
+        self.storage()
+            .persistent()
+            .get(&VaultsDataKeys::VaultIndex(vault_index_key.clone()))
+    }
 }

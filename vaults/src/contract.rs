@@ -1,36 +1,28 @@
 use crate::errors::SCErrors;
-use crate::utils::core::*;
 
-use crate::storage::core::CoreState;
-use crate::storage::currencies::{CurrenciesDataKeys, Currency};
-use crate::storage::vaults::{OptionalVaultKey, Vault, VaultIndexKey, VaultKey, VaultsInfo};
-use crate::utils::currencies::{
-    get_currency, get_currency_rate, is_currency_active, save_currency, validate_currency,
+use crate::storage::core::{CoreFunc, CoreState};
+use crate::storage::currencies::{CurrenciesDataKeys, CurrenciesFunc, Currency};
+use crate::storage::vaults::{
+    OptionalVaultKey, Vault, VaultIndexKey, VaultKey, VaultsFunc, VaultsInfo,
 };
+use crate::utils::currencies::get_currency_rate;
 use crate::utils::indexes::calculate_user_vault_index;
 use crate::utils::payments::{
     burn_stablecoin, calc_fee, deposit_collateral, mint_stablecoin, pay_fee, withdraw_collateral,
 };
 use crate::utils::vaults::{
-    bump_vault, bump_vault_index, calculate_deposit_ratio, can_be_liquidated,
-    create_and_insert_vault, get_vault, get_vaults, get_vaults_info, is_vaults_info_started,
-    search_vault, set_vaults_info, validate_user_vault, vault_spot_available, withdraw_vault,
+    calculate_deposit_ratio, can_be_liquidated, create_and_insert_vault, get_vaults, search_vault,
+    withdraw_vault,
 };
 use num_integer::div_floor;
-use soroban_sdk::{
-    contract, contractimpl, panic_with_error, symbol_short, token, vec, Address, BytesN, Env, Map,
-    Symbol, Vec,
-};
+use soroban_sdk::{contract, contractimpl, panic_with_error, Address, BytesN, Env, Symbol, Vec};
 
-use crate::oracle::{Asset, Client as OracleClient, PriceData};
-
-pub const CONTRACT_DESCRIPTION: Symbol = symbol_short!("Vaults");
-pub const CONTRACT_VERSION: Symbol = symbol_short!("0_3_0");
+use crate::oracle::PriceData;
 
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
     fn init(
-        env: Env,
+        e: Env,
         admin: Address,
         protocol_manager: Address,
         col_token: Address,
@@ -40,63 +32,62 @@ pub trait VaultsContractTrait {
         oracle: Address,
     );
 
-    fn get_core_state(env: Env) -> CoreState;
+    fn get_core_state(e: Env) -> CoreState;
 
-    fn set_admin(env: Env, address: Address);
-    fn set_protocol_manager(env: Env, address: Address);
+    fn set_admin(e: Env, address: Address);
+    fn set_protocol_manager(e: Env, address: Address);
 
     // TODO: Test these
-    fn upgrade(env: Env, new_wasm_hash: BytesN<32>);
-    fn version(env: Env) -> (Symbol, Symbol);
+    fn upgrade(e: Env, hash: BytesN<32>);
 
     /// Currencies methods
-    fn create_currency(env: Env, denomination: Symbol, contract: Address);
-    fn get_currency(env: Env, denomination: Symbol) -> Currency;
-    fn toggle_currency(env: Env, denomination: Symbol, active: bool);
+    fn create_currency(e: Env, denomination: Symbol, contract: Address);
+    fn get_currency(e: Env, denomination: Symbol) -> Currency;
+    fn toggle_currency(e: Env, denomination: Symbol, active: bool);
 
     /// Vaults methods
     fn set_vault_conditions(
-        env: Env,
+        e: Env,
         min_col_rate: u128,
         min_debt_creation: u128,
         opening_col_rate: u128,
         denomination: Symbol,
     );
-    fn get_vaults_info(env: Env, denomination: Symbol) -> VaultsInfo;
+    fn get_vaults_info(e: Env, denomination: Symbol) -> VaultsInfo;
     fn calculate_deposit_ratio(currency_rate: u128, collateral: u128, debt: u128) -> u128;
     fn new_vault(
-        env: Env,
+        e: Env,
         prev_key: OptionalVaultKey,
         caller: Address,
         initial_debt: u128,
         collateral_amount: u128,
         denomination: Symbol,
     );
-    fn get_vault(env: Env, caller: Address, denomination: Symbol) -> Vault;
-    fn get_vault_from_key(env: Env, vault_key: VaultKey) -> Vault;
+    fn get_vault(e: Env, caller: Address, denomination: Symbol) -> Vault;
+    fn get_vault_from_key(e: Env, vault_key: VaultKey) -> Vault;
     fn get_vaults(
-        env: Env,
+        e: Env,
         prev_key: OptionalVaultKey,
         denomination: Symbol,
         total: u32,
         only_to_liquidate: bool,
     ) -> Vec<Vault>;
     fn increase_collateral(
-        env: Env,
+        e: Env,
         prev_key: OptionalVaultKey,
         vault_key: VaultKey,
         new_prev_key: OptionalVaultKey,
         amount: u128,
     );
     fn increase_debt(
-        env: Env,
+        e: Env,
         prev_key: OptionalVaultKey,
         vault_key: VaultKey,
         new_prev_key: OptionalVaultKey,
         amount: u128,
     );
     fn pay_debt(
-        env: Env,
+        e: Env,
         prev_key: OptionalVaultKey,
         vault_key: VaultKey,
         new_prev_key: OptionalVaultKey,
@@ -104,11 +95,11 @@ pub trait VaultsContractTrait {
     );
 
     /// Redeeming
-    fn redeem(env: Env, caller: Address, denomination: Symbol);
+    fn redeem(e: Env, caller: Address, denomination: Symbol);
 
     /// Liquidation
     fn liquidate(
-        env: Env,
+        e: Env,
         liquidator: Address,
         denomination: Symbol,
         total_vaults_to_liquidate: u32,
@@ -122,7 +113,7 @@ pub struct VaultsContract;
 #[contractimpl]
 impl VaultsContractTrait for VaultsContract {
     fn init(
-        env: Env,
+        e: Env,
         admin: Address,
         protocol_manager: Address,
         col_token: Address,
@@ -131,12 +122,12 @@ impl VaultsContractTrait for VaultsContract {
         fee: u128,
         oracle: Address,
     ) {
-        bump_instance(&env);
-        if is_core_created(&env) {
-            panic_with_error!(&env, &SCErrors::CoreAlreadySet);
+        e.bump_instance();
+        if e.core_state().is_some() {
+            panic_with_error!(&e, &SCErrors::CoreAlreadySet);
         }
 
-        let core_state: CoreState = CoreState {
+        e.set_core_state(&CoreState {
             col_token,
             stable_issuer,
             admin,
@@ -145,94 +136,84 @@ impl VaultsContractTrait for VaultsContract {
             treasury,
             fee,
             oracle,
-        };
-
-        save_core_state(&env, &core_state);
+        });
     }
 
-    fn get_core_state(env: Env) -> CoreState {
-        bump_instance(&env);
-        get_core_state(&env)
+    fn get_core_state(e: Env) -> CoreState {
+        e.bump_instance();
+        e.core_state().unwrap()
     }
 
-    fn set_admin(env: Env, address: Address) {
-        bump_instance(&env);
-        let mut core_state: CoreState = get_core_state(&env);
+    fn set_admin(e: Env, address: Address) {
+        e.bump_instance();
+        let mut core_state: CoreState = e.core_state().unwrap();
         core_state.admin.require_auth();
         core_state.admin = address;
-        save_core_state(&env, &core_state);
+        e.set_core_state(&core_state);
     }
 
-    fn set_protocol_manager(env: Env, address: Address) {
-        bump_instance(&env);
-        let mut core_state: CoreState = get_core_state(&env);
+    fn set_protocol_manager(e: Env, address: Address) {
+        e.bump_instance();
+        let mut core_state: CoreState = e.core_state().unwrap();
         core_state.protocol_manager.require_auth();
         core_state.protocol_manager = address;
-        save_core_state(&env, &core_state);
+        e.set_core_state(&core_state);
     }
 
-    fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
-        bump_instance(&env);
-        get_core_state(&env).admin.require_auth();
-        env.deployer().update_current_contract_wasm(new_wasm_hash);
+    fn upgrade(e: Env, hash: BytesN<32>) {
+        e.bump_instance();
+        e.core_state().unwrap().admin.require_auth();
+        e.deployer().update_current_contract_wasm(hash);
     }
 
-    fn version(env: Env) -> (Symbol, Symbol) {
-        bump_instance(&env);
-        (CONTRACT_DESCRIPTION, CONTRACT_VERSION)
-    }
+    fn create_currency(e: Env, denomination: Symbol, contract: Address) {
+        e.bump_instance();
+        e.core_state().unwrap().protocol_manager.require_auth();
 
-    fn create_currency(env: Env, denomination: Symbol, contract: Address) {
-        bump_instance(&env);
-        get_core_state(&env).protocol_manager.require_auth();
-
-        if env
-            .storage()
+        if e.storage()
             .instance()
             .has(&CurrenciesDataKeys::Currency(denomination.clone()))
         {
-            panic_with_error!(&env, &SCErrors::CurrencyAlreadyAdded);
+            panic_with_error!(&e, &SCErrors::CurrencyAlreadyAdded);
         }
 
-        save_currency(
-            &env,
-            &Currency {
-                denomination,
-                active: false,
-                contract,
-            },
-        );
+        e.set_currency(&Currency {
+            denomination,
+            active: false,
+            contract,
+        });
     }
 
-    fn get_currency(env: Env, denomination: Symbol) -> Currency {
-        bump_instance(&env);
-        validate_currency(&env, &denomination);
-        get_currency(&env, &denomination)
+    fn get_currency(e: Env, denomination: Symbol) -> Currency {
+        e.bump_instance();
+        e.currency(&denomination)
+            .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::CurrencyDoesntExist))
     }
 
-    fn toggle_currency(env: Env, denomination: Symbol, active: bool) {
-        bump_instance(&env);
-        get_core_state(&env).admin.require_auth();
-        validate_currency(&env, &denomination);
-        let mut currency = get_currency(&env, &denomination);
+    fn toggle_currency(e: Env, denomination: Symbol, active: bool) {
+        e.bump_instance();
+        e.core_state().unwrap().admin.require_auth();
+        let mut currency: Currency = e
+            .currency(&denomination)
+            .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::CurrencyDoesntExist));
+
         currency.active = active;
-        save_currency(&env, &currency);
+        e.set_currency(&currency);
     }
 
     fn set_vault_conditions(
-        env: Env,
+        e: Env,
         min_col_rate: u128,
         min_debt_creation: u128,
         opening_col_rate: u128,
         denomination: Symbol,
     ) {
-        bump_instance(&env);
-        get_core_state(&env).admin.require_auth();
+        e.bump_instance();
+        e.core_state().unwrap().admin.require_auth();
 
-        if !is_vaults_info_started(&env, &denomination) {
-            set_vaults_info(
-                &env,
-                &VaultsInfo {
+        match e.vaults_info(&denomination) {
+            None => {
+                e.set_vaults_info(&VaultsInfo {
                     denomination,
                     min_col_rate,
                     min_debt_creation,
@@ -241,29 +222,26 @@ impl VaultsContractTrait for VaultsContract {
                     total_col: 0,
                     total_debt: 0,
                     lowest_key: OptionalVaultKey::None,
-                },
-            );
-        } else {
-            let current_state: VaultsInfo = get_vaults_info(&env, &denomination);
-            set_vaults_info(
-                &env,
-                &VaultsInfo {
+                });
+            }
+            Some(vaults_info) => {
+                e.set_vaults_info(&VaultsInfo {
                     denomination,
                     min_col_rate,
                     min_debt_creation,
                     opening_col_rate,
-                    total_vaults: current_state.total_vaults,
-                    total_col: current_state.total_col,
-                    total_debt: current_state.total_debt,
-                    lowest_key: current_state.lowest_key,
-                },
-            );
+                    total_vaults: vaults_info.total_vaults,
+                    total_col: vaults_info.total_col,
+                    total_debt: vaults_info.total_debt,
+                    lowest_key: vaults_info.lowest_key,
+                });
+            }
         }
     }
 
-    fn get_vaults_info(env: Env, denomination: Symbol) -> VaultsInfo {
-        bump_instance(&env);
-        get_vaults_info(&env, &denomination)
+    fn get_vaults_info(e: Env, denomination: Symbol) -> VaultsInfo {
+        e.bump_instance();
+        e.vaults_info(&denomination).unwrap()
     }
 
     fn calculate_deposit_ratio(currency_rate: u128, collateral: u128, debt: u128) -> u128 {
@@ -271,42 +249,52 @@ impl VaultsContractTrait for VaultsContract {
     }
 
     fn new_vault(
-        env: Env,
+        e: Env,
         prev_key: OptionalVaultKey,
         caller: Address,
         initial_debt: u128,
         collateral_amount: u128,
         denomination: Symbol,
     ) {
-        bump_instance(&env);
+        e.bump_instance();
         // TODO: check if we are in panic mode once is implemented
         caller.require_auth();
-        validate_currency(&env, &denomination);
-        is_currency_active(&env, &denomination);
-        vault_spot_available(&env, caller.clone(), &denomination);
+        let currency: Currency = e
+            .currency(&denomination)
+            .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::CurrencyDoesntExist));
 
-        let core_state: CoreState = get_core_state(&env);
+        if !currency.active {
+            panic_with_error!(&e, &SCErrors::CurrencyIsInactive);
+        }
+
+        if e.vault_index(&VaultIndexKey {
+            user: caller.clone(),
+            denomination: denomination.clone(),
+        })
+        .is_some()
+        {
+            panic_with_error!(&e, &SCErrors::UserAlreadyHasDenominationVault);
+        }
+
+        let core_state: CoreState = e.core_state().unwrap();
         let fee: u128 = calc_fee(&core_state.fee, &collateral_amount);
         let vault_col: u128 = collateral_amount - fee;
 
-        let rate: PriceData = get_currency_rate(&env, &core_state, &denomination);
+        let rate: PriceData = get_currency_rate(&e, &core_state, &denomination);
 
-        if !is_vaults_info_started(&env, &denomination) {
-            panic_with_error!(&env, &SCErrors::VaultsInfoHasNotStarted);
-        }
-
-        let mut vaults_info: VaultsInfo = get_vaults_info(&env, &denomination);
+        let mut vaults_info: VaultsInfo = e
+            .vaults_info(&denomination)
+            .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::VaultsInfoHasNotStarted));
 
         if vaults_info.min_debt_creation > initial_debt {
-            panic_with_error!(env, &SCErrors::InvalidMinDebtAmount);
+            panic_with_error!(e, &SCErrors::InvalidMinDebtAmount);
         }
 
-        let currency: Currency = get_currency(&env, &denomination);
         let deposit_collateral_rate: u128 =
             calculate_deposit_ratio(&(rate.price as u128), &vault_col, &initial_debt);
 
         if deposit_collateral_rate < vaults_info.opening_col_rate {
-            panic_with_error!(&env, &SCErrors::InvalidOpeningCollateralRatio);
+            panic_with_error!(&e, &SCErrors::InvalidOpeningCollateralRatio);
         }
 
         let new_vault_index: u128 = calculate_user_vault_index(initial_debt, vault_col);
@@ -321,13 +309,13 @@ impl VaultsContractTrait for VaultsContract {
             OptionalVaultKey::None => {}
             OptionalVaultKey::Some(value) => {
                 if new_vault_index < value.index {
-                    panic_with_error!(&env, &SCErrors::InvalidPrevVaultIndex);
+                    panic_with_error!(&e, &SCErrors::InvalidPrevVaultIndex);
                 }
             }
         }
 
         let (_, new_vault_key, new_vault_index_key, updated_lowest_key) = create_and_insert_vault(
-            &env,
+            &e,
             &vaults_info.lowest_key,
             &new_vault_key,
             &prev_key,
@@ -339,62 +327,64 @@ impl VaultsContractTrait for VaultsContract {
         vaults_info.total_vaults = vaults_info.total_vaults + 1;
         vaults_info.total_debt = vaults_info.total_debt + initial_debt;
         vaults_info.total_col = vaults_info.total_col + vault_col;
-        set_vaults_info(&env, &vaults_info);
+        e.set_vaults_info(&vaults_info);
 
-        deposit_collateral(&env, &core_state, &caller, vault_col as i128);
-        mint_stablecoin(&env, &currency, &caller, initial_debt as i128);
-        pay_fee(&env, &core_state, &caller, fee as i128);
+        deposit_collateral(&e, &core_state, &caller, vault_col as i128);
+        mint_stablecoin(&e, &currency, &caller, initial_debt as i128);
+        pay_fee(&e, &core_state, &caller, fee as i128);
 
-        bump_vault(&env, new_vault_key);
-        bump_vault_index(&env, new_vault_index_key);
+        e.bump_vault(&new_vault_key);
+        e.bump_vault_index(&new_vault_index_key);
     }
 
-    fn get_vault(env: Env, user: Address, denomination: Symbol) -> Vault {
-        bump_instance(&env);
+    fn get_vault(e: Env, user: Address, denomination: Symbol) -> Vault {
+        e.bump_instance();
 
-        let (user_vault, vault_key, vault_index_key) = search_vault(&env, &user, &denomination);
+        let (user_vault, vault_key, vault_index_key) = search_vault(&e, &user, &denomination);
 
-        bump_vault(&env, vault_key);
-        bump_vault_index(&env, vault_index_key);
+        e.bump_vault(&vault_key);
+        e.bump_vault_index(&vault_index_key);
 
         user_vault
     }
 
-    fn get_vault_from_key(env: Env, vault_key: VaultKey) -> Vault {
-        bump_instance(&env);
+    fn get_vault_from_key(e: Env, vault_key: VaultKey) -> Vault {
+        e.bump_instance();
 
-        validate_user_vault(&env, vault_key.clone());
+        if e.vault(&vault_key).is_none() {
+            panic_with_error!(&e, SCErrors::VaultDoesntExist);
+        }
 
         let vault_index_key: VaultIndexKey = VaultIndexKey {
             user: vault_key.account.clone(),
             denomination: vault_key.denomination.clone(),
         };
 
-        bump_vault(&env, vault_key.clone());
-        bump_vault_index(&env, vault_index_key);
+        e.bump_vault(&vault_key.clone());
+        e.bump_vault_index(&vault_index_key);
 
-        get_vault(&env, vault_key)
+        e.vault(&vault_key).unwrap()
     }
 
     fn get_vaults(
-        env: Env,
+        e: Env,
         prev_key: OptionalVaultKey,
         denomination: Symbol,
         total: u32,
         only_to_liquidate: bool,
     ) -> Vec<Vault> {
-        bump_instance(&env);
+        e.bump_instance();
 
-        let core_state: CoreState = get_core_state(&env);
-        let rate: PriceData = get_currency_rate(&env, &core_state, &denomination);
-        let vaults_info: VaultsInfo = get_vaults_info(&env, &denomination);
+        let core_state: CoreState = e.core_state().unwrap();
+        let rate: PriceData = get_currency_rate(&e, &core_state, &denomination);
+        let vaults_info: VaultsInfo = e.vaults_info(&denomination).unwrap();
 
         if OptionalVaultKey::None == prev_key && OptionalVaultKey::None == vaults_info.lowest_key {
-            return Vec::new(&env);
+            return Vec::new(&e);
         }
 
         get_vaults(
-            &env,
+            &e,
             &prev_key,
             &vaults_info,
             total,
@@ -404,47 +394,53 @@ impl VaultsContractTrait for VaultsContract {
     }
 
     fn increase_collateral(
-        env: Env,
+        e: Env,
         prev_key: OptionalVaultKey,
         vault_key: VaultKey,
         new_prev_key: OptionalVaultKey,
         amount: u128,
     ) {
-        bump_instance(&env);
+        e.bump_instance();
         vault_key.account.require_auth();
-        validate_currency(&env, &vault_key.denomination);
-        is_currency_active(&env, &vault_key.denomination);
 
-        let core_state: CoreState = get_core_state(&env);
+        let currency: Currency = e
+            .currency(&vault_key.denomination)
+            .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::CurrencyDoesntExist));
+
+        if !currency.active {
+            panic_with_error!(&e, &SCErrors::CurrencyIsInactive);
+        }
+
+        let core_state: CoreState = e.core_state().unwrap();
 
         let fee: u128 = calc_fee(&core_state.fee, &amount);
         let collateral: u128 = amount - fee;
 
-        deposit_collateral(&env, &core_state, &vault_key.account, collateral as i128);
-        pay_fee(&env, &core_state, &vault_key.account, fee as i128);
+        deposit_collateral(&e, &core_state, &vault_key.account, collateral as i128);
+        pay_fee(&e, &core_state, &vault_key.account, fee as i128);
 
         let (target_vault, target_vault_key, _) =
-            search_vault(&env, &vault_key.account, &vault_key.denomination);
+            search_vault(&e, &vault_key.account, &vault_key.denomination);
 
         // TODO: Test this
         if target_vault.index != vault_key.index {
-            panic_with_error!(&env, &SCErrors::IndexProvidedIsNotTheOneSaved);
+            panic_with_error!(&e, &SCErrors::IndexProvidedIsNotTheOneSaved);
         }
 
-        let mut vaults_info: VaultsInfo = get_vaults_info(&env, &target_vault_key.denomination);
+        let mut vaults_info: VaultsInfo = e.vaults_info(&target_vault_key.denomination).unwrap();
 
         let lowest_key = match vaults_info.lowest_key.clone() {
             // It should be impossible to reach this case, but just in case we panic if it happens.
-            OptionalVaultKey::None => panic_with_error!(&env, &SCErrors::ThereAreNoVaults),
+            OptionalVaultKey::None => panic_with_error!(&e, &SCErrors::ThereAreNoVaults),
             OptionalVaultKey::Some(key) => key,
         };
 
         // If prev_key is None, the target Vault needs to be the lowest vault otherwise panic
         if prev_key == OptionalVaultKey::None && target_vault_key != lowest_key {
-            panic_with_error!(&env, &SCErrors::PrevVaultCantBeNone);
+            panic_with_error!(&e, &SCErrors::PrevVaultCantBeNone);
         }
 
-        withdraw_vault(&env, &target_vault, &prev_key);
+        withdraw_vault(&e, &target_vault, &prev_key);
 
         // If the target vault is the lowest, we update the lowest value
         if lowest_key == target_vault_key {
@@ -464,7 +460,7 @@ impl VaultsContractTrait for VaultsContract {
 
         let (_, updated_target_vault_key, updated_target_vault_index_key, updated_lowest_key) =
             create_and_insert_vault(
-                &env,
+                &e,
                 &vaults_info.lowest_key,
                 &new_vault_key,
                 &new_prev_key,
@@ -474,60 +470,63 @@ impl VaultsContractTrait for VaultsContract {
 
         vaults_info.lowest_key = updated_lowest_key;
         vaults_info.total_col = vaults_info.total_col + collateral;
-        set_vaults_info(&env, &vaults_info);
+        e.set_vaults_info(&vaults_info);
 
-        bump_vault(&env, updated_target_vault_key);
-        bump_vault_index(&env, updated_target_vault_index_key);
+        e.bump_vault(&updated_target_vault_key);
+        e.bump_vault_index(&updated_target_vault_index_key);
     }
 
     fn increase_debt(
-        env: Env,
+        e: Env,
         prev_key: OptionalVaultKey,
         vault_key: VaultKey,
         new_prev_key: OptionalVaultKey,
         amount: u128,
     ) {
-        bump_instance(&env);
+        e.bump_instance();
         vault_key.account.require_auth();
 
-        validate_currency(&env, &vault_key.denomination);
-        is_currency_active(&env, &vault_key.denomination);
+        let currency: Currency = e
+            .currency(&vault_key.denomination)
+            .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::CurrencyDoesntExist));
+
+        if !currency.active {
+            panic_with_error!(&e, &SCErrors::CurrencyIsInactive);
+        }
 
         let (target_vault, target_vault_key, _) =
-            search_vault(&env, &vault_key.account, &vault_key.denomination);
+            search_vault(&e, &vault_key.account, &vault_key.denomination);
 
         // TODO: Test this
         if target_vault.index != vault_key.index {
-            panic_with_error!(&env, &SCErrors::IndexProvidedIsNotTheOneSaved);
+            panic_with_error!(&e, &SCErrors::IndexProvidedIsNotTheOneSaved);
         }
 
         // TODO: check if we are in panic mode once is implemented
         // TODO: check if collateral price has been updated lately
 
-        let mut vaults_info: VaultsInfo = get_vaults_info(&env, &target_vault.denomination);
+        let mut vaults_info: VaultsInfo = e.vaults_info(&target_vault.denomination).unwrap();
 
         let lowest_key = match vaults_info.lowest_key.clone() {
             // It should be impossible to reach this case, but just in case we panic if it happens.
-            OptionalVaultKey::None => panic_with_error!(&env, &SCErrors::ThereAreNoVaults),
+            OptionalVaultKey::None => panic_with_error!(&e, &SCErrors::ThereAreNoVaults),
             OptionalVaultKey::Some(key) => key,
         };
 
         // If prev_key is None, the target Vault needs to be the lowest vault otherwise panic
         if prev_key == OptionalVaultKey::None && target_vault_key != lowest_key {
-            panic_with_error!(&env, &SCErrors::PrevVaultCantBeNone);
+            panic_with_error!(&e, &SCErrors::PrevVaultCantBeNone);
         }
 
-        withdraw_vault(&env, &target_vault, &prev_key);
+        withdraw_vault(&e, &target_vault, &prev_key);
 
         // If the target vault is the lowest, we update the lowest value
         if lowest_key == target_vault_key {
             vaults_info.lowest_key = target_vault.next_key.clone();
         }
 
-        let core_state: CoreState = get_core_state(&env);
-        let rate: PriceData = get_currency_rate(&env, &core_state, &target_vault.denomination);
-
-        let currency: Currency = get_currency(&env, &target_vault.denomination);
+        let core_state: CoreState = e.core_state().unwrap();
+        let rate: PriceData = get_currency_rate(&e, &core_state, &target_vault.denomination);
 
         let new_debt_amount: u128 = target_vault.total_debt + amount;
 
@@ -536,10 +535,10 @@ impl VaultsContractTrait for VaultsContract {
         let new_deposit_rate: u128 = div_floor(new_collateral_value, new_debt_amount);
 
         if new_deposit_rate < vaults_info.opening_col_rate {
-            panic_with_error!(&env, SCErrors::CollateralRateUnderMinimum);
+            panic_with_error!(&e, SCErrors::CollateralRateUnderMinimum);
         }
 
-        mint_stablecoin(&env, &currency, &target_vault.account, amount as i128);
+        mint_stablecoin(&e, &currency, &target_vault.account, amount as i128);
 
         let new_vault_key: VaultKey = VaultKey {
             index: calculate_user_vault_index(
@@ -552,7 +551,7 @@ impl VaultsContractTrait for VaultsContract {
 
         let (_, updated_target_vault_key, updated_target_vault_index_key, updated_lowest_key) =
             create_and_insert_vault(
-                &env,
+                &e,
                 &vaults_info.lowest_key,
                 &new_vault_key,
                 &new_prev_key,
@@ -562,61 +561,65 @@ impl VaultsContractTrait for VaultsContract {
 
         vaults_info.lowest_key = updated_lowest_key;
         vaults_info.total_debt = vaults_info.total_debt + amount;
-        set_vaults_info(&env, &vaults_info);
+        e.set_vaults_info(&vaults_info);
 
-        bump_vault(&env, updated_target_vault_key);
-        bump_vault_index(&env, updated_target_vault_index_key);
+        e.bump_vault(&updated_target_vault_key);
+        e.bump_vault_index(&updated_target_vault_index_key);
     }
 
     fn pay_debt(
-        env: Env,
+        e: Env,
         prev_key: OptionalVaultKey,
         vault_key: VaultKey,
         new_prev_key: OptionalVaultKey,
         amount: u128,
     ) {
-        bump_instance(&env);
+        e.bump_instance();
         vault_key.account.require_auth();
-        validate_currency(&env, &vault_key.denomination);
-        is_currency_active(&env, &vault_key.denomination);
+
+        let currency: Currency = e
+            .currency(&vault_key.denomination)
+            .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::CurrencyDoesntExist));
+
+        if !currency.active {
+            panic_with_error!(&e, &SCErrors::CurrencyIsInactive);
+        }
 
         let (target_vault, target_vault_key, _) =
-            search_vault(&env, &vault_key.account, &vault_key.denomination);
+            search_vault(&e, &vault_key.account, &vault_key.denomination);
 
         // TODO: Test this
         if target_vault.index != vault_key.index {
-            panic_with_error!(&env, &SCErrors::IndexProvidedIsNotTheOneSaved);
+            panic_with_error!(&e, &SCErrors::IndexProvidedIsNotTheOneSaved);
         }
 
-        let mut vaults_info: VaultsInfo = get_vaults_info(&env, &target_vault_key.denomination);
+        let mut vaults_info: VaultsInfo = e.vaults_info(&target_vault_key.denomination).unwrap();
 
         let lowest_key = match vaults_info.lowest_key.clone() {
             // It should be impossible to reach this case, but just in case we panic if it happens.
-            OptionalVaultKey::None => panic_with_error!(&env, &SCErrors::ThereAreNoVaults),
+            OptionalVaultKey::None => panic_with_error!(&e, &SCErrors::ThereAreNoVaults),
             OptionalVaultKey::Some(key) => key,
         };
 
         // If prev_key is None, the target Vault needs to be the lowest vault otherwise panic
         if prev_key == OptionalVaultKey::None && target_vault_key != lowest_key {
-            panic_with_error!(&env, &SCErrors::PrevVaultCantBeNone);
+            panic_with_error!(&e, &SCErrors::PrevVaultCantBeNone);
         }
-
-        let currency: Currency = get_currency(&env, &target_vault.denomination);
 
         if amount > target_vault.total_debt {
-            panic_with_error!(&env, SCErrors::DepositAmountIsMoreThanTotalDebt);
+            panic_with_error!(&e, SCErrors::DepositAmountIsMoreThanTotalDebt);
         }
 
-        let core_state: CoreState = get_core_state(&env);
+        let core_state: CoreState = e.core_state().unwrap();
 
-        burn_stablecoin(&env, &currency, &target_vault.account, amount as i128);
+        burn_stablecoin(&e, &currency, &target_vault.account, amount as i128);
 
         if target_vault.total_debt == amount {
             // If the amount is equal to the debt it means it is paid in full so we release the collateral and remove the vault
 
             // If new_prev_key is not None, we panic because we are removing the vault
             if let OptionalVaultKey::Some(_) = new_prev_key {
-                panic_with_error!(&env, &SCErrors::NextPrevVaultShouldBeNone);
+                panic_with_error!(&e, &SCErrors::NextPrevVaultShouldBeNone);
             }
 
             vaults_info.total_vaults = vaults_info.total_vaults - 1;
@@ -625,20 +628,15 @@ impl VaultsContractTrait for VaultsContract {
             let fee: u128 = calc_fee(&core_state.fee, &target_vault.total_collateral);
 
             withdraw_collateral(
-                &env,
+                &e,
                 &core_state,
                 &target_vault.account,
                 (target_vault.total_collateral - fee) as i128,
             );
 
-            pay_fee(
-                &env,
-                &core_state,
-                &env.current_contract_address(),
-                fee as i128,
-            );
+            pay_fee(&e, &core_state, &e.current_contract_address(), fee as i128);
 
-            withdraw_vault(&env, &target_vault, &prev_key);
+            withdraw_vault(&e, &target_vault, &prev_key);
 
             // If the target vault is the lowest, we update the lowest value
             if lowest_key == target_vault_key {
@@ -648,13 +646,13 @@ impl VaultsContractTrait for VaultsContract {
             // If amount is not enough to pay all the debt, we check the debt value is not lower than the minimum and if is ok we just updated the stats of the user's vault
             let new_vault_debt: u128 = target_vault.total_debt - amount;
             if new_vault_debt < vaults_info.min_debt_creation {
-                panic_with_error!(&env, &SCErrors::InvalidMinDebtAmount);
+                panic_with_error!(&e, &SCErrors::InvalidMinDebtAmount);
             }
             let new_vault_collateral: u128 = target_vault.total_collateral.clone();
             let new_vault_index: u128 =
                 calculate_user_vault_index(new_vault_debt.clone(), new_vault_collateral.clone());
 
-            withdraw_vault(&env, &target_vault, &prev_key);
+            withdraw_vault(&e, &target_vault, &prev_key);
 
             // If the target vault is the lowest, we update the lowest value
             if lowest_key == target_vault_key {
@@ -663,7 +661,7 @@ impl VaultsContractTrait for VaultsContract {
 
             let (_, updated_target_vault_key, updated_target_vault_index_key, updated_lowest_key) =
                 create_and_insert_vault(
-                    &env,
+                    &e,
                     &vaults_info.lowest_key,
                     &VaultKey {
                         index: new_vault_index.clone(),
@@ -677,35 +675,39 @@ impl VaultsContractTrait for VaultsContract {
 
             vaults_info.lowest_key = updated_lowest_key;
 
-            bump_vault(&env, updated_target_vault_key);
-            bump_vault_index(&env, updated_target_vault_index_key);
+            e.bump_vault(&updated_target_vault_key);
+            e.bump_vault_index(&updated_target_vault_index_key);
         }
 
         vaults_info.total_debt = vaults_info.total_debt - amount;
-        set_vaults_info(&env, &vaults_info);
+        e.set_vaults_info(&vaults_info);
     }
 
-    fn redeem(env: Env, caller: Address, denomination: Symbol) {
-        bump_instance(&env);
+    fn redeem(e: Env, caller: Address, denomination: Symbol) {
+        e.bump_instance();
         caller.require_auth();
 
-        validate_currency(&env, &denomination);
-        is_currency_active(&env, &denomination);
+        let currency: Currency = e
+            .currency(&denomination)
+            .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::CurrencyDoesntExist));
 
-        let core_state: CoreState = get_core_state(&env);
-        let currency: Currency = get_currency(&env, &denomination);
-        let rate: PriceData = get_currency_rate(&env, &core_state, &denomination);
-        let mut vaults_info: VaultsInfo = get_vaults_info(&env, &denomination);
+        if !currency.active {
+            panic_with_error!(&e, &SCErrors::CurrencyIsInactive);
+        }
+
+        let core_state: CoreState = e.core_state().unwrap();
+        let rate: PriceData = get_currency_rate(&e, &core_state, &denomination);
+        let mut vaults_info: VaultsInfo = e.vaults_info(&denomination).unwrap();
 
         let lowest_key = match vaults_info.lowest_key.clone() {
             // It should be impossible to reach this case, but just in case we panic if it happens.
-            OptionalVaultKey::None => panic_with_error!(&env, &SCErrors::ThereAreNoVaults),
+            OptionalVaultKey::None => panic_with_error!(&e, &SCErrors::ThereAreNoVaults),
             OptionalVaultKey::Some(key) => key,
         };
 
-        let lowest_vault: Vault = get_vault(&env, lowest_key);
+        let lowest_vault: Vault = e.vault(&lowest_key).unwrap();
 
-        burn_stablecoin(&env, &currency, &caller, lowest_vault.total_debt as i128);
+        burn_stablecoin(&e, &currency, &caller, lowest_vault.total_debt as i128);
 
         // Update the redeemable vaults information
         let fee: u128 = calc_fee(&core_state.fee, &lowest_vault.total_collateral);
@@ -719,43 +721,40 @@ impl VaultsContractTrait for VaultsContract {
 
         // We send the remaining collateral to the owner of the Vault
         withdraw_collateral(
-            &env,
+            &e,
             &core_state,
             &lowest_vault.account,
             (lowest_vault.total_collateral - collateral_to_withdraw - fee) as i128,
         );
 
-        withdraw_vault(&env, &lowest_vault, &OptionalVaultKey::None);
+        withdraw_vault(&e, &lowest_vault, &OptionalVaultKey::None);
 
-        withdraw_collateral(&env, &core_state, &caller, collateral_to_withdraw as i128);
+        withdraw_collateral(&e, &core_state, &caller, collateral_to_withdraw as i128);
 
-        pay_fee(
-            &env,
-            &core_state,
-            &env.current_contract_address(),
-            fee as i128,
-        );
+        pay_fee(&e, &core_state, &e.current_contract_address(), fee as i128);
 
-        set_vaults_info(&env, &vaults_info);
+        e.set_vaults_info(&vaults_info);
     }
 
     fn liquidate(
-        env: Env,
+        e: Env,
         liquidator: Address,
         denomination: Symbol,
         total_vaults_to_liquidate: u32,
     ) -> Vec<Vault> {
-        bump_instance(&env);
+        e.bump_instance();
         liquidator.require_auth();
 
-        let core_state: CoreState = get_core_state(&env);
-        let rate: PriceData = get_currency_rate(&env, &core_state, &denomination);
-        let currency: Currency = get_currency(&env, &denomination);
-        let mut vaults_info: VaultsInfo = get_vaults_info(&env, &denomination);
+        let core_state: CoreState = e.core_state().unwrap();
+        let rate: PriceData = get_currency_rate(&e, &core_state, &denomination);
+        let currency: Currency = e
+            .currency(&denomination)
+            .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::CurrencyDoesntExist));
+        let mut vaults_info: VaultsInfo = e.vaults_info(&denomination).unwrap();
         let mut collateral_to_withdraw: u128 = 0;
         let mut amount_to_deposit: u128 = 0;
         let vaults_to_liquidate: Vec<Vault> = get_vaults(
-            &env,
+            &e,
             &OptionalVaultKey::None,
             &vaults_info,
             total_vaults_to_liquidate,
@@ -764,12 +763,12 @@ impl VaultsContractTrait for VaultsContract {
         );
 
         if vaults_to_liquidate.len() < total_vaults_to_liquidate {
-            panic_with_error!(&env, &SCErrors::NotEnoughVaultsToLiquidate);
+            panic_with_error!(&e, &SCErrors::NotEnoughVaultsToLiquidate);
         }
 
         for vault in vaults_to_liquidate.iter() {
             if !can_be_liquidated(&vault, &vaults_info, &(rate.price as u128)) {
-                panic_with_error!(&env, SCErrors::UserVaultCantBeLiquidated);
+                panic_with_error!(&e, SCErrors::UserVaultCantBeLiquidated);
             }
 
             collateral_to_withdraw = collateral_to_withdraw + vault.total_collateral;
@@ -779,17 +778,17 @@ impl VaultsContractTrait for VaultsContract {
             vaults_info.total_col = vaults_info.total_col - vault.total_collateral;
             vaults_info.total_debt = vaults_info.total_debt - vault.total_debt;
 
-            withdraw_vault(&env, &vault, &OptionalVaultKey::None);
+            withdraw_vault(&e, &vault, &OptionalVaultKey::None);
 
             vaults_info.lowest_key = vault.next_key;
         }
 
-        set_vaults_info(&env, &vaults_info);
-        burn_stablecoin(&env, &currency, &liquidator, amount_to_deposit as i128);
+        e.set_vaults_info(&vaults_info);
+        burn_stablecoin(&e, &currency, &liquidator, amount_to_deposit as i128);
 
         let end_collateral: u128 =
             collateral_to_withdraw - calc_fee(&core_state.fee, &collateral_to_withdraw);
-        withdraw_collateral(&env, &core_state, &liquidator, end_collateral as i128);
+        withdraw_collateral(&e, &core_state, &liquidator, end_collateral as i128);
 
         vaults_to_liquidate
     }

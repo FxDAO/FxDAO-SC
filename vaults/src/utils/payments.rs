@@ -1,7 +1,7 @@
 use crate::storage::core::CoreState;
 use crate::storage::currencies::Currency;
-use num_integer::{div_ceil, div_floor};
-use soroban_sdk::{self, panic_with_error, token, Address, Env, Symbol};
+use num_integer::div_ceil;
+use soroban_sdk::{self, token, Address, Env};
 
 pub fn calc_fee(fee: &u128, amount: &u128) -> u128 {
     div_ceil(amount * fee, 1_0000000)
