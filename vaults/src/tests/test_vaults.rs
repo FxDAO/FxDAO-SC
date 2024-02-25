@@ -12,12 +12,17 @@ use crate::errors::SCErrors;
 use crate::utils::indexes::calculate_user_vault_index;
 use crate::utils::payments::calc_fee;
 use num_integer::div_floor;
-use soroban_sdk::testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation};
+use soroban_sdk::testutils::arbitrary::std::println;
+use soroban_sdk::testutils::{
+    Address as _, AuthorizedFunction, AuthorizedInvocation, Ledger, LedgerInfo, MockAuth,
+    MockAuthInvoke,
+};
 use soroban_sdk::{symbol_short, token, Address, Env, IntoVal, Symbol, Vec};
 
 #[test]
 fn test_set_vault_conditions() {
     let env = Env::default();
+    env.mock_all_auths();
     let data: TestData = create_base_data(&env);
     let base_variables: InitialVariables = create_base_variables(&env, &data);
 
@@ -72,6 +77,7 @@ fn test_set_vault_conditions() {
 #[test]
 fn test_new_vault() {
     let env = Env::default();
+    env.mock_all_auths();
     let data = create_base_data(&env);
 
     data.contract_client.init(
@@ -97,20 +103,19 @@ fn test_new_vault() {
     token::StellarAssetClient::new(&env, &data.stable_token_client.address)
         .set_admin(&contract_address);
 
-    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-    // let inactive_currency = data
-    //     .contract_client
-    //     .try_new_vault(
-    //         &OptionalVaultKey::None,
-    //         &depositor,
-    //         &initial_debt,
-    //         &collateral_amount,
-    //         &data.stable_token_denomination,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(inactive_currency, SCErrors::CurrencyDoesntExist.into());
+    let inactive_currency = data
+        .contract_client
+        .try_new_vault(
+            &OptionalVaultKey::None,
+            &depositor,
+            &initial_debt,
+            &collateral_amount,
+            &data.stable_token_denomination,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(inactive_currency, SCErrors::CurrencyDoesntExist.into());
 
     data.contract_client.create_currency(
         &data.stable_token_denomination,
@@ -119,20 +124,19 @@ fn test_new_vault() {
 
     init_oracle_contract(&env, &data, &(currency_price as i128));
 
-    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-    // let inactive_currency = data
-    //     .contract_client
-    //     .try_new_vault(
-    //         &OptionalVaultKey::None,
-    //         &depositor,
-    //         &initial_debt,
-    //         &collateral_amount,
-    //         &data.stable_token_denomination,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(inactive_currency, SCErrors::CurrencyIsInactive.into());
+    let inactive_currency = data
+        .contract_client
+        .try_new_vault(
+            &OptionalVaultKey::None,
+            &depositor,
+            &initial_debt,
+            &collateral_amount,
+            &data.stable_token_denomination,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(inactive_currency, SCErrors::CurrencyIsInactive.into());
 
     data.contract_client
         .toggle_currency(&data.stable_token_denomination, &true);
@@ -140,23 +144,22 @@ fn test_new_vault() {
     data.collateral_token_admin_client
         .mint(&depositor, &(collateral_amount as i128 * 2));
 
-    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-    // let vaults_info_not_started = data
-    //     .contract_client
-    //     .try_new_vault(
-    //         &OptionalVaultKey::None,
-    //         &depositor,
-    //         &initial_debt,
-    //         &collateral_amount,
-    //         &data.stable_token_denomination,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(
-    //     vaults_info_not_started,
-    //     SCErrors::VaultsInfoHasNotStarted.into()
-    // );
+    let vaults_info_not_started = data
+        .contract_client
+        .try_new_vault(
+            &OptionalVaultKey::None,
+            &depositor,
+            &initial_debt,
+            &collateral_amount,
+            &data.stable_token_denomination,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(
+        vaults_info_not_started,
+        SCErrors::VaultsInfoHasNotStarted.into()
+    );
 
     data.contract_client.set_vault_conditions(
         &min_col_rate,
@@ -165,80 +168,66 @@ fn test_new_vault() {
         &data.stable_token_denomination,
     );
 
-    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-    // let invalid_initial_debt = data
-    //     .contract_client
-    //     .try_new_vault(
-    //         &OptionalVaultKey::None,
-    //         &depositor,
-    //         &10,
-    //         &collateral_amount,
-    //         &data.stable_token_denomination,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(
-    //     invalid_initial_debt,
-    //     SCErrors::InvalidInitialDebtAmount.into()
-    // );
+    let invalid_initial_debt = data
+        .contract_client
+        .try_new_vault(
+            &OptionalVaultKey::None,
+            &depositor,
+            &10,
+            &collateral_amount,
+            &data.stable_token_denomination,
+        )
+        .unwrap_err()
+        .unwrap();
 
-    // data.contract_client.new_vault(
-    //     &depositor,
-    //     &initial_debt,
-    //     &collateral_amount,
-    //     &data.stable_token_denomination,
-    // );
+    assert_eq!(invalid_initial_debt, SCErrors::InvalidMinDebtAmount.into());
 
-    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-    // let invalid_opening_col_ratio = data
-    //     .contract_client
-    //     .try_new_vault(
-    //         &OptionalVaultKey::None,
-    //         &depositor,
-    //         &collateral_amount,
-    //         &collateral_amount,
-    //         &data.stable_token_denomination,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(
-    //     invalid_opening_col_ratio,
-    //     SCErrors::InvalidOpeningCollateralRatio.into()
-    // );
+    let invalid_opening_col_ratio = data
+        .contract_client
+        .try_new_vault(
+            &OptionalVaultKey::None,
+            &depositor,
+            &collateral_amount,
+            &collateral_amount,
+            &data.stable_token_denomination,
+        )
+        .unwrap_err()
+        .unwrap();
 
-    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-    // let prev_index_is_higher_error = data
-    //     .contract_client
-    //     .try_new_vault(
-    //         &OptionalVaultKey::Some(VaultKey {
-    //             index: u128::MAX,
-    //             account: Address::generate(&env),
-    //             denomination: symbol_short!("usd"),
-    //         }),
-    //         &depositor,
-    //         &initial_debt,
-    //         &collateral_amount,
-    //         &data.stable_token_denomination,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(
-    //     prev_index_is_higher_error,
-    //     SCErrors::InvalidPrevVaultIndex.into()
-    // );
+    assert_eq!(
+        invalid_opening_col_ratio,
+        SCErrors::InvalidOpeningCollateralRatio.into()
+    );
+
+    let prev_index_is_higher_error = data
+        .contract_client
+        .try_new_vault(
+            &OptionalVaultKey::Some(VaultKey {
+                index: u128::MAX,
+                account: Address::generate(&env),
+                denomination: symbol_short!("usd"),
+            }),
+            &depositor,
+            &initial_debt,
+            &collateral_amount,
+            &data.stable_token_denomination,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(
+        prev_index_is_higher_error,
+        SCErrors::InvalidPrevVaultIndex.into()
+    );
 
     // Fail if the Vault doesn't exist
-    // TODO: UPDATE THIS ONCE SOROBAN FIX IT
-    // let vault_doesnt_exist_error = data
-    //     .contract_client
-    //     .try_get_vault(&depositor, &data.stable_token_denomination)
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(vault_doesnt_exist_error, SCErrors::VaultDoesntExist.into());
+    let vault_doesnt_exist_error = data
+        .contract_client
+        .try_get_vault(&depositor, &data.stable_token_denomination)
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(vault_doesnt_exist_error, SCErrors::VaultDoesntExist.into());
 
     data.contract_client.new_vault(
         &OptionalVaultKey::None,
@@ -336,7 +325,7 @@ fn test_new_vault() {
         user_vault.index,
         div_floor(
             1000000000 * (collateral_amount - calc_fee(&data.fee, &collateral_amount)),
-            initial_debt
+            initial_debt,
         )
     );
     assert_eq!(
@@ -346,70 +335,49 @@ fn test_new_vault() {
     assert_eq!(user_vault.total_debt, initial_debt);
 
     // Should fail if user tries to create a new vault but already have one
-    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-    // let vault_already_exist = data
-    //     .contract_client
-    //     .try_new_vault(
-    //         &OptionalVaultKey::None,
-    //         &depositor,
-    //         &initial_debt,
-    //         &collateral_amount,
-    //         &data.stable_token_denomination,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(
-    //     &vault_already_exist,
-    //     &SCErrors::UserAlreadyHasDenominationVault.into()
-    // );
+    let vault_already_exist = data
+        .contract_client
+        .try_new_vault(
+            &OptionalVaultKey::None,
+            &depositor,
+            &initial_debt,
+            &collateral_amount,
+            &data.stable_token_denomination,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(
+        &vault_already_exist,
+        &SCErrors::UserAlreadyHasDenominationVault.into()
+    );
 
     let depositor_2 = Address::generate(&env);
 
     data.collateral_token_admin_client
         .mint(&depositor_2, &(collateral_amount as i128 * 2));
 
-    // If there is already a lowest key, prev key cant not be None
-    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-    // let prev_cant_be_none_error = data
-    //     .contract_client
-    //     .try_new_vault(
-    //         &OptionalVaultKey::None,
-    //         &depositor_2,
-    //         &initial_debt,
-    //         &collateral_amount,
-    //         &data.stable_token_denomination,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(
-    //     &prev_cant_be_none_error,
-    //     &SCErrors::PrevVaultCantBeNone.into()
-    // );
-
     // If prev vault doesn't exist, fail
-    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-    // let prev_doesnt_exist_error = data
-    //     .contract_client
-    //     .try_new_vault(
-    //         &OptionalVaultKey::Some(VaultKey {
-    //             denomination: data.stable_token_denomination.clone(),
-    //             index: 1,
-    //             account: Address::generate(&env),
-    //         }),
-    //         &depositor_2,
-    //         &initial_debt,
-    //         &collateral_amount,
-    //         &data.stable_token_denomination,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(
-    //     &prev_doesnt_exist_error,
-    //     &SCErrors::PrevVaultDoesntExist.into()
-    // );
+    let prev_doesnt_exist_error = data
+        .contract_client
+        .try_new_vault(
+            &OptionalVaultKey::Some(VaultKey {
+                denomination: data.stable_token_denomination.clone(),
+                index: 1,
+                account: Address::generate(&env),
+            }),
+            &depositor_2,
+            &initial_debt,
+            &collateral_amount,
+            &data.stable_token_denomination,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(
+        &prev_doesnt_exist_error,
+        &SCErrors::PrevVaultDoesntExist.into()
+    );
 
     data.contract_client.new_vault(
         &vault_info.lowest_key,
@@ -443,7 +411,7 @@ fn test_new_vault() {
         second_user_vault.index,
         div_floor(
             1000000000 * (collateral_amount - calc_fee(&data.fee, &collateral_amount)),
-            initial_debt
+            initial_debt,
         )
     );
     assert_eq!(
@@ -461,6 +429,7 @@ fn test_multiple_vaults_same_values() {
 #[test]
 fn test_increase_collateral() {
     let env = Env::default();
+    env.mock_all_auths();
     let data = create_base_data(&env);
     let base_variables = create_base_variables(&env, &data);
     set_initial_state(&env, &data, &base_variables);
@@ -496,23 +465,22 @@ fn test_increase_collateral() {
     );
 
     // It should fail if the user doesn't have a Vault open
-    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-    // let no_vault_created_error = data
-    //     .contract_client
-    //     .try_incr_col(
-    //         &OptionalVaultKey::None,
-    //         &VaultKey {
-    //             index: 1,
-    //             account: depositor.clone(),
-    //             denomination: data.stable_token_denomination.clone(),
-    //         },
-    //         &OptionalVaultKey::None,
-    //         &100_0000000,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(no_vault_created_error, SCErrors::VaultDoesntExist.into());
+    let no_vault_created_error = data
+        .contract_client
+        .try_increase_collateral(
+            &OptionalVaultKey::None,
+            &VaultKey {
+                index: 1,
+                account: depositor.clone(),
+                denomination: data.stable_token_denomination.clone(),
+            },
+            &OptionalVaultKey::None,
+            &100_0000000,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(no_vault_created_error, SCErrors::VaultDoesntExist.into());
 
     data.contract_client.new_vault(
         &OptionalVaultKey::None,
@@ -591,7 +559,7 @@ fn test_increase_collateral() {
                                 .into_val(&env)
                         )),
                         sub_invocations: std::vec![],
-                    }
+                    },
                 ],
             }
         )
@@ -662,89 +630,86 @@ fn test_increase_collateral() {
         .contract_client
         .get_vault(&depositor, &data.stable_token_denomination);
 
-    // Currently this is the lowest vault
+    // Currently this is the middle vault
     let vault_2: Vault = data
         .contract_client
         .get_vault(&depositor_2, &data.stable_token_denomination);
 
-    // Currently this is the middle vault
+    // Currently this is the lowest vault
     let vault_3: Vault = data
         .contract_client
         .get_vault(&depositor_3, &data.stable_token_denomination);
 
     // If prev_key is None, the target Vault needs to be the lowest vault otherwise panic
-    // TODO: FIX ONCE SOROBAN FIX IT
-    // let none_must_be_the_lowest_error = data
-    //     .contract_client
-    //     .try_increase_collateral(
-    //         &OptionalVaultKey::None,
-    //         &VaultKey {
-    //             index: vault_3.index.clone(),
-    //             account: vault_3.account.clone(),
-    //             denomination: vault_3.denomination.clone(),
-    //         },
-    //         &OptionalVaultKey::None,
-    //         &collateral_to_add,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(
-    //     none_must_be_the_lowest_error,
-    //     SCErrors::PrevVaultCantBeNone.into(),
-    // );
+    let none_must_be_the_lowest_error = data
+        .contract_client
+        .try_increase_collateral(
+            &OptionalVaultKey::None,
+            &VaultKey {
+                index: vault_3.index.clone(),
+                account: vault_3.account.clone(),
+                denomination: vault_3.denomination.clone(),
+            },
+            &OptionalVaultKey::None,
+            &collateral_to_add,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(
+        none_must_be_the_lowest_error,
+        SCErrors::PrevVaultCantBeNone.into(),
+    );
 
     // If the Next Key of the prev_vault we provide is None, it means is not this one so it panics
-    // TODO: FIX ONCE SOROBAN FIX IT
-    // let invalid_next_key_none = data
-    //     .contract_client
-    //     .try_increase_collateral(
-    //         &OptionalVaultKey::Some(VaultKey {
-    //             index: vault_1.index.clone(),
-    //             account: vault_1.account.clone(),
-    //             denomination: vault_1.denomination.clone(),
-    //         }),
-    //         &VaultKey {
-    //             index: vault_3.index.clone(),
-    //             account: vault_3.account.clone(),
-    //             denomination: vault_3.denomination.clone(),
-    //         },
-    //         &OptionalVaultKey::None,
-    //         &collateral_to_add,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(
-    //     invalid_next_key_none,
-    //     SCErrors::PrevVaultNextIndexIsInvalid.into(),
-    // );
+    let invalid_next_key_none = data
+        .contract_client
+        .try_increase_collateral(
+            &OptionalVaultKey::Some(VaultKey {
+                index: vault_1.index.clone(),
+                account: vault_1.account.clone(),
+                denomination: vault_1.denomination.clone(),
+            }),
+            &VaultKey {
+                index: vault_3.index.clone(),
+                account: vault_3.account.clone(),
+                denomination: vault_3.denomination.clone(),
+            },
+            &OptionalVaultKey::None,
+            &collateral_to_add,
+        )
+        .unwrap_err()
+        .unwrap();
 
-    // If the Next Key of the prev_vault we provide is not the target vault, it means the prev_vault is not the correct one
-    // TODO: FIX ONCE SOROBAN FIX IT
-    // let invalid_next_key_wrong = data
-    //     .contract_client
-    //     .try_increase_collateral(
-    //         &OptionalVaultKey::Some(VaultKey {
-    //             index: vault_2.index.clone(),
-    //             account: vault_2.account.clone(),
-    //             denomination: vault_2.denomination.clone(),
-    //         }),
-    //         &VaultKey {
-    //             index: vault_1.index.clone(),
-    //             account: vault_1.account.clone(),
-    //             denomination: vault_1.denomination.clone(),
-    //         },
-    //         &OptionalVaultKey::None,
-    //         &collateral_to_add,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(
-    //     invalid_next_key_wrong,
-    //     SCErrors::PrevVaultNextIndexIsInvalid.into(),
-    // );
+    assert_eq!(
+        invalid_next_key_none,
+        SCErrors::PrevVaultNextIndexIsInvalid.into(),
+    );
+
+    // If the Next Key of the prev_vault we provide is not the target vault, it means the prev_vault is not the correct one even if its index is lower than the target vault
+    let invalid_next_key_wrong = data
+        .contract_client
+        .try_increase_collateral(
+            &OptionalVaultKey::Some(VaultKey {
+                index: vault_3.index.clone(),
+                account: vault_3.account.clone(),
+                denomination: vault_3.denomination.clone(),
+            }),
+            &VaultKey {
+                index: vault_1.index.clone(),
+                account: vault_1.account.clone(),
+                denomination: vault_1.denomination.clone(),
+            },
+            &OptionalVaultKey::None,
+            &collateral_to_add,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(
+        invalid_next_key_wrong,
+        SCErrors::PrevVaultNextIndexIsInvalid.into(),
+    );
 
     data.contract_client.increase_collateral(
         &OptionalVaultKey::Some(VaultKey {
@@ -784,6 +749,7 @@ fn test_increase_collateral() {
 #[test]
 fn test_increase_debt() {
     let env: Env = Env::default();
+    env.mock_all_auths();
     let data: TestData = create_base_data(&env);
     let base_variables: InitialVariables = create_base_variables(&env, &data);
     set_initial_state(&env, &data, &base_variables);
@@ -814,23 +780,22 @@ fn test_increase_debt() {
     );
 
     // It should fail if the user doesn't have a Vault open
-    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-    // let no_vault_created_error = data
-    //     .contract_client
-    //     .try_increase_debt(
-    //         &OptionalVaultKey::None,
-    //         &VaultKey {
-    //             index: 1,
-    //             account: base_variables.depositor.clone(),
-    //             denomination: data.stable_token_denomination.clone(),
-    //         },
-    //         &OptionalVaultKey::None,
-    //         &100_0000000,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(no_vault_created_error, SCErrors::VaultDoesntExist.into());
+    let no_vault_created_error = data
+        .contract_client
+        .try_increase_debt(
+            &OptionalVaultKey::None,
+            &VaultKey {
+                index: 1,
+                account: base_variables.depositor.clone(),
+                denomination: data.stable_token_denomination.clone(),
+            },
+            &OptionalVaultKey::None,
+            &100_0000000,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(no_vault_created_error, SCErrors::VaultDoesntExist.into());
 
     data.contract_client.new_vault(
         &OptionalVaultKey::None,
@@ -898,7 +863,7 @@ fn test_increase_debt() {
                     )
                         .into_val(&env),
                 )),
-                sub_invocations: std::vec![]
+                sub_invocations: std::vec![],
             }
         )
     );
@@ -927,6 +892,7 @@ fn test_increase_debt() {
 #[test]
 fn test_pay_debt() {
     let env: Env = Env::default();
+    env.mock_all_auths();
     let data: TestData = create_base_data(&env);
     let base_variables: InitialVariables = create_base_variables(&env, &data);
     set_initial_state(&env, &data, &base_variables);
@@ -956,26 +922,25 @@ fn test_pay_debt() {
     );
 
     // It should fail if the user doesn't have a Vault open
-    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-    // let no_vault_open_error = data
-    //     .contract_client
-    //     .try_pay_debt(
-    //         &OptionalVaultKey::None,
-    //         &VaultKey {
-    //             index: calculate_user_vault_index(
-    //                 base_variables.initial_debt.clone(),
-    //                 base_variables.collateral_amount.clone(),
-    //             ),
-    //             account: base_variables.depositor.clone(),
-    //             denomination: data.stable_token_denomination.clone(),
-    //         },
-    //         &OptionalVaultKey::None,
-    //         &base_variables.initial_debt,
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(no_vault_open_error, SCErrors::VaultDoesntExist.into());
+    let no_vault_open_error = data
+        .contract_client
+        .try_pay_debt(
+            &OptionalVaultKey::None,
+            &VaultKey {
+                index: calculate_user_vault_index(
+                    base_variables.initial_debt.clone(),
+                    base_variables.collateral_amount.clone(),
+                ),
+                account: base_variables.depositor.clone(),
+                denomination: data.stable_token_denomination.clone(),
+            },
+            &OptionalVaultKey::None,
+            &base_variables.initial_debt,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(no_vault_open_error, SCErrors::VaultDoesntExist.into());
 
     data.contract_client.new_vault(
         &OptionalVaultKey::None,
@@ -1086,26 +1051,25 @@ fn test_pay_debt() {
         .get_vault(&base_variables.depositor, &data.stable_token_denomination);
 
     // If the vault will be below the min deb it should fail
-    // TODO: FIX THIS ONCE SOROBAN FIX IT
-    // let min_debt_invalid_error = data
-    //     .contract_client
-    //     .try_pay_debt(
-    //         &OptionalVaultKey::None,
-    //         &VaultKey {
-    //             index: vault.index.clone(),
-    //             account: vault.account.clone(),
-    //             denomination: vault.denomination.clone(),
-    //         },
-    //         &OptionalVaultKey::None,
-    //         &(base_variables.initial_debt / 2),
-    //     )
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(
-    //     min_debt_invalid_error,
-    //     SCErrors::InvalidMinDebtAmount.into()
-    // );
+    let min_debt_invalid_error = data
+        .contract_client
+        .try_pay_debt(
+            &OptionalVaultKey::None,
+            &VaultKey {
+                index: vault.index.clone(),
+                account: vault.account.clone(),
+                denomination: vault.denomination.clone(),
+            },
+            &OptionalVaultKey::None,
+            &(base_variables.initial_debt / 2),
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(
+        min_debt_invalid_error,
+        SCErrors::InvalidMinDebtAmount.into()
+    );
 
     data.contract_client.pay_debt(
         &OptionalVaultKey::None,
@@ -1137,19 +1101,19 @@ fn test_pay_debt() {
     );
 
     // We confirm the vault was removed from the storage
-    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-    // let vault_removed_error = data
-    //     .contract_client
-    //     .try_get_vault(&base_variables.depositor, &data.stable_token_denomination)
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(vault_removed_error, SCErrors::VaultDoesntExist.into());
+    let vault_removed_error = data
+        .contract_client
+        .try_get_vault(&base_variables.depositor, &data.stable_token_denomination)
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(vault_removed_error, SCErrors::VaultDoesntExist.into());
 }
 
 #[test]
 fn get_vaults() {
     let env: Env = Env::default();
+    env.mock_all_auths();
     let data: TestData = create_base_data(&env);
     let base_variables: InitialVariables = create_base_variables(&env, &data);
     set_initial_state(&env, &data, &base_variables);
@@ -1176,6 +1140,12 @@ fn get_vaults() {
     data.stable_token_admin_client.mint(
         &base_variables.contract_address,
         &(base_variables.initial_debt as i128 * 5),
+    );
+
+    println!(
+        "Timestamp: {:?}, Rate time: {:?}",
+        env.ledger().timestamp(),
+        env.ledger().timestamp().saturating_sub(1200)
     );
 
     data.contract_client.new_vault(
@@ -1222,4 +1192,157 @@ fn get_vaults() {
     );
 
     assert_eq!(&vaults.first().unwrap(), &vault_from_basic);
+}
+
+#[test]
+fn panic_mode_enabled() {
+    let env: Env = Env::default();
+    let data: TestData = create_base_data(&env);
+    let base_variables: InitialVariables = create_base_variables(&env, &data);
+    set_initial_state(&env, &data, &base_variables);
+
+    data.contract_client.mock_all_auths().set_vault_conditions(
+        &base_variables.min_col_rate,
+        &base_variables.min_debt_creation,
+        &base_variables.opening_col_rate,
+        &data.stable_token_denomination,
+    );
+
+    update_oracle_price(
+        &env,
+        &data.oracle_contract_client,
+        &data.stable_token_denomination,
+        &(base_variables.currency_price as i128),
+    );
+
+    data.collateral_token_admin_client.mock_all_auths().mint(
+        &base_variables.depositor,
+        &(base_variables.collateral_amount as i128 * 5),
+    );
+
+    data.stable_token_admin_client.mock_all_auths().mint(
+        &base_variables.contract_address,
+        &(base_variables.initial_debt as i128 * 5),
+    );
+
+    // If the one authorizing isn't the manager it should fail
+    assert!(data
+        .contract_client
+        .mock_auths(&[MockAuth {
+            address: &data.contract_admin,
+            invoke: &MockAuthInvoke {
+                contract: &data.contract_client.address,
+                fn_name: "set_panic",
+                args: (true,).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_set_panic(&true)
+        .is_err());
+
+    data.contract_client.mock_all_auths().set_panic(&true);
+
+    let panic_mode_enabled_error = data
+        .contract_client
+        .mock_all_auths()
+        .try_new_vault(
+            &OptionalVaultKey::None,
+            &base_variables.depositor,
+            &(base_variables.initial_debt),
+            &(base_variables.collateral_amount),
+            &data.stable_token_denomination,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(panic_mode_enabled_error, SCErrors::PanicModeEnabled.into(),);
+
+    data.contract_client.mock_all_auths().set_panic(&false);
+
+    data.contract_client.mock_all_auths().new_vault(
+        &OptionalVaultKey::None,
+        &base_variables.depositor,
+        &(base_variables.initial_debt),
+        &(base_variables.collateral_amount),
+        &data.stable_token_denomination,
+    );
+
+    data.contract_client.mock_all_auths().set_panic(&true);
+
+    let vault: Vault = data
+        .contract_client
+        .mock_all_auths()
+        .get_vault(&base_variables.depositor, &data.stable_token_denomination);
+
+    let panic_mode_enabled_error_2 = data
+        .contract_client
+        .mock_all_auths()
+        .try_increase_debt(
+            &OptionalVaultKey::None,
+            &VaultKey {
+                index: vault.index,
+                account: base_variables.depositor.clone(),
+                denomination: data.stable_token_denomination.clone(),
+            },
+            &OptionalVaultKey::None,
+            &base_variables.initial_debt,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(
+        panic_mode_enabled_error_2,
+        SCErrors::PanicModeEnabled.into(),
+    );
+
+    data.contract_client.mock_all_auths().set_panic(&false);
+
+    // If it's been more than 20 minutes since the last update of the oracle rate, act as if we were in panic mode
+
+    // Just confirm the mode is not enabled but still will act like that
+    assert_eq!(data.contract_client.get_core_state().panic_mode, false);
+
+    env.ledger().set(LedgerInfo {
+        timestamp: env.ledger().timestamp() + 1201,
+        protocol_version: 20,
+        sequence_number: env.ledger().sequence(),
+        network_id: Default::default(),
+        base_reserve: 10,
+        min_temp_entry_ttl: 1,
+        min_persistent_entry_ttl: 1,
+        max_entry_ttl: u32::MAX,
+    });
+
+    let cant_open_new_vault_error = data
+        .contract_client
+        .mock_all_auths()
+        .try_new_vault(
+            &OptionalVaultKey::None,
+            &Address::generate(&env),
+            &(base_variables.initial_debt),
+            &(base_variables.collateral_amount),
+            &data.stable_token_denomination,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(cant_open_new_vault_error, SCErrors::PanicModeEnabled.into());
+
+    let cant_increase_debt = data
+        .contract_client
+        .mock_all_auths()
+        .try_increase_debt(
+            &OptionalVaultKey::None,
+            &VaultKey {
+                index: vault.index,
+                account: base_variables.depositor,
+                denomination: data.stable_token_denomination.clone(),
+            },
+            &OptionalVaultKey::None,
+            &base_variables.initial_debt,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(cant_increase_debt, SCErrors::PanicModeEnabled.into(),);
 }

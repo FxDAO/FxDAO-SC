@@ -11,6 +11,7 @@ use crate::tests::test_utils::*;
 #[test]
 fn test_create_new_currency() {
     let env = Env::default();
+    env.mock_all_auths();
     let data: TestData = create_base_data(&env);
 
     data.contract_client.init(

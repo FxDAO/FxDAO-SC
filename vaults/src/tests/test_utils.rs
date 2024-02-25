@@ -1,4 +1,5 @@
 #![cfg(test)]
+
 use crate::contract::VaultsContract;
 use crate::oracle::{
     Asset, AssetsData, Client as OracleClient, CoreData, CustomerQuota, PriceData,
@@ -60,8 +61,6 @@ pub struct InitialVariables {
 }
 
 pub fn create_base_data(env: &Env) -> TestData {
-    env.mock_all_auths();
-
     // Set up the collateral token
     let collateral_token_admin = Address::generate(&env);
     let (collateral_token_client, collateral_token_admin_client) =
@@ -127,7 +126,7 @@ pub fn create_base_variables(env: &Env, data: &TestData) -> InitialVariables {
 }
 
 pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVariables) {
-    data.contract_client.init(
+    data.contract_client.mock_all_auths().init(
         &data.contract_admin,
         &data.protocol_manager,
         &data.collateral_token_client.address,
@@ -137,7 +136,7 @@ pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVar
         &data.oracle,
     );
 
-    data.contract_client.create_currency(
+    data.contract_client.mock_all_auths().create_currency(
         &data.stable_token_denomination,
         &data.stable_token_client.address,
     );
@@ -145,9 +144,10 @@ pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVar
     init_oracle_contract(&env, &data, &(base_variables.currency_price as i128));
 
     data.contract_client
+        .mock_all_auths()
         .toggle_currency(&data.stable_token_denomination, &true);
 
-    data.contract_client.set_vault_conditions(
+    data.contract_client.mock_all_auths().set_vault_conditions(
         &base_variables.min_col_rate,
         &base_variables.min_debt_creation,
         &base_variables.opening_col_rate,
@@ -155,14 +155,16 @@ pub fn set_initial_state(env: &Env, data: &TestData, base_variables: &InitialVar
     );
 
     token::StellarAssetClient::new(&env, &data.stable_token_client.address)
+        .mock_all_auths()
         .set_admin(&base_variables.contract_address);
 
     token::StellarAssetClient::new(&env, &data.stable_token_client.address)
+        .mock_all_auths()
         .mint(&data.stable_token_issuer, &90000000000000000000);
 }
 
 pub fn init_oracle_contract(env: &Env, data: &TestData, rate: &i128) {
-    data.oracle_contract_client.init(
+    data.oracle_contract_client.mock_all_auths().init(
         &CoreData {
             adm: data.oracle_contract_admin.clone(),
             tick: 60,
@@ -181,7 +183,7 @@ pub fn init_oracle_contract(env: &Env, data: &TestData, rate: &i128) {
         rate,
     );
 
-    data.oracle_contract_client.set_quota(
+    data.oracle_contract_client.mock_all_auths().set_quota(
         &data.contract_client.address,
         &CustomerQuota {
             max: 0,
@@ -192,13 +194,13 @@ pub fn init_oracle_contract(env: &Env, data: &TestData, rate: &i128) {
 }
 
 pub fn update_oracle_price(env: &Env, client: &OracleClient, denomination: &Symbol, price: &i128) {
-    client.set_records(
+    client.mock_all_auths().set_records(
         &Vec::from_array(&env, [Asset::Other(denomination.clone())]),
         &Vec::from_array(
             &env,
             [PriceData {
                 price: price.clone(),
-                timestamp: 1,
+                timestamp: env.ledger().timestamp(),
             }],
         ),
     );

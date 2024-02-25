@@ -7,14 +7,14 @@ use soroban_sdk::{Address, Env, IntoVal, Symbol};
 
 use crate::errors::SCErrors;
 use crate::storage::core::CoreState;
-use crate::tests::test_utils::create_base_data;
+use crate::tests::test_utils::{create_base_data, TestData};
 
 #[test]
 fn test_init() {
     let env: Env = Env::default();
 
     // Create the contract
-    let data = create_base_data(&env);
+    let data: TestData = create_base_data(&env);
 
     data.contract_client.init(
         &data.contract_admin,
@@ -54,9 +54,10 @@ fn test_init() {
 #[test]
 fn test_site_updates() {
     let env: Env = Env::default();
+    env.mock_all_auths();
 
     // Create the contract
-    let data = create_base_data(&env);
+    let data: TestData = create_base_data(&env);
 
     data.contract_client.init(
         &data.contract_admin,

@@ -9,7 +9,6 @@ use crate::tests::test_utils::{
 };
 use crate::utils::indexes::calculate_user_vault_index;
 use crate::utils::payments::calc_fee;
-use soroban_sdk::testutils::arbitrary::std::println;
 use soroban_sdk::testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation};
 use soroban_sdk::{symbol_short, token, vec, Address, Env, Error, IntoVal, Symbol, Vec};
 
@@ -19,6 +18,7 @@ use soroban_sdk::{symbol_short, token, vec, Address, Env, Error, IntoVal, Symbol
 #[test]
 fn test_liquidation() {
     let env = Env::default();
+    env.mock_all_auths();
     let data: TestData = create_base_data(&env);
     let base_variables: InitialVariables = create_base_variables(&env, &data);
     set_initial_state(&env, &data, &base_variables);
@@ -74,18 +74,17 @@ fn test_liquidation() {
         &data.stable_token_denomination,
     );
 
-    // TODO: FIX THIS ONCE SOROBAN FIX IT
     // It should throw an error because the vault can't be liquidated yet
-    // let cant_liquidate_error_result = data
-    //     .contract_client
-    //     .try_liquidate(&liquidator, &data.stable_token_denomination, &1)
-    //     .unwrap_err()
-    //     .unwrap();
-    //
-    // assert_eq!(
-    //     cant_liquidate_error_result,
-    //     SCErrors::ThereAreNoVaultsToLiquidate.into()
-    // );
+    let cant_liquidate_error_result = data
+        .contract_client
+        .try_liquidate(&liquidator, &data.stable_token_denomination, &1)
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(
+        cant_liquidate_error_result,
+        SCErrors::NotEnoughVaultsToLiquidate.into()
+    );
 
     // We update the collateral price in order to put the depositor's vault below the min collateral ratio
     let second_rate: u128 = 531953;
@@ -134,16 +133,15 @@ fn test_liquidation() {
     );
 
     // The depositor's vault should be removed from the protocol
-    // TODO: UPDATE THIS ONCE SOROBAN IS FIXED
-    // let vault_doesnt_exist_result = data
-    //     .contract_client
-    //     .try_get_vault(&depositor, &data.stable_token_denomination)
-    //     .unwrap_err();
-    //
-    // assert_eq!(
-    //     vault_doesnt_exist_result.unwrap(),
-    //     SCErrors::VaultDoesntExist.into()
-    // );
+    let vault_doesnt_exist_result = data
+        .contract_client
+        .try_get_vault(&depositor, &data.stable_token_denomination)
+        .unwrap_err();
+
+    assert_eq!(
+        vault_doesnt_exist_result.unwrap(),
+        SCErrors::VaultDoesntExist.into()
+    );
 
     // The liquidator should now have the collateral from the depositor
     let liquidator_collateral_balance =
@@ -190,6 +188,7 @@ fn test_liquidation() {
 #[test]
 fn test_vaults_to_liquidate() {
     let env = Env::default();
+    env.mock_all_auths();
     let data: TestData = create_base_data(&env);
     let base_variables: InitialVariables = create_base_variables(&env, &data);
     set_initial_state(&env, &data, &base_variables);

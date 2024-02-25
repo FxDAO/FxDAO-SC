@@ -26,6 +26,7 @@ use soroban_sdk::{symbol_short, token, Address, Env, IntoVal, Symbol};
 #[test]
 fn test_redeem() {
     let env = Env::default();
+    env.mock_all_auths();
     let data: TestData = create_base_data(&env);
     let base_variables: InitialVariables = create_base_variables(&env, &data);
     set_initial_state(&env, &data, &base_variables);

@@ -15,6 +15,7 @@ use soroban_sdk::{panic_with_error, symbol_short, token, vec, Address, Env, Vec}
 #[test]
 fn test_indexes_orders() {
     let env = Env::default();
+    env.mock_all_auths();
     let data = create_base_data(&env);
     let base_variables = create_base_variables(&env, &data);
     set_initial_state(&env, &data, &base_variables);

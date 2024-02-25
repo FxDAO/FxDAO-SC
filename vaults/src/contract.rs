@@ -37,8 +37,8 @@ pub trait VaultsContractTrait {
     fn set_admin(e: Env, address: Address);
     fn set_protocol_manager(e: Env, address: Address);
 
-    // TODO: Test these
     fn upgrade(e: Env, hash: BytesN<32>);
+    fn set_panic(e: Env, status: bool);
 
     /// Currencies methods
     fn create_currency(e: Env, denomination: Symbol, contract: Address);
@@ -166,6 +166,14 @@ impl VaultsContractTrait for VaultsContract {
         e.deployer().update_current_contract_wasm(hash);
     }
 
+    fn set_panic(e: Env, status: bool) {
+        e.bump_instance();
+        e.core_state().unwrap().protocol_manager.require_auth();
+        let mut core_state: CoreState = e.core_state().unwrap();
+        core_state.panic_mode = status;
+        e.set_core_state(&core_state);
+    }
+
     fn create_currency(e: Env, denomination: Symbol, contract: Address) {
         e.bump_instance();
         e.core_state().unwrap().protocol_manager.require_auth();
@@ -257,7 +265,6 @@ impl VaultsContractTrait for VaultsContract {
         denomination: Symbol,
     ) {
         e.bump_instance();
-        // TODO: check if we are in panic mode once is implemented
         caller.require_auth();
         let currency: Currency = e
             .currency(&denomination)
@@ -276,11 +283,17 @@ impl VaultsContractTrait for VaultsContract {
             panic_with_error!(&e, &SCErrors::UserAlreadyHasDenominationVault);
         }
 
-        let core_state: CoreState = e.core_state().unwrap();
-        let fee: u128 = calc_fee(&core_state.fee, &collateral_amount);
-        let vault_col: u128 = collateral_amount - fee;
+        let mut core_state: CoreState = e.core_state().unwrap();
 
         let rate: PriceData = get_currency_rate(&e, &core_state, &denomination);
+
+        // If price of the collateral hasn't been updated in more than 20 minutes or the protocol is in panic mode we throw
+        if core_state.panic_mode || rate.timestamp < e.ledger().timestamp().saturating_sub(1200) {
+            panic_with_error!(&e, &SCErrors::PanicModeEnabled);
+        }
+
+        let fee: u128 = calc_fee(&core_state.fee, &collateral_amount);
+        let vault_col: u128 = collateral_amount - fee;
 
         let mut vaults_info: VaultsInfo = e
             .vaults_info(&denomination)
@@ -304,12 +317,16 @@ impl VaultsContractTrait for VaultsContract {
             denomination: denomination.clone(),
         };
 
-        // In case prev value is not None, we confirm its index is not higher than the new Vault index
+        // In case prev value is not None, we confirm it exists and its index is not higher than the new Vault index
         match prev_key.clone() {
             OptionalVaultKey::None => {}
             OptionalVaultKey::Some(value) => {
                 if new_vault_index < value.index {
                     panic_with_error!(&e, &SCErrors::InvalidPrevVaultIndex);
+                }
+
+                if e.vault(&value).is_none() {
+                    panic_with_error!(&e, &SCErrors::PrevVaultDoesntExist);
                 }
             }
         }
@@ -502,8 +519,14 @@ impl VaultsContractTrait for VaultsContract {
             panic_with_error!(&e, &SCErrors::IndexProvidedIsNotTheOneSaved);
         }
 
-        // TODO: check if we are in panic mode once is implemented
-        // TODO: check if collateral price has been updated lately
+        let mut core_state: CoreState = e.core_state().unwrap();
+
+        let rate: PriceData = get_currency_rate(&e, &core_state, &target_vault.denomination);
+
+        // If price of the collateral hasn't been updated in more than 20 minutes or the protocol is in panic mode we throw
+        if core_state.panic_mode || rate.timestamp < e.ledger().timestamp().saturating_sub(1200) {
+            panic_with_error!(&e, &SCErrors::PanicModeEnabled);
+        }
 
         let mut vaults_info: VaultsInfo = e.vaults_info(&target_vault.denomination).unwrap();
 
@@ -524,9 +547,6 @@ impl VaultsContractTrait for VaultsContract {
         if lowest_key == target_vault_key {
             vaults_info.lowest_key = target_vault.next_key.clone();
         }
-
-        let core_state: CoreState = e.core_state().unwrap();
-        let rate: PriceData = get_currency_rate(&e, &core_state, &target_vault.denomination);
 
         let new_debt_amount: u128 = target_vault.total_debt + amount;
 
@@ -615,7 +635,7 @@ impl VaultsContractTrait for VaultsContract {
         burn_stablecoin(&e, &currency, &target_vault.account, amount as i128);
 
         if target_vault.total_debt == amount {
-            // If the amount is equal to the debt it means it is paid in full so we release the collateral and remove the vault
+            // If the amount is equal to the debt it means it is paid in full, so we release the collateral and remove the vault
 
             // If new_prev_key is not None, we panic because we are removing the vault
             if let OptionalVaultKey::Some(_) = new_prev_key {
