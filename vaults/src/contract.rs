@@ -14,7 +14,7 @@ use crate::utils::vaults::{
     calculate_deposit_ratio, can_be_liquidated, create_and_insert_vault, get_vaults, search_vault,
     withdraw_vault,
 };
-use num_integer::div_floor;
+use num_integer::{div_floor};
 use soroban_sdk::{contract, contractimpl, panic_with_error, Address, BytesN, Env, Symbol, Vec};
 
 use crate::oracle::PriceData;

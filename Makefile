@@ -16,7 +16,6 @@ build-optimized:
 	soroban contract build --package vaults
 	soroban contract build
 	soroban contract optimize --wasm ./target/wasm32-unknown-unknown/release/vaults.wasm --wasm-out ./target/wasm32-unknown-unknown/release/vaults.wasm
-	soroban contract optimize --wasm ./target/wasm32-unknown-unknown/release/safety_pool.wasm --wasm-out ./target/wasm32-unknown-unknown/release/safety_pool.wasm
 	soroban contract optimize --wasm ./target/wasm32-unknown-unknown/release/stable_liquidity_pool.wasm --wasm-out ./target/wasm32-unknown-unknown/release/stable_liquidity_pool.wasm
 
 watch:

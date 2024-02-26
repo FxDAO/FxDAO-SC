@@ -10,7 +10,7 @@ use crate::utils::deposits::{
     make_deposit, make_withdrawal, remove_deposit, remove_depositor_from_depositors, save_deposit,
     save_depositors, validate_deposit_asset,
 };
-use num_integer::div_floor;
+use num_integer::{div_ceil, div_floor};
 use soroban_sdk::{
     contract, contractimpl, panic_with_error, symbol_short, token, Address, BytesN, Env, Map,
     Symbol, Vec,
@@ -242,8 +242,8 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
             panic_with_error!(&env, &SCErrors::InvalidAsset);
         }
 
-        let fee: u128 = div_floor(amount * core_state.fee_percentage, 1_0000000);
-        let protocol_share: u128 = div_floor(fee, 2);
+        let fee: u128 = div_ceil(amount * core_state.fee_percentage, 1_0000000);
+        let protocol_share: u128 = div_ceil(fee, 2);
         let amount_to_exchange: u128 = amount - fee;
 
         make_deposit(&env, &caller, &from_asset, &amount);

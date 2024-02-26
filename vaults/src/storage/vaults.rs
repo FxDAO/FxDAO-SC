@@ -26,8 +26,8 @@ pub struct VaultsInfo {
     pub opening_col_rate: u128,  // Opening collateral ratio - ex: 1.15
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
 #[contracttype]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VaultKey {
     pub index: u128,
     pub account: Address,
