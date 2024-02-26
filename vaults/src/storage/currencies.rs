@@ -1,16 +1,16 @@
 use soroban_sdk::{contracttype, Address, Env, Symbol};
 
-#[derive(Clone)]
 #[contracttype]
+#[derive(Clone)]
 pub struct Currency {
-    pub denomination: Symbol, // symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
+    pub denomination: Symbol,
     pub active: bool,
     pub contract: Address,
 }
 
 #[contracttype]
 pub enum CurrenciesDataKeys {
-    Currency(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "usd"
+    Currency(Symbol), // Symbol is the denomination, not the asset code. For example for xUSD the symbol should be "USD"
 }
 
 pub trait CurrenciesFunc {

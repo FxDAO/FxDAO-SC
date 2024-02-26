@@ -12,7 +12,7 @@ use crate::utils::deposits::{
 };
 use num_integer::div_floor;
 use soroban_sdk::{
-    contract, contractimpl, map, panic_with_error, symbol_short, token, Address, BytesN, Env, Map,
+    contract, contractimpl, panic_with_error, symbol_short, token, Address, BytesN, Env, Map,
     Symbol, Vec,
 };
 

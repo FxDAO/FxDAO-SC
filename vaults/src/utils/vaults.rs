@@ -1,6 +1,6 @@
 use crate::errors::SCErrors;
 use crate::storage::vaults::{
-    OptionalVaultKey, Vault, VaultIndexKey, VaultKey, VaultsDataKeys, VaultsFunc, VaultsInfo,
+    OptionalVaultKey, Vault, VaultIndexKey, VaultKey, VaultsFunc, VaultsInfo,
 };
 use num_integer::div_floor;
 use soroban_sdk::{panic_with_error, Address, Env, Symbol, Vec};
@@ -174,41 +174,6 @@ pub fn get_vaults(
     }
 
     vaults
-}
-
-pub fn get_redeemable_vaults(
-    e: &Env,
-    vaults_info: &VaultsInfo,
-    total_to_redeem: &u128,
-) -> (u128, Vec<Vault>) {
-    let mut total_can_be_redeemed: u128 = 0u128;
-    let mut vaults: Vec<Vault> = Vec::new(&e);
-
-    let mut target_key: VaultKey = match vaults_info.lowest_key.clone() {
-        OptionalVaultKey::None => {
-            panic_with_error!(&e, &SCErrors::UnexpectedError);
-        }
-        OptionalVaultKey::Some(key) => key,
-    };
-
-    for _ in 0..10 {
-        let vault: Vault = e.vault(&target_key).unwrap();
-
-        vaults.push_back(vault.clone());
-        total_can_be_redeemed = total_can_be_redeemed + vault.total_debt;
-
-        if total_to_redeem <= &total_can_be_redeemed {
-            break;
-        }
-
-        if let OptionalVaultKey::Some(key) = vault.next_key {
-            target_key = key
-        } else {
-            break;
-        }
-    }
-
-    (total_can_be_redeemed, vaults)
 }
 
 /// This function checks and removes the given Vault, it also updates the previous Vault if there is one.

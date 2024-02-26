@@ -11,16 +11,18 @@ pub enum OptionalVaultKey {
     Some(VaultKey),
 }
 
-#[derive(Debug, Clone)]
 #[contracttype]
+#[derive(Debug, Clone)]
 pub struct VaultsInfo {
     pub denomination: Symbol,
     pub total_vaults: u64,
     pub total_debt: u128,
     pub total_col: u128,
     pub lowest_key: OptionalVaultKey,
-    pub min_col_rate: u128,      // Min collateral ratio - ex: 1.10
-    pub min_debt_creation: u128, // Min vault creation amount - ex: 5000
+    pub min_col_rate: u128,
+    // Min collateral ratio - ex: 1.10
+    pub min_debt_creation: u128,
+    // Min vault creation amount - ex: 5000
     pub opening_col_rate: u128,  // Opening collateral ratio - ex: 1.15
 }
 
@@ -32,8 +34,8 @@ pub struct VaultKey {
     pub denomination: Symbol,
 }
 
-#[derive(Clone, Debug, PartialEq)]
 #[contracttype]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Vault {
     pub index: u128,
     pub next_key: OptionalVaultKey,
@@ -43,8 +45,8 @@ pub struct Vault {
     pub denomination: Symbol,
 }
 
-#[derive(Clone, Debug)]
 #[contracttype]
+#[derive(Clone, Debug)]
 pub struct VaultIndexKey {
     pub user: Address,
     pub denomination: Symbol,

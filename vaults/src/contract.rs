@@ -278,12 +278,12 @@ impl VaultsContractTrait for VaultsContract {
             user: caller.clone(),
             denomination: denomination.clone(),
         })
-        .is_some()
+            .is_some()
         {
             panic_with_error!(&e, &SCErrors::UserAlreadyHasDenominationVault);
         }
 
-        let mut core_state: CoreState = e.core_state().unwrap();
+        let core_state: CoreState = e.core_state().unwrap();
 
         let rate: PriceData = get_currency_rate(&e, &core_state, &denomination);
 
@@ -519,7 +519,7 @@ impl VaultsContractTrait for VaultsContract {
             panic_with_error!(&e, &SCErrors::IndexProvidedIsNotTheOneSaved);
         }
 
-        let mut core_state: CoreState = e.core_state().unwrap();
+        let core_state: CoreState = e.core_state().unwrap();
 
         let rate: PriceData = get_currency_rate(&e, &core_state, &target_vault.denomination);
 

@@ -4,13 +4,12 @@ extern crate std;
 
 use crate::storage::vaults::{OptionalVaultKey, Vault, VaultKey, VaultsInfo};
 use crate::tests::test_utils::{
-    create_base_data, create_base_variables, init_oracle_contract, set_initial_state,
+    create_base_data, create_base_variables, set_initial_state,
     update_oracle_price,
 };
-use crate::utils::indexes::calculate_user_vault_index;
-use crate::utils::payments::calc_fee;
+
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{panic_with_error, symbol_short, token, vec, Address, Env, Vec};
+use soroban_sdk::{Address, Env};
 
 #[test]
 fn test_indexes_orders() {
@@ -19,7 +18,6 @@ fn test_indexes_orders() {
     let data = create_base_data(&env);
     let base_variables = create_base_variables(&env, &data);
     set_initial_state(&env, &data, &base_variables);
-    let contract_address: Address = data.contract_client.address.clone();
 
     let currency_price: u128 = 920330;
     let min_col_rate: u128 = 11000000;
@@ -271,4 +269,6 @@ fn test_indexes_orders() {
     // We are going to start increasing the collateral and increasing/paying the debt
     // ----------------------------------------
     env.budget().reset_default();
+
+    // TODO: we need to finish this test
 }
