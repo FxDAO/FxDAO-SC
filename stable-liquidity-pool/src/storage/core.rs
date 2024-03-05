@@ -6,7 +6,8 @@ pub struct CoreState {
     pub manager: Address,
     pub governance_token: Address,
     pub accepted_assets: Vec<Address>,
-    pub fee_percentage: u128, // For example 0.3% = 0.003 = 30000
+    // For example 0.3% = 0.003 = 30000
+    pub fee_percentage: u128,
     pub total_deposited: u128,
     pub share_price: u128,
     pub total_shares: u128,
@@ -15,6 +16,5 @@ pub struct CoreState {
 
 #[contracttype]
 pub enum CoreStorageKeys {
-    CoreState,                       // CoreState
-    LastGovernanceTokenDistribution, // u64
+    CoreState,
 }

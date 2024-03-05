@@ -1,19 +1,12 @@
 use crate::storage::deposits::{Deposit, DepositsDataKeys};
-use soroban_sdk::{token, vec, Address, Env, Vec};
+use soroban_sdk::{token, Address, Env, Vec};
+
 pub const PERSISTENT_BUMP_CONSTANT: u32 = 1036800;
 pub const PERSISTENT_BUMP_CONSTANT_THRESHOLD: u32 = 518400;
 
 pub fn bump_deposit(env: &Env, depositor: Address) {
     env.storage().persistent().extend_ttl(
         &DepositsDataKeys::Deposit(depositor),
-        PERSISTENT_BUMP_CONSTANT_THRESHOLD,
-        PERSISTENT_BUMP_CONSTANT,
-    );
-}
-
-pub fn bump_depositors(env: &Env) {
-    env.storage().persistent().extend_ttl(
-        &DepositsDataKeys::Depositors,
         PERSISTENT_BUMP_CONSTANT_THRESHOLD,
         PERSISTENT_BUMP_CONSTANT,
     );
@@ -59,45 +52,6 @@ pub fn save_deposit(env: &Env, deposit: &Deposit) {
         &DepositsDataKeys::Deposit(deposit.depositor.clone()),
         deposit,
     );
-}
-
-pub fn save_depositors(env: &Env, depositors: &Vec<Address>) {
-    env.storage()
-        .persistent()
-        .set(&DepositsDataKeys::Depositors, depositors)
-}
-
-pub fn get_depositors(env: &Env) -> Vec<Address> {
-    env.storage()
-        .persistent()
-        .get(&DepositsDataKeys::Depositors)
-        .unwrap_or(vec![&env] as Vec<Address>)
-}
-
-pub fn is_depositor_listed(records: &Vec<Address>, depositor: &Address) -> bool {
-    let mut saved: bool = false;
-
-    for value in records.iter() {
-        if depositor == &value {
-            saved = true;
-        }
-    }
-    saved
-}
-
-pub fn remove_depositor_from_depositors(
-    depositors: &Vec<Address>,
-    depositor: &Address,
-) -> Vec<Address> {
-    let mut updated_record = depositors.clone();
-
-    for (i, el) in updated_record.iter().enumerate() {
-        if depositor == &el {
-            updated_record.remove(i as u32);
-        }
-    }
-
-    updated_record
 }
 
 pub fn remove_deposit(env: &Env, depositor: &Address) {

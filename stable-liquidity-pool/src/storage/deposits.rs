@@ -9,6 +9,5 @@ pub struct Deposit {
 
 #[contracttype]
 pub enum DepositsDataKeys {
-    Deposit(Address), // Returns a Deposit
-    Depositors,       // Returns a Vec<Address>
+    Deposit(Address),
 }

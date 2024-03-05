@@ -1,4 +1,5 @@
 #![cfg(test)]
+
 use crate::errors::SCErrors;
 use crate::storage::core::CoreState;
 use crate::storage::deposits::Deposit;
@@ -161,13 +162,6 @@ pub fn test_deposits() {
         .get_core_state();
 
     assert_eq!(&core_state.total_deposited, &(deposit_amount * 3));
-
-    assert_eq!(
-        test_data
-            .stable_liquidity_pool_contract_client
-            .get_depositors(),
-        vec![&env, depositor_1, depositor_2, depositor_3]
-    );
 }
 
 #[test]
@@ -283,18 +277,6 @@ fn test_simple_withdrawals() {
         100_0000000
     );
 
-    assert_eq!(
-        test_data
-            .stable_liquidity_pool_contract_client
-            .get_depositors(),
-        vec![
-            &env,
-            depositor_1.clone(),
-            depositor_2.clone(),
-            depositor_3.clone()
-        ]
-    );
-
     test_data.stable_liquidity_pool_contract_client.withdraw(
         &depositor_3,
         &50_0000000,
@@ -304,18 +286,6 @@ fn test_simple_withdrawals() {
             (test_data.usdx_token_client.address.clone(), 0),
             (test_data.usdt_token_client.address.clone(), 0),
         ],
-    );
-
-    assert_eq!(
-        test_data
-            .stable_liquidity_pool_contract_client
-            .get_depositors(),
-        vec![
-            &env,
-            depositor_1.clone(),
-            depositor_2.clone(),
-            depositor_3.clone()
-        ]
     );
 
     let mut deposit_3: Deposit = test_data
@@ -349,13 +319,6 @@ fn test_simple_withdrawals() {
             (test_data.usdx_token_client.address.clone(), 0),
             (test_data.usdt_token_client.address.clone(), 50_0000000),
         ],
-    );
-
-    assert_eq!(
-        test_data
-            .stable_liquidity_pool_contract_client
-            .get_depositors(),
-        vec![&env, depositor_1.clone(), depositor_2.clone(),]
     );
 
     deposit_3 = test_data
@@ -438,11 +401,4 @@ fn test_simple_withdrawals() {
     assert_eq!(&last_core_state.share_price, &1_0000000);
     assert_eq!(&last_core_state.total_deposited, &0);
     assert_eq!(&last_core_state.total_shares, &0);
-
-    assert_eq!(
-        test_data
-            .stable_liquidity_pool_contract_client
-            .get_depositors(),
-        vec![&env]
-    );
 }
