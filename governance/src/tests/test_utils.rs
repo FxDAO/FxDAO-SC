@@ -6,8 +6,8 @@ use crate::storage::proposals::{
 };
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{map, token, vec, Address, Env, Map, Symbol, Vec};
-use token::AdminClient as TokenAdminClient;
 use token::Client as TokenClient;
+use token::StellarAssetClient as TokenAdminClient;
 
 pub const TEST_PROPOSAL_FEE: u128 = 12_00_000_0000000;
 pub const TEST_VOTING_CREDIT_PRICE: u128 = 1_0000000;
@@ -36,11 +36,11 @@ pub struct TestData<'a> {
 }
 
 pub fn create_test_data(env: &Env) -> TestData {
-    let governance_token_admin = Address::random(&env);
+    let governance_token_admin = Address::generate(&env);
     let (governance_token_client, governance_token_admin_client) =
         create_token_contract(&env, &governance_token_admin);
 
-    let contract_admin: Address = Address::random(&env);
+    let contract_admin: Address = Address::generate(&env);
     let contract_client =
         GovernanceContractClient::new(&env, &env.register_contract(None, GovernanceContract));
 

@@ -1,9 +1,10 @@
 #![cfg(test)]
+
 use crate::errors::SCErrors;
 use crate::storage::core::CoreState;
 use crate::storage::deposits::Deposit;
 use crate::tests::test_utils::{create_test_data, init_contract, prepare_test_accounts, TestData};
-use soroban_sdk::arbitrary::std;
+use soroban_sdk::testutils::arbitrary::std;
 use soroban_sdk::testutils::{
     Address as _, AuthorizedFunction, AuthorizedInvocation, Ledger, LedgerInfo,
 };
@@ -18,9 +19,9 @@ pub fn test_deposits() {
     init_contract(&env, &test_data);
 
     let deposit_amount: u128 = 100_0000000;
-    let depositor_1: Address = Address::random(&env);
-    let depositor_2: Address = Address::random(&env);
-    let depositor_3: Address = Address::random(&env);
+    let depositor_1: Address = Address::generate(&env);
+    let depositor_2: Address = Address::generate(&env);
+    let depositor_3: Address = Address::generate(&env);
     let depositors: Vec<Address> = vec![
         &env,
         depositor_1.clone(),
@@ -83,7 +84,7 @@ pub fn test_deposits() {
         .stable_liquidity_pool_contract_client
         .get_deposit(&depositor_1);
 
-    assert_eq!(&deposit_1.last_deposit, &0);
+    assert_eq!(&deposit_1.unlocks_at, &(0 + (3600 * 48)));
     assert_eq!(&deposit_1.depositor, &depositor_1);
     assert_eq!(&deposit_1.shares, &deposit_amount);
     assert_eq!(
@@ -95,12 +96,12 @@ pub fn test_deposits() {
     env.ledger().set(LedgerInfo {
         timestamp: 1000,
         protocol_version: 1,
-        sequence_number: 10,
+        sequence_number: env.ledger().sequence(),
         network_id: Default::default(),
         base_reserve: 10,
-        min_temp_entry_expiration: 0,
-        min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        min_temp_entry_ttl: 1,
+        min_persistent_entry_ttl: 1,
+        max_entry_ttl: u32::MAX,
     });
 
     test_data.stable_liquidity_pool_contract_client.deposit(
@@ -113,7 +114,7 @@ pub fn test_deposits() {
         .stable_liquidity_pool_contract_client
         .get_deposit(&depositor_2);
 
-    assert_eq!(&deposit_2.last_deposit, &1000);
+    assert_eq!(&deposit_2.unlocks_at, &(1000 + (3600 * 48)));
     assert_eq!(&deposit_2.depositor, &depositor_2);
     assert_eq!(&deposit_2.shares, &deposit_amount);
     assert_eq!(
@@ -130,12 +131,12 @@ pub fn test_deposits() {
     env.ledger().set(LedgerInfo {
         timestamp: 2000,
         protocol_version: 1,
-        sequence_number: 10,
+        sequence_number: env.ledger().sequence(),
         network_id: Default::default(),
         base_reserve: 10,
-        min_temp_entry_expiration: 0,
-        min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        min_temp_entry_ttl: 1,
+        min_persistent_entry_ttl: 1,
+        max_entry_ttl: u32::MAX,
     });
 
     test_data.stable_liquidity_pool_contract_client.deposit(
@@ -148,7 +149,7 @@ pub fn test_deposits() {
         .stable_liquidity_pool_contract_client
         .get_deposit(&depositor_3);
 
-    assert_eq!(&deposit_3.last_deposit, &2000);
+    assert_eq!(&deposit_3.unlocks_at, &(2000 + (3600 * 48)));
     assert_eq!(&deposit_3.depositor, &depositor_3);
     assert_eq!(&deposit_3.shares, &deposit_amount);
     assert_eq!(
@@ -161,13 +162,6 @@ pub fn test_deposits() {
         .get_core_state();
 
     assert_eq!(&core_state.total_deposited, &(deposit_amount * 3));
-
-    assert_eq!(
-        test_data
-            .stable_liquidity_pool_contract_client
-            .get_depositors(),
-        vec![&env, depositor_1, depositor_2, depositor_3]
-    );
 }
 
 #[test]
@@ -179,9 +173,9 @@ fn test_simple_withdrawals() {
     init_contract(&env, &test_data);
 
     let deposit_amount: u128 = 100_0000000;
-    let depositor_1: Address = Address::random(&env);
-    let depositor_2: Address = Address::random(&env);
-    let depositor_3: Address = Address::random(&env);
+    let depositor_1: Address = Address::generate(&env);
+    let depositor_2: Address = Address::generate(&env);
+    let depositor_3: Address = Address::generate(&env);
     let depositors: Vec<Address> = vec![
         &env,
         depositor_1.clone(),
@@ -251,12 +245,12 @@ fn test_simple_withdrawals() {
     env.ledger().set(LedgerInfo {
         timestamp: (3600 * 49),
         protocol_version: 1,
-        sequence_number: 10,
+        sequence_number: env.ledger().sequence(),
         network_id: Default::default(),
         base_reserve: 10,
-        min_temp_entry_expiration: 0,
-        min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        min_temp_entry_ttl: 1,
+        min_persistent_entry_ttl: 1,
+        max_entry_ttl: u32::MAX,
     });
 
     let core_state: CoreState = test_data
@@ -283,18 +277,6 @@ fn test_simple_withdrawals() {
         100_0000000
     );
 
-    assert_eq!(
-        test_data
-            .stable_liquidity_pool_contract_client
-            .get_depositors(),
-        vec![
-            &env,
-            depositor_1.clone(),
-            depositor_2.clone(),
-            depositor_3.clone()
-        ]
-    );
-
     test_data.stable_liquidity_pool_contract_client.withdraw(
         &depositor_3,
         &50_0000000,
@@ -306,23 +288,11 @@ fn test_simple_withdrawals() {
         ],
     );
 
-    assert_eq!(
-        test_data
-            .stable_liquidity_pool_contract_client
-            .get_depositors(),
-        vec![
-            &env,
-            depositor_1.clone(),
-            depositor_2.clone(),
-            depositor_3.clone()
-        ]
-    );
-
     let mut deposit_3: Deposit = test_data
         .stable_liquidity_pool_contract_client
         .get_deposit(&depositor_3);
 
-    assert_eq!(&deposit_3.last_deposit, &0);
+    assert_eq!(&deposit_3.unlocks_at, &(0 + (3600 * 48)));
     assert_eq!(&deposit_3.shares, &50_0000000);
     assert_eq!(&deposit_3.depositor, &depositor_3);
     assert_eq!(
@@ -351,18 +321,11 @@ fn test_simple_withdrawals() {
         ],
     );
 
-    assert_eq!(
-        test_data
-            .stable_liquidity_pool_contract_client
-            .get_depositors(),
-        vec![&env, depositor_1.clone(), depositor_2.clone(),]
-    );
-
     deposit_3 = test_data
         .stable_liquidity_pool_contract_client
         .get_deposit(&depositor_3);
 
-    assert_eq!(&deposit_3.last_deposit, &0);
+    assert_eq!(&deposit_3.unlocks_at, &0);
     assert_eq!(&deposit_3.shares, &0);
     assert_eq!(
         &(test_data.usdt_token_client.balance(&depositor_3) as u128),
@@ -438,11 +401,4 @@ fn test_simple_withdrawals() {
     assert_eq!(&last_core_state.share_price, &1_0000000);
     assert_eq!(&last_core_state.total_deposited, &0);
     assert_eq!(&last_core_state.total_shares, &0);
-
-    assert_eq!(
-        test_data
-            .stable_liquidity_pool_contract_client
-            .get_depositors(),
-        vec![&env]
-    );
 }

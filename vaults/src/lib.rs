@@ -1,10 +1,14 @@
 #![no_std]
 
+mod oracle {
+    soroban_sdk::contractimport!(file = "../currencies_oracle.wasm");
+}
+
 mod contract;
 mod storage;
 mod utils;
 
-mod test;
+mod errors;
 mod tests;
 
 pub use crate::contract::VaultsContractClient;

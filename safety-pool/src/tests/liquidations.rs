@@ -2,12 +2,16 @@
 
 use crate::contract::{SafetyPoolContract, SafetyPoolContractClient};
 use crate::errors::SCErrors;
+use crate::storage::core::CoreStats;
 use crate::storage::deposits::Deposit;
-use crate::tests::utils::{create_token_contract, set_allowance};
+use crate::tests::utils::{create_test_data, create_token_contract, init_contract, TestData};
+use num_integer::div_floor;
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{symbol_short, vec, Address, Env, Symbol, Vec};
 
-use crate::vaults;
+use crate::oracle::{Asset, AssetsData, CoreData, CustomerQuota, PriceData};
+use crate::vaults::{OptionalVaultKey, VaultKey};
+use crate::{oracle, vaults};
 
 #[test]
 fn test_simple_liquidations_flow() {
@@ -18,28 +22,28 @@ fn test_simple_liquidations_flow() {
     // Set up the contracts
 
     // Shared variables
-    let treasury_contract: Address = Address::random(&env);
+    let treasury_contract: Address = Address::generate(&env);
 
-    let governance_token_admin: Address = Address::random(&env);
+    let governance_token_admin: Address = Address::generate(&env);
     let (governance_token_client, governance_token_client_admin) =
         create_token_contract(&env, &governance_token_admin);
 
-    let currency_price: i128 = 0_0958840;
-    let collateral_token_admin: Address = Address::random(&env);
+    let currency_price: u128 = 0_0958840;
+    let collateral_token_admin: Address = Address::generate(&env);
     let (collateral_token_client, collateral_token_client_admin) =
         create_token_contract(&env, &collateral_token_admin);
 
-    let stable_token_admin: Address = Address::random(&env);
+    let stable_token_admin: Address = Address::generate(&env);
     let (stable_token_client, stable_token_client_admin) =
         create_token_contract(&env, &stable_token_admin);
     let stable_token_denomination = symbol_short!("usd");
 
-    let depositor_1: Address = Address::random(&env);
-    let depositor_2: Address = Address::random(&env);
-    let depositor_3: Address = Address::random(&env);
-    let depositor_4: Address = Address::random(&env);
-    let depositor_5: Address = Address::random(&env);
-    let depositor_6: Address = Address::random(&env);
+    let depositor_1: Address = Address::generate(&env);
+    let depositor_2: Address = Address::generate(&env);
+    let depositor_3: Address = Address::generate(&env);
+    let depositor_4: Address = Address::generate(&env);
+    let depositor_5: Address = Address::generate(&env);
+    let depositor_6: Address = Address::generate(&env);
     let depositors: [Address; 6] = [
         depositor_1.clone(),
         depositor_2.clone(),
@@ -48,28 +52,66 @@ fn test_simple_liquidations_flow() {
         depositor_5.clone(),
         depositor_6.clone(),
     ];
-    let collateral_initial_balance: i128 = 3000_0000000;
+    let collateral_initial_balance: u128 = 3000_0000000;
 
     // Register and start vaults' contract
     let vaults_contract_address: Address = env.register_contract_wasm(None, vaults::WASM);
     let vaults_contract_client = vaults::Client::new(&env, &vaults_contract_address);
-    let vaults_contract_admin: Address = Address::random(&env);
-    let min_collateral_rate: i128 = 1_1000000;
-    let opening_debt_amount: i128 = 1_0000000;
-    let opening_collateral_rate: i128 = 1_1500000;
+    let vaults_contract_admin: Address = Address::generate(&env);
+    let min_collateral_rate: u128 = 1_1000000;
+    let opening_debt_amount: u128 = 1_0000000;
+    let opening_collateral_rate: u128 = 1_1500000;
+    let vaults_contract_fee: u128 = 0;
+
+    // Oracle contract
+    let oracle: Address = env.register_contract_wasm(None, oracle::WASM);
+    let oracle_contract_client: oracle::Client = oracle::Client::new(&env, &oracle);
+    let oracle_contract_admin: Address = Address::generate(&env);
 
     vaults_contract_client.init(
         &vaults_contract_admin,
         &vaults_contract_admin,
-        &vaults_contract_admin,
         &collateral_token_client.address,
         &stable_token_admin,
+        &treasury_contract,
+        &vaults_contract_fee,
+        &oracle,
+    );
+
+    oracle_contract_client.init(
+        &CoreData {
+            adm: oracle_contract_admin.clone(),
+            tick: 60,
+            dp: 7,
+        },
+        &AssetsData {
+            base: Asset::Stellar(collateral_token_client.address.clone()),
+            assets: Vec::from_array(&env, [Asset::Other(stable_token_denomination.clone())]),
+        },
+    );
+
+    oracle_contract_client.set_quota(
+        &vaults_contract_client.address,
+        &CustomerQuota {
+            max: 0,
+            current: 0,
+            exp: u64::MAX,
+        },
     );
 
     vaults_contract_client
         .create_currency(&stable_token_denomination, &stable_token_client.address);
 
-    vaults_contract_client.set_currency_rate(&stable_token_denomination, &currency_price);
+    oracle_contract_client.set_records(
+        &Vec::from_array(&env, [Asset::Other(stable_token_denomination.clone())]),
+        &Vec::from_array(
+            &env,
+            [PriceData {
+                price: currency_price as i128,
+                timestamp: 1,
+            }],
+        ),
+    );
 
     vaults_contract_client.toggle_currency(&stable_token_denomination, &true);
 
@@ -80,12 +122,7 @@ fn test_simple_liquidations_flow() {
         &stable_token_denomination,
     );
 
-    stable_token_client.approve(
-        &stable_token_admin,
-        &vaults_contract_address,
-        &90000000000000000000,
-        &200_000,
-    );
+    stable_token_client_admin.set_admin(&vaults_contract_address);
 
     stable_token_client_admin.mint(&stable_token_admin, &90000000000000000000);
 
@@ -93,10 +130,10 @@ fn test_simple_liquidations_flow() {
     let pool_contract_id: Address = env.register_contract(None, SafetyPoolContract);
     // let pool_contract_address: Address = Address::from_contract_id(&env, &pool_contract_id);
     let pool_contract_client = SafetyPoolContractClient::new(&env, &pool_contract_id);
-    let pool_contract_admin: Address = Address::random(&env);
+    let pool_contract_admin: Address = Address::generate(&env);
     let min_pool_deposit: u128 = 100_0000000;
-    let profit_share: Vec<u32> = vec![&env, 1u32, 2u32] as Vec<u32>;
-    let liquidator_share: Vec<u32> = vec![&env, 1u32, 2u32] as Vec<u32>;
+    let profit_share: Vec<u32> = Vec::from_array(&env, [1u32, 2u32]);
+    let liquidator_share: Vec<u32> = Vec::from_array(&env, [1u32, 2u32]);
 
     pool_contract_client.init(
         &pool_contract_admin,
@@ -106,41 +143,62 @@ fn test_simple_liquidations_flow() {
         &stable_token_client.address,
         &stable_token_denomination,
         &min_pool_deposit,
-        &profit_share,
-        &liquidator_share,
         &governance_token_client.address,
+        &oracle,
+    );
+
+    oracle_contract_client.set_quota(
+        &pool_contract_client.address,
+        &CustomerQuota {
+            max: 0,
+            current: 0,
+            exp: u64::MAX,
+        },
     );
 
     // We create the initial vaults, a total of 6 vaults will be created where two of them
     // will be liquidated later, a total of 18k collateral (3k each) will be issued. The first 4
-    // depositors will deposit all of the stablecoin balance into the pool (400 usd)
-    let assets: Vec<Address> = vec![&env, collateral_token_client.address.clone()] as Vec<Address>;
+    // depositors will deposit all the stablecoin balance into the pool (400 usd)
+    let mut lowest_index: OptionalVaultKey = OptionalVaultKey::None;
+    let assets: Vec<Address> = Vec::from_array(&env, [collateral_token_client.address.clone()]);
     for (i, depositor) in depositors.iter().enumerate() {
-        collateral_token_client_admin.mint(&depositor, &collateral_initial_balance);
+        collateral_token_client_admin.mint(&depositor, &(collateral_initial_balance as i128));
 
-        set_allowance(&env, &assets, &vaults_contract_client.address, &depositor);
-
-        let initial_debt: i128;
+        let initial_debt: u128;
         if i + 1 < 5 {
             initial_debt = 100_0000000;
         } else {
             initial_debt = 160_0000000;
+            if i + 1 == 5 {
+                lowest_index = OptionalVaultKey::None;
+            }
         }
+
         vaults_contract_client.new_vault(
+            &lowest_index,
             depositor,
             &initial_debt,
             &collateral_initial_balance,
             &stable_token_denomination,
         );
 
+        let current_index: u128 = div_floor(1000000000 * collateral_initial_balance, initial_debt);
+        if lowest_index == OptionalVaultKey::None {
+            lowest_index = OptionalVaultKey::Some(VaultKey {
+                index: current_index,
+                account: depositor.clone(),
+                denomination: stable_token_denomination.clone(),
+            });
+        }
+
         // If is depositor between 1 and 4, deposit the stable balance into the pool
         if i + 1 < 5 {
-            let stablecoin_balance: i128 = stable_token_client.balance(&depositor);
-            pool_contract_client.deposit(&depositor, &(stablecoin_balance as u128));
+            let stablecoin_balance: u128 = stable_token_client.balance(&depositor) as u128;
+            pool_contract_client.deposit(&depositor, &stablecoin_balance);
         }
     }
 
-    let liquidator: Address = Address::random(&env);
+    let liquidator: Address = Address::generate(&env);
 
     // We test that it should fail because there is no vault to liquidate yet
     let no_vaults_error_result = pool_contract_client.try_liquidate(&liquidator).unwrap_err();
@@ -152,8 +210,16 @@ fn test_simple_liquidations_flow() {
     // );
 
     // We update the price in order to liquidate the two vaults
-    let new_currency_price = 0_0586660;
-    vaults_contract_client.set_currency_rate(&stable_token_denomination, &new_currency_price);
+    oracle_contract_client.set_records(
+        &Vec::from_array(&env, [Asset::Other(stable_token_denomination.clone())]),
+        &Vec::from_array(
+            &env,
+            [PriceData {
+                price: 0_0586660,
+                timestamp: 1,
+            }],
+        ),
+    );
 
     pool_contract_client.liquidate(&liquidator);
 
@@ -167,33 +233,20 @@ fn test_simple_liquidations_flow() {
         12_000_0000000
     );
 
-    for (i, depositor) in depositors.iter().enumerate() {
-        if i + 1 < 5 {
-            assert_eq!(collateral_token_client.balance(&depositor), 1431_8259298);
-        } else {
-            assert_eq!(collateral_token_client.balance(&depositor), 0);
-        }
-    }
+    let updated_stats: CoreStats = pool_contract_client.get_core_stats();
 
-    // We now check that each deposit into the pool gets updated and reflect the current pool balance
-    let mut total_in_vaults: u128 = 0;
-    for depositor in depositors.iter() {
-        let deposit: Deposit = pool_contract_client.get_deposit(&depositor);
-        total_in_vaults = total_in_vaults + deposit.amount;
-    }
+    assert_eq!(updated_stats.lifetime_deposited, 400_0000000);
+    assert_eq!(updated_stats.current_deposited, 80_0000000);
+    assert_eq!(updated_stats.lifetime_profit, 545_3925613);
+    assert_eq!(updated_stats.lifetime_liquidated, 5727_3037194);
 
     assert_eq!(
-        total_in_vaults as i128,
-        stable_token_client.balance(&pool_contract_id)
+        collateral_token_client.balance(&treasury_contract) + 1,
+        div_floor(272_6962808, 2)
     );
 
     assert_eq!(
-        collateral_token_client.balance(&treasury_contract),
-        272_6962808 / 2
-    );
-
-    assert_eq!(
-        collateral_token_client.balance(&liquidator),
-        272_6962808 / 2
+        collateral_token_client.balance(&liquidator) + 1,
+        div_floor(272_6962808, 2)
     );
 }

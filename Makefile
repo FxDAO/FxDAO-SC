@@ -2,32 +2,19 @@ default: build
 
 test: build
 	cargo test
-	cargo test --features testutils
 
 test-optimized: build-optimized
 	cargo test
-	cargo test --features testutils
 
 build:
-	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package vaults
-	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package safety-pool
-	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package governance
-	cargo rustc --crate-type cdylib --target wasm32-unknown-unknown --release --package stable-liquidity-pool
-	cd target/wasm32-unknown-unknown/release/ && \
-		for i in *.wasm ; do \
-			ls -l "$$i"; \
-		done
+	soroban contract build --package vaults
+	soroban contract build
 
 build-optimized:
-	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p vaults
-	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p safety-pool
-	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p governance
-	cargo +nightly build --target wasm32-unknown-unknown --release -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -p stable-liquidity-pool
-	cd target/wasm32-unknown-unknown/release/ && \
-		for i in *.wasm ; do \
-			wasm-opt -Oz "$$i" -o "$$i.tmp" && mv "$$i.tmp" "$$i"; \
-			ls -l "$$i"; \
-		done
+	soroban contract build --package vaults
+	soroban contract build
+	soroban contract optimize --wasm ./target/wasm32-unknown-unknown/release/vaults.wasm --wasm-out ./target/wasm32-unknown-unknown/release/vaults.wasm
+	soroban contract optimize --wasm ./target/wasm32-unknown-unknown/release/stable_liquidity_pool.wasm --wasm-out ./target/wasm32-unknown-unknown/release/stable_liquidity_pool.wasm
 
 watch:
 	cargo watch --clear --watch-when-idle --shell '$(MAKE)'
@@ -46,7 +33,7 @@ launch_standalone:
 	docker run -d -it \
       -p 8000:8000 \
       --name stellar-soroban-network \
-      stellar/quickstart:soroban-dev@sha256:8a99332f834ca82e3ac1418143736af59b5288e792d1c4278d6c547c6ed8da3b \
+      stellar/quickstart:testing@sha256:3c7947f65db493f2ab8ca639753130ba4916c57d000d4a1f01ec530e3423853b \
       --standalone \
       --enable-soroban-rpc
 

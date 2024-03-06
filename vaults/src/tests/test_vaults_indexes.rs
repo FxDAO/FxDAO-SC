@@ -2,27 +2,27 @@
 
 extern crate std;
 
-use crate::storage::storage_types::*;
-use crate::storage::vaults::*;
+use crate::storage::vaults::{OptionalVaultKey, Vault, VaultKey, VaultsInfo};
 use crate::tests::test_utils::{
-    create_base_data, create_base_variables, set_allowance, set_initial_state, InitialVariables,
-    TestData,
+    create_base_data, create_base_variables, set_initial_state,
+    update_oracle_price,
 };
-use crate::utils::indexes::calculate_user_vault_index;
+
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{vec, Address, Env, Vec};
+use soroban_sdk::{Address, Env};
 
 #[test]
-fn test_vault_indexes_logic_around() {
+fn test_indexes_orders() {
     let env = Env::default();
-    let data: TestData = create_base_data(&env);
-    let base_variables: InitialVariables = create_base_variables(&env, &data);
+    env.mock_all_auths();
+    let data = create_base_data(&env);
+    let base_variables = create_base_variables(&env, &data);
     set_initial_state(&env, &data, &base_variables);
 
-    let currency_price: i128 = 920330;
-    let min_col_rate: i128 = 11000000;
-    let min_debt_creation: i128 = 1000000000;
-    let opening_col_rate: i128 = 11500000;
+    let currency_price: u128 = 920330;
+    let min_col_rate: u128 = 11000000;
+    let min_debt_creation: u128 = 1000000000;
+    let opening_col_rate: u128 = 11500000;
 
     data.contract_client.set_vault_conditions(
         &min_col_rate,
@@ -31,217 +31,244 @@ fn test_vault_indexes_logic_around() {
         &data.stable_token_denomination,
     );
 
-    data.contract_client
-        .set_currency_rate(&data.stable_token_denomination, &currency_price);
+    update_oracle_price(
+        &env,
+        &data.oracle_contract_client,
+        &data.stable_token_denomination,
+        &(currency_price as i128),
+    );
 
     // 1st Set of tests
     // This section includes and checks that every time we create a new vault the values are updated
 
     // First deposit
-    let depositor_1 = Address::random(&env);
-    let depositor_1_debt: i128 = 1500000000;
-    let depositor_1_collateral_amount: i128 = 30000000000;
+    // This deposit should have an index of: 2000_0000000 - fee
+    let depositor_1 = Address::generate(&env);
+    let depositor_1_debt: u128 = 150_0000000;
+    let depositor_1_collateral_amount: u128 = 3000_0000000;
 
     data.collateral_token_admin_client
-        .mint(&depositor_1, &(depositor_1_collateral_amount * 2));
-
-    set_allowance(&env, &data, &depositor_1);
+        .mint(&depositor_1, &(depositor_1_collateral_amount as i128 * 2));
 
     data.contract_client.new_vault(
+        &OptionalVaultKey::None,
         &depositor_1,
         &depositor_1_debt,
         &depositor_1_collateral_amount,
         &data.stable_token_denomination,
     );
 
-    let mut current_indexes: Vec<i128> = data
+    let depositor_1_vault: Vault = data
         .contract_client
-        .get_indexes(&data.stable_token_denomination);
-
-    assert_eq!(current_indexes.len(), 1);
-    assert_eq!(
-        current_indexes.first().unwrap(),
-        calculate_user_vault_index(depositor_1_debt, depositor_1_collateral_amount)
-    );
+        .get_vault(&depositor_1, &data.stable_token_denomination);
 
     // Second depositor
-    let depositor_2 = Address::random(&env);
-    let depositor_2_debt: i128 = 1400000000;
-    let depositor_2_collateral_amount: i128 = 26000000000;
+    // This deposit should have an index of: 1857_1428571 - fee
+    let depositor_2 = Address::generate(&env);
+    let depositor_2_debt: u128 = 140_0000000;
+    let depositor_2_collateral_amount: u128 = 2600_0000000;
 
     data.collateral_token_admin_client
-        .mint(&depositor_2, &(depositor_2_collateral_amount * 2));
-
-    set_allowance(&env, &data, &depositor_2);
+        .mint(&depositor_2, &(depositor_2_collateral_amount as i128 * 2));
 
     data.contract_client.new_vault(
+        &OptionalVaultKey::None,
         &depositor_2,
         &depositor_2_debt,
         &depositor_2_collateral_amount,
         &data.stable_token_denomination,
     );
 
-    current_indexes = data
+    let depositor_2_vault: Vault = data
         .contract_client
-        .get_indexes(&data.stable_token_denomination);
-
-    assert_eq!(current_indexes.len(), 2);
-    assert_eq!(
-        current_indexes.first().unwrap(),
-        calculate_user_vault_index(depositor_2_debt, depositor_2_collateral_amount)
-    );
-    assert_eq!(
-        current_indexes.last().unwrap(),
-        calculate_user_vault_index(depositor_1_debt, depositor_1_collateral_amount)
-    );
+        .get_vault(&depositor_2, &data.stable_token_denomination);
 
     // Third depositor
-    let depositor_3 = Address::random(&env);
-    let depositor_3_debt: i128 = 1000000000;
-    let depositor_3_collateral_amount: i128 = 32500000000;
+    // This deposit should have an index of: 3250_0000000
+    let depositor_3 = Address::generate(&env);
+    let depositor_3_debt: u128 = 100_0000000;
+    let depositor_3_collateral_amount: u128 = 3250_0000000;
 
     data.collateral_token_admin_client
-        .mint(&depositor_3, &(depositor_3_collateral_amount * 2));
-
-    set_allowance(&env, &data, &depositor_3);
+        .mint(&depositor_3, &(depositor_3_collateral_amount as i128 * 2));
 
     data.contract_client.new_vault(
+        &OptionalVaultKey::Some(VaultKey {
+            index: depositor_1_vault.index.clone(),
+            account: depositor_1_vault.account.clone(),
+            denomination: data.stable_token_denomination.clone(),
+        }),
         &depositor_3,
         &depositor_3_debt,
         &depositor_3_collateral_amount,
         &data.stable_token_denomination,
     );
 
-    current_indexes = data
+    let depositor_3_vault: Vault = data
         .contract_client
-        .get_indexes(&data.stable_token_denomination);
-
-    assert_eq!(current_indexes.len(), 3);
-    assert_eq!(
-        current_indexes.first().unwrap(),
-        calculate_user_vault_index(depositor_2_debt, depositor_2_collateral_amount)
-    );
-    assert_eq!(
-        current_indexes.last().unwrap(),
-        calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount)
-    );
+        .get_vault(&depositor_3, &data.stable_token_denomination);
 
     // fourth depositor
-    let depositor_4 = Address::random(&env);
-    let depositor_4_debt: i128 = 1000000000;
-    let depositor_4_collateral_amount: i128 = 32500000000;
+    // This deposit should have an index of: 3250_0000000
+    let depositor_4 = Address::generate(&env);
+    let depositor_4_debt: u128 = 100_0000000;
+    let depositor_4_collateral_amount: u128 = 3250_0000000;
 
     data.collateral_token_admin_client
-        .mint(&depositor_4, &(depositor_4_collateral_amount * 2));
-
-    set_allowance(&env, &data, &depositor_4);
+        .mint(&depositor_4, &(depositor_4_collateral_amount as i128 * 2));
 
     data.contract_client.new_vault(
+        &OptionalVaultKey::Some(VaultKey {
+            index: depositor_1_vault.index.clone(),
+            account: depositor_1_vault.account.clone(),
+            denomination: data.stable_token_denomination.clone(),
+        }),
         &depositor_4,
         &depositor_4_debt,
         &depositor_4_collateral_amount,
         &data.stable_token_denomination,
     );
 
-    current_indexes = data
+    let depositor_4_vault: Vault = data
         .contract_client
-        .get_indexes(&data.stable_token_denomination);
-
-    assert_eq!(current_indexes.len(), 3);
-    assert_eq!(
-        current_indexes.first().unwrap(),
-        calculate_user_vault_index(depositor_2_debt, depositor_2_collateral_amount)
-    );
-    assert_eq!(
-        current_indexes.last().unwrap(),
-        calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount)
-    );
+        .get_vault(&depositor_4, &data.stable_token_denomination);
 
     // fifth depositor
-    let depositor_5 = Address::random(&env);
-    let depositor_5_debt: i128 = 1400000000;
-    let depositor_5_collateral_amount: i128 = 24590000000;
+    // This deposit should have an index of: 1756_4285710
+    let depositor_5 = Address::generate(&env);
+    let depositor_5_debt: u128 = 140_0000000;
+    let depositor_5_collateral_amount: u128 = 2459_0000000;
 
     data.collateral_token_admin_client
-        .mint(&depositor_5, &(depositor_5_collateral_amount * 2));
-
-    set_allowance(&env, &data, &depositor_5);
+        .mint(&depositor_5, &(depositor_5_collateral_amount as i128 * 2));
 
     data.contract_client.new_vault(
+        &OptionalVaultKey::None,
         &depositor_5,
         &depositor_5_debt,
         &depositor_5_collateral_amount,
         &data.stable_token_denomination,
     );
 
-    current_indexes = data
+    let depositor_5_vault: Vault = data
         .contract_client
-        .get_indexes(&data.stable_token_denomination);
+        .get_vault(&depositor_5, &data.stable_token_denomination);
 
-    assert_eq!(current_indexes.len(), 4);
-    assert_eq!(
-        current_indexes.first().unwrap(),
-        calculate_user_vault_index(depositor_5_debt, depositor_5_collateral_amount)
-    );
-    assert_eq!(
-        current_indexes.last().unwrap(),
-        calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount)
-    );
+    // Sixth depositor
+    // This deposit should have an index of: 6000_0000000
+    let depositor_6 = Address::generate(&env);
+    let depositor_6_debt: u128 = 150_0000000;
+    let depositor_6_collateral_amount: u128 = 9000_0000000;
 
-    // 2nd Section
-    // We test the function get_vaults_with_index and confirm it returns correct vaults in their order
+    data.collateral_token_admin_client
+        .mint(&depositor_6, &(depositor_6_collateral_amount as i128 * 2));
 
-    // We test the index from depositor 5 and confirm we receive a single UserVault
-    let mut vaults_with_index: Vec<UserVault> = data.contract_client.get_vaults_with_index(
+    data.contract_client.new_vault(
+        &OptionalVaultKey::Some(VaultKey {
+            index: depositor_3_vault.index.clone(),
+            account: depositor_3_vault.account.clone(),
+            denomination: data.stable_token_denomination.clone(),
+        }),
+        &depositor_6,
+        &depositor_6_debt,
+        &depositor_6_collateral_amount,
         &data.stable_token_denomination,
-        &calculate_user_vault_index(depositor_5_debt, depositor_5_collateral_amount),
     );
 
-    assert_eq!(
-        vaults_with_index,
-        vec![
-            &env,
-            UserVault {
-                index: calculate_user_vault_index(depositor_5_debt, depositor_5_collateral_amount,),
-                id: depositor_5,
-                total_debt: depositor_5_debt,
-                total_col: depositor_5_collateral_amount,
-                denomination: data.stable_token_denomination.clone(),
-            }
-        ]
-    );
+    let depositor_6_vault: Vault = data
+        .contract_client
+        .get_vault(&depositor_6, &data.stable_token_denomination);
 
-    // We now test the index from depositor 3 and confirm we receive two UserVaults (3 and 4)
-    vaults_with_index = data.contract_client.get_vaults_with_index(
-        &data.stable_token_denomination,
-        &calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount),
-    );
+    // 2nd part of the test
+    // We are going to get the lowest vault and we should be able to go from lowest to higher
+    // ----------------------------------------
+    env.budget().reset_default();
 
-    assert_eq!(
-        vaults_with_index,
-        vec![
-            &env,
-            UserVault {
-                index: calculate_user_vault_index(depositor_3_debt, depositor_3_collateral_amount),
-                id: depositor_3,
-                total_debt: depositor_3_debt,
-                total_col: depositor_3_collateral_amount,
-                denomination: data.stable_token_denomination.clone(),
-            },
-            UserVault {
-                index: calculate_user_vault_index(depositor_4_debt, depositor_4_collateral_amount),
-                id: depositor_4,
-                total_debt: depositor_4_debt,
-                total_col: depositor_4_collateral_amount,
-                denomination: data.stable_token_denomination.clone(),
-            },
-        ]
-    );
+    let latest_vaults_info: VaultsInfo = data
+        .contract_client
+        .get_vaults_info(&data.stable_token_denomination);
 
-    // 3rd Section
-    // This section checks that when we update a vault, values get updated correctly
-    // We also include changes in the currency rates and new vaults creations in order to emulate a real scenario
+    let lowest_key = match latest_vaults_info.lowest_key {
+        OptionalVaultKey::None => panic!("We don't reach this point"),
+        OptionalVaultKey::Some(data) => data,
+    };
 
-    // 4th Section
-    // TODO
+    let first_vault: Vault = data
+        .contract_client
+        .get_vault(&lowest_key.account, &lowest_key.denomination);
+
+    let first_lowest_key = match first_vault.next_key {
+        OptionalVaultKey::None => panic!("We don't reach this point"),
+        OptionalVaultKey::Some(data) => data,
+    };
+
+    assert_eq!(first_vault.index, depositor_5_vault.index);
+    assert_eq!(first_vault.account, depositor_5);
+
+    let second_vault: Vault = data
+        .contract_client
+        .get_vault(&first_lowest_key.account, &first_lowest_key.denomination);
+
+    let second_lowest_key = match second_vault.next_key {
+        OptionalVaultKey::None => panic!("We don't reach this point"),
+        OptionalVaultKey::Some(data) => data,
+    };
+
+    assert_eq!(second_vault.index, depositor_2_vault.index);
+    assert_eq!(second_vault.account, depositor_2);
+
+    let third_vault: Vault = data
+        .contract_client
+        .get_vault(&second_lowest_key.account, &second_lowest_key.denomination);
+
+    let third_lowest_key = match third_vault.next_key {
+        OptionalVaultKey::None => panic!("We don't reach this point"),
+        OptionalVaultKey::Some(data) => data,
+    };
+
+    assert_eq!(third_vault.index, depositor_1_vault.index);
+    assert_eq!(third_vault.account, depositor_1);
+
+    let fourth_vault: Vault = data
+        .contract_client
+        .get_vault(&third_lowest_key.account, &third_lowest_key.denomination);
+
+    let fourth_lowest_key = match fourth_vault.next_key {
+        OptionalVaultKey::None => panic!("We don't reach this point"),
+        OptionalVaultKey::Some(data) => data,
+    };
+
+    assert_eq!(fourth_vault.index, depositor_4_vault.index);
+    assert_eq!(fourth_vault.account, depositor_4);
+
+    let fifth_vault: Vault = data
+        .contract_client
+        .get_vault(&fourth_lowest_key.account, &fourth_lowest_key.denomination);
+
+    let fifth_lowest_key = match fifth_vault.next_key {
+        OptionalVaultKey::None => panic!("We don't reach this point"),
+        OptionalVaultKey::Some(data) => data,
+    };
+
+    assert_eq!(fifth_vault.index, depositor_3_vault.index);
+    assert_eq!(fifth_vault.account, depositor_3);
+
+    let sixth_vault: Vault = data
+        .contract_client
+        .get_vault(&fifth_lowest_key.account, &fifth_lowest_key.denomination);
+
+    match sixth_vault.next_key {
+        OptionalVaultKey::None => {}
+        OptionalVaultKey::Some(_) => panic!("We don't reach this point"),
+    };
+
+    assert_eq!(sixth_vault.index, depositor_6_vault.index);
+    assert_eq!(sixth_vault.account, depositor_6);
+
+    // 3rd phase of the test
+    // We are going to start increasing the collateral and increasing/paying the debt
+    // ----------------------------------------
+    env.budget().reset_default();
+
+    // TODO: we need to finish this test
 }

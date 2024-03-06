@@ -1,23 +1,20 @@
 use crate::errors::SCErrors;
-use crate::storage::core::CoreState;
-use crate::storage::deposits::Deposit;
+use crate::storage::core::{CoreState, CoreStorageFunc, LockingState};
+use crate::storage::deposits::{Deposit};
 use crate::utils::core::{
-    bump_instance, can_init_contract, get_core_state, get_last_governance_token_distribution_time,
-    set_core_state, set_last_governance_token_distribution_time,
+    bump_instance, can_init_contract, get_core_state,
+    set_core_state,
 };
 use crate::utils::deposits::{
-    bump_deposit, bump_depositors, get_deposit, get_depositors, is_depositor_listed, make_deposit,
-    make_withdrawal, remove_deposit, remove_depositor_from_depositors, save_deposit,
-    save_depositors, validate_deposit_asset,
+    bump_deposit, get_deposit, has_deposit,
+    make_deposit, make_withdrawal, remove_deposit, save_deposit,
+    validate_deposit_asset,
 };
-use num_integer::div_floor;
+use num_integer::{div_ceil, div_floor};
 use soroban_sdk::{
-    contract, contractimpl, map, panic_with_error, symbol_short, token, Address, BytesN, Env, Map,
-    Symbol, Vec,
+    contract, contractimpl, panic_with_error, token, Address, BytesN, Env, Map,
+    Vec,
 };
-
-pub const CONTRACT_DESCRIPTION: Symbol = symbol_short!("StableLP");
-pub const CONTRACT_VERSION: Symbol = symbol_short!("0_3_0");
 
 pub trait StableLiquidityPoolContractTrait {
     fn init(
@@ -34,8 +31,6 @@ pub trait StableLiquidityPoolContractTrait {
 
     fn upgrade(env: Env, new_wasm_hash: BytesN<32>);
 
-    fn version(env: Env) -> (Symbol, Symbol);
-
     fn deposit(env: Env, caller: Address, asset: Address, amount: u128);
 
     fn withdraw(
@@ -47,15 +42,15 @@ pub trait StableLiquidityPoolContractTrait {
 
     fn get_deposit(env: Env, caller: Address) -> Deposit;
 
-    fn get_depositors(env: Env) -> Vec<Address>;
-
     fn get_supported_assets(env: Env) -> Vec<Address>;
 
     fn swap(env: Env, caller: Address, from_asset: Address, to_asset: Address, amount: u128);
 
-    fn last_gov_distribution_time(env: Env) -> u64;
 
-    fn distribute_governance_token(env: Env);
+    // Gov rewards fns
+    fn lock(e: Env, caller: Address);
+    fn unlock(e: Env, caller: Address);
+    fn distribute(e: Env, caller: Address, amt: u128);
 }
 
 #[contract]
@@ -87,6 +82,10 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
                 treasury,
             },
         );
+        env._set_locking_state(&LockingState {
+            total: 0,
+            factor: 0,
+        });
         bump_instance(&env);
     }
 
@@ -99,11 +98,6 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         bump_instance(&env);
         get_core_state(&env).admin.require_auth();
         env.deployer().update_current_contract_wasm(new_wasm_hash);
-    }
-
-    fn version(env: Env) -> (Symbol, Symbol) {
-        bump_instance(&env);
-        (CONTRACT_DESCRIPTION, CONTRACT_VERSION)
     }
 
     fn deposit(env: Env, caller: Address, asset: Address, amount_deposit: u128) {
@@ -119,23 +113,15 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
 
         let shares_to_issue: u128 = div_floor(amount_deposit * 1_0000000, core_state.share_price);
         let mut deposit: Deposit = get_deposit(&env, &caller);
-        deposit.last_deposit = env.ledger().timestamp();
+        deposit.unlocks_at = env.ledger().timestamp() + (3600 * 48);
         deposit.shares = deposit.shares + shares_to_issue;
-
         save_deposit(&env, &deposit);
-
-        let mut depositors: Vec<Address> = get_depositors(&env);
-        if !is_depositor_listed(&depositors, &caller) {
-            depositors.push_back(caller.clone());
-            save_depositors(&env, &depositors)
-        }
 
         core_state.total_deposited = core_state.total_deposited + amount_deposit;
         core_state.total_shares = core_state.total_shares + shares_to_issue;
         set_core_state(&env, &core_state);
 
         bump_deposit(&env, caller);
-        bump_depositors(&env);
     }
 
     fn withdraw(
@@ -161,10 +147,12 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
             panic_with_error!(&env, &SCErrors::NotEnoughSharesToWithdraw);
         }
 
-        let min_timestamp: u64 = deposit.last_deposit + (3600 * 48);
-
-        if env.ledger().timestamp() < min_timestamp {
+        if env.ledger().timestamp() < deposit.unlocks_at {
             panic_with_error!(&env, &SCErrors::LockedPeriodUncompleted);
+        }
+
+        if deposit.locked {
+            panic_with_error!(&env, &SCErrors::LockedDeposit)
         }
 
         let mut withdraw_amount: u128 = 0;
@@ -180,6 +168,10 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         }
 
         for (asset, amount) in assets_orders.iter() {
+            if !validate_deposit_asset(&core_state.accepted_assets, &asset) {
+                panic_with_error!(&env, &SCErrors::InvalidAsset);
+            }
+
             if amount != 0 {
                 make_withdrawal(&env, &deposit.depositor, &asset, &amount);
             }
@@ -188,11 +180,9 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         if shares_to_redeem < deposit.shares {
             deposit.shares = deposit.shares - shares_to_redeem;
             save_deposit(&env, &deposit);
+            bump_deposit(&env, caller);
         } else {
             remove_deposit(&env, &caller);
-            let mut depositors: Vec<Address> = get_depositors(&env);
-            depositors = remove_depositor_from_depositors(&depositors, &caller);
-            save_depositors(&env, &depositors);
         }
 
         core_state.total_deposited = core_state.total_deposited - withdraw_amount;
@@ -201,30 +191,18 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
             core_state.share_price = 1_0000000;
         }
         set_core_state(&env, &core_state);
-
-        bump_deposit(&env, caller);
-
-        bump_depositors(&env);
     }
 
     fn get_deposit(env: Env, caller: Address) -> Deposit {
         bump_instance(&env);
-        bump_deposit(&env, caller.clone());
-        bump_depositors(&env);
-
+        if has_deposit(&env, &caller) {
+            bump_deposit(&env, caller.clone());
+        }
         get_deposit(&env, &caller)
-    }
-
-    fn get_depositors(env: Env) -> Vec<Address> {
-        bump_instance(&env);
-        bump_depositors(&env);
-
-        get_depositors(&env)
     }
 
     fn get_supported_assets(env: Env) -> Vec<Address> {
         bump_instance(&env);
-        bump_depositors(&env);
         get_core_state(&env).accepted_assets
     }
 
@@ -242,8 +220,8 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
             panic_with_error!(&env, &SCErrors::InvalidAsset);
         }
 
-        let fee: u128 = div_floor(amount * core_state.fee_percentage, 1_0000000);
-        let protocol_share: u128 = div_floor(fee, 2);
+        let fee: u128 = div_ceil(amount * core_state.fee_percentage, 1_0000000);
+        let protocol_share: u128 = div_ceil(fee, 2);
         let amount_to_exchange: u128 = amount - fee;
 
         make_deposit(&env, &caller, &from_asset, &amount);
@@ -268,43 +246,75 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         set_core_state(&env, &core_state);
     }
 
-    // Update the way we distribute the governance tokens
-    fn last_gov_distribution_time(env: Env) -> u64 {
-        bump_instance(&env);
-        bump_depositors(&env);
-        get_last_governance_token_distribution_time(&env)
+    fn lock(e: Env, caller: Address) {
+        bump_instance(&e);
+        caller.require_auth();
+
+        if !has_deposit(&e, &caller) {
+            panic_with_error!(&e, &SCErrors::AlreadyLocked);
+        }
+        let mut deposit: Deposit = get_deposit(&e, &caller);
+        if deposit.locked {
+            panic_with_error!(&e, &SCErrors::AlreadyLocked);
+        }
+
+        deposit.locked = true;
+        deposit.unlocks_at = e.ledger().timestamp() + (3600 * 24 * 7);
+
+        let mut locking_state: LockingState = e._locking_state().unwrap();
+        locking_state.total += deposit.shares;
+        e._set_locking_state(&locking_state);
+
+        deposit.snapshot = locking_state.factor;
+        save_deposit(&e, &deposit);
+        bump_deposit(&e, caller.clone());
     }
 
-    fn distribute_governance_token(env: Env) {
-        bump_instance(&env);
-        let daily_distribution: u128 = 16438_0000000;
-        let core_state: CoreState = get_core_state(&env);
+    fn unlock(e: Env, caller: Address) {
+        bump_instance(&e);
+        caller.require_auth();
 
-        let last_distribution = get_last_governance_token_distribution_time(&env);
+        if !has_deposit(&e, &caller) {
+            panic_with_error!(&e, &SCErrors::AlreadyLocked);
+        }
+        let mut deposit: Deposit = get_deposit(&e, &caller);
 
-        if env.ledger().timestamp() < last_distribution + (3600 * 24) {
-            panic_with_error!(&env, &SCErrors::RecentDistribution);
+        if !deposit.locked {
+            panic_with_error!(&e, &SCErrors::NotLockedDeposit)
         }
 
-        let depositors: Vec<Address> = get_depositors(&env);
-        let governance_token = token::Client::new(&env, &core_state.governance_token);
-
-        for depositor in depositors.iter() {
-            let deposit: Deposit = get_deposit(&env, &depositor);
-            let deposit_percentage =
-                div_floor(deposit.shares * 1_0000000, core_state.total_deposited);
-
-            let amount_to_send: u128 =
-                div_floor(deposit_percentage * daily_distribution, 1_0000000);
-
-            governance_token.transfer(
-                &env.current_contract_address(),
-                &deposit.depositor,
-                &(amount_to_send as i128),
-            );
+        if e.ledger().timestamp() < deposit.unlocks_at {
+            panic_with_error!(&e, &SCErrors::LockedPeriodUncompleted);
         }
 
-        set_last_governance_token_distribution_time(&env);
-        bump_depositors(&env);
+        let mut locking_state: LockingState = e._locking_state().unwrap();
+        locking_state.total -= deposit.shares;
+        e._set_locking_state(&locking_state);
+
+        let reward: u128 = div_floor(deposit.shares * (locking_state.factor - deposit.snapshot), 1_0000000);
+
+        deposit.locked = false;
+        deposit.snapshot = 0;
+        save_deposit(&e, &deposit);
+
+        make_withdrawal(&e, &caller, &get_core_state(&e).governance_token, &reward);
+        bump_deposit(&e, caller);
+    }
+
+    fn distribute(e: Env, caller: Address, amt: u128) {
+        bump_instance(&e);
+        caller.require_auth();
+
+        let core_state: CoreState = get_core_state(&e);
+        let mut locking_state: LockingState = e._locking_state().unwrap();
+
+        if locking_state.total == 0 {
+            panic_with_error!(&e, &SCErrors::CantDistribute);
+        }
+
+        make_deposit(&e, &caller, &core_state.governance_token, &amt);
+
+        locking_state.factor += div_floor(amt * 1_0000000, locking_state.total);
+        e._set_locking_state(&locking_state);
     }
 }

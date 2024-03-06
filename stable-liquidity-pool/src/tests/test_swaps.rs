@@ -3,7 +3,7 @@ use crate::errors::SCErrors;
 use crate::storage::core::CoreState;
 use crate::storage::deposits::Deposit;
 use crate::tests::test_utils::{create_test_data, init_contract, prepare_test_accounts, TestData};
-use soroban_sdk::arbitrary::std;
+use soroban_sdk::testutils::arbitrary::std;
 use soroban_sdk::testutils::{
     Address as _, AuthorizedFunction, AuthorizedInvocation, Ledger, LedgerInfo,
 };
@@ -18,10 +18,10 @@ fn test_swaps_and_profit_retiring() {
     init_contract(&env, &test_data);
 
     let deposit_amount: u128 = 100_0000000;
-    let depositor_1: Address = Address::random(&env);
-    let depositor_2: Address = Address::random(&env);
-    let depositor_3: Address = Address::random(&env);
-    let depositor_4: Address = Address::random(&env);
+    let depositor_1: Address = Address::generate(&env);
+    let depositor_2: Address = Address::generate(&env);
+    let depositor_3: Address = Address::generate(&env);
+    let depositor_4: Address = Address::generate(&env);
     let depositors: Vec<Address> = vec![
         &env,
         depositor_1.clone(),
@@ -50,7 +50,7 @@ fn test_swaps_and_profit_retiring() {
         &deposit_amount,
     );
 
-    let customer_1: Address = Address::random(&env);
+    let customer_1: Address = Address::generate(&env);
 
     test_data
         .usdc_token_admin_client
@@ -133,7 +133,7 @@ fn test_swaps_and_profit_retiring() {
         &(100_0000000 - 99_7000000)
     );
 
-    let customer_2: Address = Address::random(&env);
+    let customer_2: Address = Address::generate(&env);
 
     test_data
         .usdt_token_admin_client
@@ -212,12 +212,12 @@ fn test_swaps_and_profit_retiring() {
     env.ledger().set(LedgerInfo {
         timestamp: 3600 * 50,
         protocol_version: 1,
-        sequence_number: 10,
+        sequence_number: env.ledger().sequence(),
         network_id: Default::default(),
         base_reserve: 10,
-        min_temp_entry_expiration: 0,
-        min_persistent_entry_expiration: 0,
-        max_entry_expiration: 0,
+        min_temp_entry_ttl: 1,
+        min_persistent_entry_ttl: 1,
+        max_entry_ttl: u32::MAX,
     });
 
     test_data.stable_liquidity_pool_contract_client.withdraw(

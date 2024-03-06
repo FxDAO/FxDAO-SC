@@ -1,18 +1,24 @@
 use crate::storage::deposits::{Deposit, DepositsDataKeys};
 use soroban_sdk::{token, vec, Address, Env, Vec};
-pub const PERSISTENT_BUMP_CONSTANT: u32 = 1036800;
+
+pub const DAY_IN_LEDGERS: u32 = 17280;
+pub const PERSISTENT_BUMP_CONSTANT: u32 = DAY_IN_LEDGERS * 30;
+pub const PERSISTENT_BUMP_CONSTANT_THRESHOLD: u32 = DAY_IN_LEDGERS * 20;
 
 pub fn bump_deposit(env: &Env, depositor: Address) {
-    env.storage().persistent().bump(
+    env.storage().persistent().extend_ttl(
         &DepositsDataKeys::Deposit(depositor),
+        PERSISTENT_BUMP_CONSTANT_THRESHOLD,
         PERSISTENT_BUMP_CONSTANT,
     );
 }
 
 pub fn bump_depositors(env: &Env) {
-    env.storage()
-        .persistent()
-        .bump(&DepositsDataKeys::Depositors, PERSISTENT_BUMP_CONSTANT);
+    env.storage().persistent().extend_ttl(
+        &DepositsDataKeys::Depositors,
+        PERSISTENT_BUMP_CONSTANT_THRESHOLD,
+        PERSISTENT_BUMP_CONSTANT,
+    );
 }
 
 pub fn make_deposit(env: &Env, asset: &Address, depositor: &Address, amount: &u128) {
@@ -23,12 +29,12 @@ pub fn make_deposit(env: &Env, asset: &Address, depositor: &Address, amount: &u1
     );
 }
 
-pub fn make_withdrawal(env: &Env, asset: &Address, deposit: &Deposit) {
-    token::Client::new(env, asset).transfer(
-        &env.current_contract_address(),
-        &deposit.depositor,
-        &(deposit.amount as i128),
-    );
+pub fn make_withdrawal(env: &Env, asset: &Address, account: &Address, amount: i128) {
+    token::Client::new(env, asset).transfer(&env.current_contract_address(), &account, &amount);
+}
+
+pub fn get_contract_balance(env: &Env, asset: &Address) -> i128 {
+    token::Client::new(env, asset).balance(&env.current_contract_address())
 }
 
 pub fn save_deposit(env: &Env, deposit: &Deposit) {
@@ -42,11 +48,13 @@ pub fn get_deposit(env: &Env, depositor: &Address) -> Deposit {
     env.storage()
         .persistent()
         .get(&DepositsDataKeys::Deposit(depositor.clone()))
-        .unwrap_or(Deposit {
-            depositor: depositor.clone(),
-            amount: 0,
-            deposit_time: env.ledger().timestamp(),
-        })
+        .unwrap()
+}
+
+pub fn has_deposit(env: &Env, depositor: &Address) -> bool {
+    env.storage()
+        .persistent()
+        .has(&DepositsDataKeys::Deposit(depositor.clone()))
 }
 
 pub fn remove_deposit(env: &Env, depositor: &Address) {
