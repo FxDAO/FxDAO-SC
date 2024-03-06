@@ -1,4 +1,5 @@
 #![cfg(test)]
+
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{token, vec, Address, Env, Vec};
 use token::Client as TokenClient;
@@ -19,7 +20,9 @@ pub struct TestData<'a> {
 
     pub admin: Address,
     pub manager: Address,
-    pub governance_token: Address,
+    pub governance_token_admin: Address,
+    pub governance_token_client: TokenClient<'a>,
+    pub governance_token_admin_client: TokenAdminClient<'a>,
 
     pub usdc_token_admin: Address,
     pub usdc_token_client: TokenClient<'a>,
@@ -42,6 +45,9 @@ pub fn create_test_data(env: &Env) -> TestData {
     let admin = Address::generate(&env);
     let manager = Address::generate(&env);
     let governance_token = Address::generate(&env);
+    let governance_token_admin = Address::generate(&env);
+    let (governance_token_client, governance_token_admin_client) =
+        create_token_contract(&env, &governance_token_admin);
 
     let usdc_token_admin = Address::generate(&env);
     let (usdc_token_client, usdc_token_admin_client) =
@@ -65,7 +71,9 @@ pub fn create_test_data(env: &Env) -> TestData {
         ),
         admin,
         manager,
-        governance_token,
+        governance_token_admin,
+        governance_token_client,
+        governance_token_admin_client,
         usdc_token_admin,
         usdc_token_client,
         usdc_token_admin_client,
@@ -85,7 +93,7 @@ pub fn init_contract(env: &Env, test_data: &TestData) {
     test_data.stable_liquidity_pool_contract_client.init(
         &test_data.admin,
         &test_data.manager,
-        &test_data.governance_token,
+        &test_data.governance_token_client.address,
         &(vec![
             &env,
             test_data.usdc_token_client.address.clone(),

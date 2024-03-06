@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, Vec};
+use soroban_sdk::{contracttype, Address, Vec, Env};
 
 #[contracttype]
 pub struct CoreState {
@@ -15,6 +15,31 @@ pub struct CoreState {
 }
 
 #[contracttype]
+pub struct LockingState {
+    // This is the total of shares locked
+    pub total: u128,
+
+    // The factor is a value used to know the rewards for each user
+    pub factor: u128,
+}
+
+#[contracttype]
 pub enum CoreStorageKeys {
     CoreState,
+    LockingState,
+}
+
+pub trait CoreStorageFunc {
+    fn _locking_state(&self) -> Option<LockingState>;
+    fn _set_locking_state(&self, v: &LockingState);
+}
+
+impl CoreStorageFunc for Env {
+    fn _locking_state(&self) -> Option<LockingState> {
+        self.storage().instance().get(&CoreStorageKeys::LockingState)
+    }
+
+    fn _set_locking_state(&self, v: &LockingState) {
+        self.storage().instance().set(&CoreStorageKeys::LockingState, v);
+    }
 }

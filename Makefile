@@ -2,11 +2,9 @@ default: build
 
 test: build
 	cargo test
-	cargo test --features testutils
 
 test-optimized: build-optimized
 	cargo test
-	cargo test --features testutils
 
 build:
 	soroban contract build --package vaults

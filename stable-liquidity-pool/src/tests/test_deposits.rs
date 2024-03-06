@@ -84,7 +84,7 @@ pub fn test_deposits() {
         .stable_liquidity_pool_contract_client
         .get_deposit(&depositor_1);
 
-    assert_eq!(&deposit_1.last_deposit, &0);
+    assert_eq!(&deposit_1.unlocks_at, &(0 + (3600 * 48)));
     assert_eq!(&deposit_1.depositor, &depositor_1);
     assert_eq!(&deposit_1.shares, &deposit_amount);
     assert_eq!(
@@ -114,7 +114,7 @@ pub fn test_deposits() {
         .stable_liquidity_pool_contract_client
         .get_deposit(&depositor_2);
 
-    assert_eq!(&deposit_2.last_deposit, &1000);
+    assert_eq!(&deposit_2.unlocks_at, &(1000 + (3600 * 48)));
     assert_eq!(&deposit_2.depositor, &depositor_2);
     assert_eq!(&deposit_2.shares, &deposit_amount);
     assert_eq!(
@@ -149,7 +149,7 @@ pub fn test_deposits() {
         .stable_liquidity_pool_contract_client
         .get_deposit(&depositor_3);
 
-    assert_eq!(&deposit_3.last_deposit, &2000);
+    assert_eq!(&deposit_3.unlocks_at, &(2000 + (3600 * 48)));
     assert_eq!(&deposit_3.depositor, &depositor_3);
     assert_eq!(&deposit_3.shares, &deposit_amount);
     assert_eq!(
@@ -292,7 +292,7 @@ fn test_simple_withdrawals() {
         .stable_liquidity_pool_contract_client
         .get_deposit(&depositor_3);
 
-    assert_eq!(&deposit_3.last_deposit, &0);
+    assert_eq!(&deposit_3.unlocks_at, &(0 + (3600 * 48)));
     assert_eq!(&deposit_3.shares, &50_0000000);
     assert_eq!(&deposit_3.depositor, &depositor_3);
     assert_eq!(
@@ -325,7 +325,7 @@ fn test_simple_withdrawals() {
         .stable_liquidity_pool_contract_client
         .get_deposit(&depositor_3);
 
-    assert_eq!(&deposit_3.last_deposit, &0);
+    assert_eq!(&deposit_3.unlocks_at, &0);
     assert_eq!(&deposit_3.shares, &0);
     assert_eq!(
         &(test_data.usdt_token_client.balance(&depositor_3) as u128),

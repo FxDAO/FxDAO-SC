@@ -1,6 +1,6 @@
 use crate::errors::SCErrors;
-use crate::storage::core::CoreState;
-use crate::storage::deposits::Deposit;
+use crate::storage::core::{CoreState, CoreStorageFunc, LockingState};
+use crate::storage::deposits::{Deposit};
 use crate::utils::core::{
     bump_instance, can_init_contract, get_core_state,
     set_core_state,
@@ -12,8 +12,8 @@ use crate::utils::deposits::{
 };
 use num_integer::{div_ceil, div_floor};
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, symbol_short, token, Address, BytesN, Env, Map,
-    Symbol, Vec,
+    contract, contractimpl, panic_with_error, token, Address, BytesN, Env, Map,
+    Vec,
 };
 
 pub trait StableLiquidityPoolContractTrait {
@@ -45,6 +45,12 @@ pub trait StableLiquidityPoolContractTrait {
     fn get_supported_assets(env: Env) -> Vec<Address>;
 
     fn swap(env: Env, caller: Address, from_asset: Address, to_asset: Address, amount: u128);
+
+
+    // Gov rewards fns
+    fn lock(e: Env, caller: Address);
+    fn unlock(e: Env, caller: Address);
+    fn distribute(e: Env, caller: Address, amt: u128);
 }
 
 #[contract]
@@ -76,6 +82,10 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
                 treasury,
             },
         );
+        env._set_locking_state(&LockingState {
+            total: 0,
+            factor: 0,
+        });
         bump_instance(&env);
     }
 
@@ -103,7 +113,7 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
 
         let shares_to_issue: u128 = div_floor(amount_deposit * 1_0000000, core_state.share_price);
         let mut deposit: Deposit = get_deposit(&env, &caller);
-        deposit.last_deposit = env.ledger().timestamp();
+        deposit.unlocks_at = env.ledger().timestamp() + (3600 * 48);
         deposit.shares = deposit.shares + shares_to_issue;
         save_deposit(&env, &deposit);
 
@@ -137,10 +147,12 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
             panic_with_error!(&env, &SCErrors::NotEnoughSharesToWithdraw);
         }
 
-        let min_timestamp: u64 = deposit.last_deposit + (3600 * 48);
-
-        if env.ledger().timestamp() < min_timestamp {
+        if env.ledger().timestamp() < deposit.unlocks_at {
             panic_with_error!(&env, &SCErrors::LockedPeriodUncompleted);
+        }
+
+        if deposit.locked {
+            panic_with_error!(&env, &SCErrors::LockedDeposit)
         }
 
         let mut withdraw_amount: u128 = 0;
@@ -232,5 +244,77 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         core_state.total_deposited = new_total_deposited;
 
         set_core_state(&env, &core_state);
+    }
+
+    fn lock(e: Env, caller: Address) {
+        bump_instance(&e);
+        caller.require_auth();
+
+        if !has_deposit(&e, &caller) {
+            panic_with_error!(&e, &SCErrors::AlreadyLocked);
+        }
+        let mut deposit: Deposit = get_deposit(&e, &caller);
+        if deposit.locked {
+            panic_with_error!(&e, &SCErrors::AlreadyLocked);
+        }
+
+        deposit.locked = true;
+        deposit.unlocks_at = e.ledger().timestamp() + (3600 * 24 * 7);
+
+        let mut locking_state: LockingState = e._locking_state().unwrap();
+        locking_state.total += deposit.shares;
+        e._set_locking_state(&locking_state);
+
+        deposit.snapshot = locking_state.factor;
+        save_deposit(&e, &deposit);
+        bump_deposit(&e, caller.clone());
+    }
+
+    fn unlock(e: Env, caller: Address) {
+        bump_instance(&e);
+        caller.require_auth();
+
+        if !has_deposit(&e, &caller) {
+            panic_with_error!(&e, &SCErrors::AlreadyLocked);
+        }
+        let mut deposit: Deposit = get_deposit(&e, &caller);
+
+        if !deposit.locked {
+            panic_with_error!(&e, &SCErrors::NotLockedDeposit)
+        }
+
+        if e.ledger().timestamp() < deposit.unlocks_at {
+            panic_with_error!(&e, &SCErrors::LockedPeriodUncompleted);
+        }
+
+        let mut locking_state: LockingState = e._locking_state().unwrap();
+        locking_state.total -= deposit.shares;
+        e._set_locking_state(&locking_state);
+
+        let reward: u128 = div_floor(deposit.shares * (locking_state.factor - deposit.snapshot), 1_0000000);
+
+        deposit.locked = false;
+        deposit.snapshot = 0;
+        save_deposit(&e, &deposit);
+
+        make_withdrawal(&e, &caller, &get_core_state(&e).governance_token, &reward);
+        bump_deposit(&e, caller);
+    }
+
+    fn distribute(e: Env, caller: Address, amt: u128) {
+        bump_instance(&e);
+        caller.require_auth();
+
+        let core_state: CoreState = get_core_state(&e);
+        let mut locking_state: LockingState = e._locking_state().unwrap();
+
+        if locking_state.total == 0 {
+            panic_with_error!(&e, &SCErrors::CantDistribute);
+        }
+
+        make_deposit(&e, &caller, &core_state.governance_token, &amt);
+
+        locking_state.factor += div_floor(amt * 1_0000000, locking_state.total);
+        e._set_locking_state(&locking_state);
     }
 }

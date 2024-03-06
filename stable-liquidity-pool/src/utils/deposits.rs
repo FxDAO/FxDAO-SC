@@ -43,7 +43,9 @@ pub fn get_deposit(env: &Env, depositor: &Address) -> Deposit {
         .unwrap_or(Deposit {
             depositor: depositor.clone(),
             shares: 0,
-            last_deposit: 0,
+            locked: false,
+            unlocks_at: 0,
+            snapshot: 0,
         })
 }
 
