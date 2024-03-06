@@ -1,0 +1,4 @@
+# .git-blame-ignore-revs
+
+# Switch to rustfmt instead of editor formatting
+0c951735b55b0b5fd8607bf5959d4a4a0277c13e
