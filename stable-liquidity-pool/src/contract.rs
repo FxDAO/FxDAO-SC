@@ -1,19 +1,14 @@
 use crate::errors::SCErrors;
 use crate::storage::core::{CoreState, CoreStorageFunc, LockingState};
-use crate::storage::deposits::{Deposit};
-use crate::utils::core::{
-    bump_instance, can_init_contract, get_core_state,
-    set_core_state,
-};
+use crate::storage::deposits::Deposit;
+use crate::utils::core::{bump_instance, can_init_contract, get_core_state, set_core_state};
 use crate::utils::deposits::{
-    bump_deposit, get_deposit, has_deposit,
-    make_deposit, make_withdrawal, remove_deposit, save_deposit,
-    validate_deposit_asset,
+    bump_deposit, get_deposit, has_deposit, make_deposit, make_withdrawal, remove_deposit,
+    save_deposit, validate_deposit_asset,
 };
 use num_integer::{div_ceil, div_floor};
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, token, Address, BytesN, Env, Map,
-    Vec,
+    contract, contractimpl, panic_with_error, token, Address, BytesN, Env, Map, Vec,
 };
 
 pub trait StableLiquidityPoolContractTrait {
@@ -45,7 +40,6 @@ pub trait StableLiquidityPoolContractTrait {
     fn get_supported_assets(env: Env) -> Vec<Address>;
 
     fn swap(env: Env, caller: Address, from_asset: Address, to_asset: Address, amount: u128);
-
 
     // Gov rewards fns
     fn lock(e: Env, caller: Address);
@@ -291,7 +285,10 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         locking_state.total -= deposit.shares;
         e._set_locking_state(&locking_state);
 
-        let reward: u128 = div_floor(deposit.shares * (locking_state.factor - deposit.snapshot), 1_0000000);
+        let reward: u128 = div_floor(
+            deposit.shares * (locking_state.factor - deposit.snapshot),
+            1_0000000,
+        );
 
         deposit.locked = false;
         deposit.snapshot = 0;

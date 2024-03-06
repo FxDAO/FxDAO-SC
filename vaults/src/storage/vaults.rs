@@ -23,7 +23,7 @@ pub struct VaultsInfo {
     // Min collateral ratio - ex: 1.10
     pub min_debt_creation: u128,
     // Min vault creation amount - ex: 5000
-    pub opening_col_rate: u128,  // Opening collateral ratio - ex: 1.15
+    pub opening_col_rate: u128, // Opening collateral ratio - ex: 1.15
 }
 
 #[contracttype]

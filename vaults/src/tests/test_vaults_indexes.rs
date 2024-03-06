@@ -4,8 +4,7 @@ extern crate std;
 
 use crate::storage::vaults::{OptionalVaultKey, Vault, VaultKey, VaultsInfo};
 use crate::tests::test_utils::{
-    create_base_data, create_base_variables, set_initial_state,
-    update_oracle_price,
+    create_base_data, create_base_variables, set_initial_state, update_oracle_price,
 };
 
 use soroban_sdk::testutils::Address as _;

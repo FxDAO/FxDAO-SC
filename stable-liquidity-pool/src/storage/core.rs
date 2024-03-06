@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, Vec, Env};
+use soroban_sdk::{contracttype, Address, Env, Vec};
 
 #[contracttype]
 pub struct CoreState {
@@ -36,10 +36,14 @@ pub trait CoreStorageFunc {
 
 impl CoreStorageFunc for Env {
     fn _locking_state(&self) -> Option<LockingState> {
-        self.storage().instance().get(&CoreStorageKeys::LockingState)
+        self.storage()
+            .instance()
+            .get(&CoreStorageKeys::LockingState)
     }
 
     fn _set_locking_state(&self, v: &LockingState) {
-        self.storage().instance().set(&CoreStorageKeys::LockingState, v);
+        self.storage()
+            .instance()
+            .set(&CoreStorageKeys::LockingState, v);
     }
 }
