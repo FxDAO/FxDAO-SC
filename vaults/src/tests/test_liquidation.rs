@@ -12,9 +12,9 @@ use crate::utils::payments::calc_fee;
 use soroban_sdk::testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation};
 use soroban_sdk::{symbol_short, token, vec, Address, Env, IntoVal, Vec};
 
-/// It test a simple liquidation
-/// The vault must be removed and the collateral sent to the liquidator
-/// Currency stats must be updated
+// It test a simple liquidation
+// The vault must be removed and the collateral sent to the liquidator
+// Currency stats must be updated
 #[test]
 fn test_liquidation() {
     let env = Env::default();

@@ -3,19 +3,19 @@ use soroban_sdk::{contracttype, Address, BytesN, Symbol, Val, Vec};
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProposalType {
-    /// A simple proposal is a proposal in which community is asked to decide on something off-chain.
-    /// This could be something like "Start the development of a dark version of the UI".
-    /// Simple proposals can be used as an "entry plebiscite" where something is requested and later when it's time to deploy the change, the community needs to approved it which it means it's an "exit plebiscite"
-    /// Proposers need to understand that they will need to spend twice so in some situations using another type of proposal could be a better option
+    // A simple proposal is a proposal in which community is asked to decide on something off-chain.
+    // This could be something like "Start the development of a dark version of the UI".
+    // Simple proposals can be used as an "entry plebiscite" where something is requested and later when it's time to deploy the change, the community needs to approved it which it means it's an "exit plebiscite"
+    // Proposers need to understand that they will need to spend twice so in some situations using another type of proposal could be a better option
     Simple,
-    /// This type of proposal must be used when there is the need to update any of the contracts where this governance contract is the admin
-    /// This type of proposal is the only proposal that can be done in an "urgent" way which means the protocol maintainer can request an express proposal (as low as 1hr before voting ends)
+    // This type of proposal must be used when there is the need to update any of the contracts where this governance contract is the admin
+    // This type of proposal is the only proposal that can be done in an "urgent" way which means the protocol maintainer can request an express proposal (as low as 1hr before voting ends)
     UpgradeContract,
-    /// Different contracts in the protocol have certain parameters that can be updated with a proposal
-    /// Things like fees, percentages, behavior, etc.
+    // Different contracts in the protocol have certain parameters that can be updated with a proposal
+    // Things like fees, percentages, behavior, etc.
     UpdateContract,
-    /// Move funds from the treasury to any address
-    /// This could be used for multiple reason like paying a provider, a donation, grants, allocation of funds, etc  
+    // Move funds from the treasury to any address
+    // This could be used for multiple reason like paying a provider, a donation, grants, allocation of funds, etc
     TreasuryPayment,
     // TODO: Structural is not supported yet so it needs to be added
     Structural,
@@ -90,7 +90,7 @@ pub struct ProposalExecutionParams {
 
 #[contracttype]
 pub struct Proposal {
-    /// The proposal id is the SHA256 hash of the text used in the proposal
+    // The proposal id is the SHA256 hash of the text used in the proposal
     pub id: BytesN<32>,
     pub status: ProposalStatus,
     pub proposal_type: ProposalType,
@@ -132,14 +132,14 @@ pub struct ProposalVoteIndex {
 
 #[contracttype]
 pub enum ProposalsStorageKeys {
-    /// A Vec with the Ids of the proposals sorted from newest to oldest
+    // A Vec with the Ids of the proposals sorted from newest to oldest
     ProposalsIds,
 
     Proposal(BytesN<32>),
 
-    /// A Vec<ProposalVoteIndex> value with the votes in order from newest to oldest
+    // A Vec<ProposalVoteIndex> value with the votes in order from newest to oldest
     ProposalVotes(BytesN<32>),
 
-    /// The struct returned is ProposalVote
+    // The struct returned is ProposalVote
     ProposalVote(ProposalVoteIndex),
 }

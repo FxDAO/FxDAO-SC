@@ -406,13 +406,13 @@ impl SafetyPoolContractTrait for SafetyPoolContract {
         );
     }
 
-    /// The liquidation process goes this way:
-    /// 1.- We first get the balance in the contract to know how much we can liquidate
-    /// 2.- We get all the vaults that can be liquidated
-    /// 3.- We iterate among the vaults and calculate how many of them we can liquidate
-    /// 4.- We call the vaults contract to liquidate the vaults (if is at least 1)
-    /// 5.- After we receive the collateral, we distributed it to others minus the contract fee
-    /// 6.- The collateral left is divided and distributed between the treasury and the liquidator
+    // The liquidation process goes this way:
+    // 1.- We first get the balance in the contract to know how much we can liquidate
+    // 2.- We get all the vaults that can be liquidated
+    // 3.- We iterate among the vaults and calculate how many of them we can liquidate
+    // 4.- We call the vaults contract to liquidate the vaults (if is at least 1)
+    // 5.- After we receive the collateral, we distributed it to others minus the contract fee
+    // 6.- The collateral left is divided and distributed between the treasury and the liquidator
     fn liquidate(env: Env, liquidator: Address) {
         bump_instance(&env);
         liquidator.require_auth();

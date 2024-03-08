@@ -41,9 +41,9 @@ pub fn calculate_proposal_vote_price(
     }
 }
 
-/// This functions checks if the voter already has voted in this proposal
-/// If it already did, it can not vote again and instead it needs to update its current vote
-/// It checks if the proposal status is Active
+// This functions checks if the voter already has voted in this proposal
+// If it already did, it can not vote again and instead it needs to update its current vote
+// It checks if the proposal status is Active
 pub fn validate_can_vote(env: &Env, voter_id: &Address, proposal: &Proposal) -> bool {
     if env
         .storage()
@@ -69,7 +69,7 @@ pub fn get_proposal_vote(env: &Env, voter_id: &Address, proposal_id: BytesN<32>)
         .unwrap()
 }
 
-/// PROPOSALS FUNCTIONS
+// PROPOSALS FUNCTIONS
 
 pub fn get_proposals_fee(env: &Env) -> u128 {
     let core_state: CoreState = env
@@ -85,8 +85,8 @@ pub fn get_proposals_fee(env: &Env) -> u128 {
     core_state.proposals_fee
 }
 
-/// This method charges the proposers with the amount they set,
-/// this method should only be called after we have made sure the amounts set by the proposers are ok
+// This method charges the proposers with the amount they set,
+// this method should only be called after we have made sure the amounts set by the proposers are ok
 pub fn charge_proposers(env: &Env, proposers: &Vec<ProposerStat>) {
     let (_, token) = get_governance_token(&env);
 
@@ -276,7 +276,7 @@ pub fn proposal_cooldown_completed(env: &Env, proposal: &Proposal, core_state: &
     proposal.ends_at + core_state.cooldown_period < env.ledger().timestamp()
 }
 
-/// PROPOSAL EXECUTION FUNCTIONS
+// PROPOSAL EXECUTION FUNCTIONS
 
 pub fn make_treasury_payment(
     env: &Env,

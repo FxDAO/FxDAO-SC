@@ -5,21 +5,21 @@ use crate::storage::vaults::{
 use num_integer::div_floor;
 use soroban_sdk::{panic_with_error, Address, Env, Symbol, Vec};
 
-/// Creates and insert a Vault into the storage while updating the prev vault in case it exists.
-/// **This function doesn't admit errors IE if something goes wrong it must panic.**
-///
-/// **Arguments:**
-/// - `lowest_key` - This key must come from the current (most recent update) lowest key in the storage. If we are making multiple operations, make sure the lowest key passed to this function is the latest state.
-/// - `new_vault_key` - We accept the VaultKey of the new vault because it's something that it already includes basic information like: account, denomination and the calculated index of the new vault.
-/// - `prev_key` - This value must be the key of the Vault that comes BEFORE the position this new Vault is going to be inserted
-/// - `initial_debt` - The debt the new vault will be opened with
-/// - `collateral_amount` - The collateral the new vault will be opened with
-///
-/// **Returns:**
-/// - The new saved Vault
-/// - The VaultKey of the new Vault
-/// - The VaultKeyIndex of the new Vault
-/// - The updated value of the `lowest_key`
+// Creates and insert a Vault into the storage while updating the prev vault in case it exists.
+// **This function doesn't admit errors IE if something goes wrong it must panic.**
+//
+// **Arguments:**
+// - `lowest_key` - This key must come from the current (most recent update) lowest key in the storage. If we are making multiple operations, make sure the lowest key passed to this function is the latest state.
+// - `new_vault_key` - We accept the VaultKey of the new vault because it's something that it already includes basic information like: account, denomination and the calculated index of the new vault.
+// - `prev_key` - This value must be the key of the Vault that comes BEFORE the position this new Vault is going to be inserted
+// - `initial_debt` - The debt the new vault will be opened with
+// - `collateral_amount` - The collateral the new vault will be opened with
+//
+// **Returns:**
+// - The new saved Vault
+// - The VaultKey of the new Vault
+// - The VaultKeyIndex of the new Vault
+// - The updated value of the `lowest_key`
 pub fn create_and_insert_vault(
     e: &Env,
     lowest_key: &OptionalVaultKey,
@@ -176,14 +176,14 @@ pub fn get_vaults(
     vaults
 }
 
-/// This function checks and removes the given Vault, it also updates the previous Vault if there is one.
-/// **This function doesn't admit errors IE if something goes wrong it must panic.**
-///
-/// This function doesn't update nor care about the lowest_key of the general contract, that's something the contract needs to handle either before or after calling this function.
-///
-/// **Arguments:**
-/// - `vault` - Target Vault to remove from the storage
-/// - `prev_key` - This value must be the key of the Vault that comes BEFORE the position the Vault we are going to remove
+// This function checks and removes the given Vault, it also updates the previous Vault if there is one.
+// **This function doesn't admit errors IE if something goes wrong it must panic.**
+//
+// This function doesn't update nor care about the lowest_key of the general contract, that's something the contract needs to handle either before or after calling this function.
+//
+// **Arguments:**
+// - `vault` - Target Vault to remove from the storage
+// - `prev_key` - This value must be the key of the Vault that comes BEFORE the position the Vault we are going to remove
 pub fn withdraw_vault(e: &Env, vault: &Vault, prev_key: &OptionalVaultKey) {
     let target_vault_key: VaultKey = VaultKey {
         index: vault.index.clone(),

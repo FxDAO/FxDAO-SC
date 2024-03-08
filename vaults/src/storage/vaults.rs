@@ -54,16 +54,16 @@ pub struct VaultIndexKey {
 
 #[contracttype]
 pub enum VaultsDataKeys {
-    /// General information by currency.
-    /// Symbol is the denomination, not the asset code.
+    // General information by currency.
+    // Symbol is the denomination, not the asset code.
     VaultsInfo(Symbol),
 
-    /// By using the index and denomination (VaultKey) we can get a Vault, all Vaults' indexes are unique.
-    /// In cases where the index (collateral / debt) is the same as one already created, we add 1 to it until is unique
+    // By using the index and denomination (VaultKey) we can get a Vault, all Vaults' indexes are unique.
+    // In cases where the index (collateral / debt) is the same as one already created, we add 1 to it until is unique
     Vault(VaultKey),
 
-    /// By using the combination of the denomination and the address (VaultIndexKey) we can get
-    /// the index of the vault so the user doesn't need to know the index of its own vault at all time
+    // By using the combination of the denomination and the address (VaultIndexKey) we can get
+    // the index of the vault so the user doesn't need to know the index of its own vault at all time
     VaultIndex(VaultIndexKey),
 }
 

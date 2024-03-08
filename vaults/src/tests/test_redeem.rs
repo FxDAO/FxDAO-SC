@@ -11,17 +11,17 @@ use num_integer::div_floor;
 use soroban_sdk::testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation};
 use soroban_sdk::{symbol_short, token, Address, Env, IntoVal};
 
-/// It tests the redeem method, this must comply with the next behaviour:
-///
-/// 1.- The user redeeming the stables must receive the expected collateral
-///
-/// 2.- The stables must be sent to the issuer (burned in the case of a classic asset)
-///
-/// 3.- The lowest key must be updated
-///
-/// 4.- Vault must be removed
-///
-/// 5.- The owner of the Vault must receive the remaining of the collateral
+// It tests the redeem method, this must comply with the next behaviour:
+//
+// 1.- The user redeeming the stables must receive the expected collateral
+//
+// 2.- The stables must be sent to the issuer (burned in the case of a classic asset)
+//
+// 3.- The lowest key must be updated
+//
+// 4.- Vault must be removed
+//
+// 5.- The owner of the Vault must receive the remaining of the collateral
 #[test]
 fn test_redeem() {
     let env = Env::default();

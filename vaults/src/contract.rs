@@ -40,12 +40,12 @@ pub trait VaultsContractTrait {
     fn upgrade(e: Env, hash: BytesN<32>);
     fn set_panic(e: Env, status: bool);
 
-    /// Currencies methods
+    // Currencies methods
     fn create_currency(e: Env, denomination: Symbol, contract: Address);
     fn get_currency(e: Env, denomination: Symbol) -> Currency;
     fn toggle_currency(e: Env, denomination: Symbol, active: bool);
 
-    /// Vaults methods
+    // Vaults methods
     fn set_vault_conditions(
         e: Env,
         min_col_rate: u128,
@@ -94,10 +94,10 @@ pub trait VaultsContractTrait {
         amount: u128,
     );
 
-    /// Redeeming
+    // Redeeming
     fn redeem(e: Env, caller: Address, denomination: Symbol);
 
-    /// Liquidation
+    // Liquidation
     fn liquidate(
         e: Env,
         liquidator: Address,
