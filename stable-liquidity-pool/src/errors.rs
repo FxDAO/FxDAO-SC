@@ -8,6 +8,7 @@ pub enum SCErrors {
 
     // Deposits
     InvalidAsset = 21,
+    MissingDeposit = 22,
 
     // Withdraws
     NothingToWithdraw = 31,

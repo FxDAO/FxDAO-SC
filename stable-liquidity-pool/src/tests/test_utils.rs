@@ -93,12 +93,14 @@ pub fn init_contract(env: &Env, test_data: &TestData) {
         &test_data.admin,
         &test_data.manager,
         &test_data.governance_token_client.address,
-        &(vec![
+        &(Vec::from_array(
             &env,
-            test_data.usdc_token_client.address.clone(),
-            test_data.usdt_token_client.address.clone(),
-            test_data.usdx_token_client.address.clone(),
-        ] as Vec<Address>),
+            [
+                test_data.usdc_token_client.address.clone(),
+                test_data.usdt_token_client.address.clone(),
+                test_data.usdx_token_client.address.clone(),
+            ],
+        )),
         &test_data.fee_percentage,
         &test_data.treasury,
     );

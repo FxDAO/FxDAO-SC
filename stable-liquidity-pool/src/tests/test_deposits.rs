@@ -22,12 +22,14 @@ pub fn test_deposits() {
     let depositor_1: Address = Address::generate(&env);
     let depositor_2: Address = Address::generate(&env);
     let depositor_3: Address = Address::generate(&env);
-    let depositors: Vec<Address> = vec![
+    let depositors: Vec<Address> = Vec::from_array(
         &env,
-        depositor_1.clone(),
-        depositor_2.clone(),
-        depositor_3.clone(),
-    ] as Vec<Address>;
+        [
+            depositor_1.clone(),
+            depositor_2.clone(),
+            depositor_3.clone(),
+        ],
+    );
 
     prepare_test_accounts(&test_data, &depositors);
 
@@ -176,12 +178,14 @@ fn test_simple_withdrawals() {
     let depositor_1: Address = Address::generate(&env);
     let depositor_2: Address = Address::generate(&env);
     let depositor_3: Address = Address::generate(&env);
-    let depositors: Vec<Address> = vec![
+    let depositors: Vec<Address> = Vec::from_array(
         &env,
-        depositor_1.clone(),
-        depositor_2.clone(),
-        depositor_3.clone(),
-    ] as Vec<Address>;
+        [
+            depositor_1.clone(),
+            depositor_2.clone(),
+            depositor_3.clone(),
+        ],
+    );
 
     prepare_test_accounts(&test_data, &depositors);
 

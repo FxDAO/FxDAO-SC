@@ -21,13 +21,15 @@ fn test_swaps_and_profit_retiring() {
     let depositor_2: Address = Address::generate(&env);
     let depositor_3: Address = Address::generate(&env);
     let depositor_4: Address = Address::generate(&env);
-    let depositors: Vec<Address> = vec![
+    let depositors: Vec<Address> = Vec::from_array(
         &env,
-        depositor_1.clone(),
-        depositor_2.clone(),
-        depositor_3.clone(),
-        depositor_4.clone(),
-    ] as Vec<Address>;
+        [
+            depositor_1.clone(),
+            depositor_2.clone(),
+            depositor_3.clone(),
+            depositor_4.clone(),
+        ],
+    );
 
     prepare_test_accounts(&test_data, &depositors);
 
