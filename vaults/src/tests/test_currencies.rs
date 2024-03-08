@@ -2,9 +2,8 @@
 
 #![cfg(test)]
 extern crate std;
-use crate::storage::currencies::Currency;
 use soroban_sdk::testutils::{AuthorizedFunction, AuthorizedInvocation};
-use soroban_sdk::{symbol_short, Address, Env, Error, FromVal, IntoVal, Symbol};
+use soroban_sdk::{Env, IntoVal, Symbol};
 
 use crate::tests::test_utils::*;
 

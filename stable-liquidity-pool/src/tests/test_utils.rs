@@ -44,7 +44,6 @@ pub struct TestData<'a> {
 pub fn create_test_data(env: &Env) -> TestData {
     let admin = Address::generate(&env);
     let manager = Address::generate(&env);
-    let governance_token = Address::generate(&env);
     let governance_token_admin = Address::generate(&env);
     let (governance_token_client, governance_token_admin_client) =
         create_token_contract(&env, &governance_token_admin);

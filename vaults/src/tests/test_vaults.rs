@@ -753,7 +753,6 @@ fn test_increase_debt() {
     let data: TestData = create_base_data(&env);
     let base_variables: InitialVariables = create_base_variables(&env, &data);
     set_initial_state(&env, &data, &base_variables);
-    let contract_address: Address = data.contract_client.address.clone();
 
     data.contract_client.set_vault_conditions(
         &base_variables.min_col_rate,

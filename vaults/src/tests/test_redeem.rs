@@ -6,11 +6,10 @@ use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_initial_state, update_oracle_price,
     InitialVariables, TestData,
 };
-use crate::utils::indexes::calculate_user_vault_index;
 use crate::utils::payments::calc_fee;
 use num_integer::div_floor;
 use soroban_sdk::testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation};
-use soroban_sdk::{symbol_short, token, Address, Env, IntoVal, Symbol};
+use soroban_sdk::{symbol_short, token, Address, Env, IntoVal};
 
 /// It tests the redeem method, this must comply with the next behaviour:
 ///

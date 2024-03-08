@@ -7,7 +7,7 @@ use crate::oracle::{
 use crate::utils::payments::calc_fee;
 use crate::{oracle, VaultsContractClient};
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{symbol_short, token, Address, Env, IntoVal, Symbol, Vec};
+use soroban_sdk::{symbol_short, token, Address, Env, Symbol, Vec};
 use token::Client as TokenClient;
 use token::StellarAssetClient as TokenAdminClient;
 

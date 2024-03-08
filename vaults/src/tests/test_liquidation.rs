@@ -10,7 +10,7 @@ use crate::tests::test_utils::{
 use crate::utils::indexes::calculate_user_vault_index;
 use crate::utils::payments::calc_fee;
 use soroban_sdk::testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation};
-use soroban_sdk::{symbol_short, token, vec, Address, Env, Error, IntoVal, Symbol, Vec};
+use soroban_sdk::{symbol_short, token, vec, Address, Env, IntoVal, Vec};
 
 /// It test a simple liquidation
 /// The vault must be removed and the collateral sent to the liquidator
@@ -62,9 +62,6 @@ fn test_liquidation() {
         &depositor_collateral,
         &data.stable_token_denomination,
     );
-    let depositor_vault: Vault = data
-        .contract_client
-        .get_vault(&depositor, &data.stable_token_denomination);
 
     data.contract_client.new_vault(
         &OptionalVaultKey::Some(depositor_key.clone()),

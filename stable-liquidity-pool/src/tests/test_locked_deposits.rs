@@ -2,7 +2,6 @@
 
 use crate::storage::core::{CoreStorageFunc, LockingState};
 use crate::tests::test_utils::{create_test_data, init_contract, TestData};
-use soroban_sdk::testutils::arbitrary::std::println;
 use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo, MockAuth, MockAuthInvoke};
 use soroban_sdk::{Address, Env, IntoVal};
 

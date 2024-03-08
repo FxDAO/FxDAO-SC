@@ -212,8 +212,7 @@ fn test_simple_withdrawals() {
         .unwrap_err()
         .unwrap();
 
-    // TODO: FIX THIS ONCE SOROBAN FIX IT
-    // assert_eq!(nothing_to_withdraw, SCErrors::NothingToWithdraw.into());
+    assert_eq!(nothing_to_withdraw, SCErrors::NothingToWithdraw.into());
 
     test_data.stable_liquidity_pool_contract_client.deposit(
         &depositor_3,
@@ -236,11 +235,10 @@ fn test_simple_withdrawals() {
         .unwrap_err()
         .unwrap();
 
-    // TODO: UPDATE THIS ONCE SOROBAN FIX IT
-    // assert_eq!(
-    //     locker_period_uncompleted,
-    //     SCErrors::LockedPeriodUncompleted.into()
-    // );
+    assert_eq!(
+        locker_period_uncompleted,
+        SCErrors::LockedPeriodUncompleted.into()
+    );
 
     env.ledger().set(LedgerInfo {
         timestamp: (3600 * 49),
@@ -380,8 +378,7 @@ fn test_simple_withdrawals() {
         .unwrap_err()
         .unwrap();
 
-    // TODO: UPDATE THIS ONCE SOROBAN FIX IT
-    // assert_eq!(not_enough_error, SCErrors::NotEnoughSharesToWithdraw.into());
+    assert_eq!(not_enough_error, SCErrors::NotEnoughSharesToWithdraw.into());
 
     test_data.stable_liquidity_pool_contract_client.withdraw(
         &depositor_1,
