@@ -87,6 +87,10 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         caller.require_auth();
         let mut core_state: CoreState = e._core_state().unwrap();
 
+        if amount_deposit < 1_0000000 {
+            panic_with_error!(&e, &SCErrors::InvalidDepositAmount);
+        }
+
         if !validate_deposit_asset(&core_state.accepted_assets, &asset) {
             panic_with_error!(&e, &SCErrors::InvalidAsset);
         }
@@ -180,6 +184,11 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         }
 
         core_state.total_deposited = core_state.total_deposited - withdraw_amount;
+
+        if core_state.total_deposited > 0 && core_state.total_deposited < 1_0000000 {
+            panic_with_error!(&e, &SCErrors::InvalidWithdraw);
+        }
+
         core_state.total_shares = core_state.total_shares - shares_to_redeem;
         if core_state.total_deposited == 0 && core_state.total_shares == 0 {
             core_state.share_price = 1_0000000;
