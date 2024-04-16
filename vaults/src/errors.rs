@@ -10,6 +10,7 @@ pub enum SCErrors {
     VaultsInfoHasNotStarted = 200,
     ThereAreNoVaults = 201,
     InvalidMinDebtAmount = 300,
+    InvalidMinCollateralAmount = 310,
     InvalidOpeningCollateralRatio = 400,
     VaultDoesntExist = 500,
     UserAlreadyHasDenominationVault = 501,

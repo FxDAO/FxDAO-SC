@@ -430,6 +430,10 @@ impl VaultsContractTrait for VaultsContract {
 
         let core_state: CoreState = e.core_state().unwrap();
 
+        if amount < (core_state.fee * 10) {
+            panic_with_error!(&e, &SCErrors::InvalidMinCollateralAmount);
+        }
+
         let fee: u128 = calc_fee(&core_state.fee, &amount);
         let collateral: u128 = amount - fee;
 
