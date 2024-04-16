@@ -105,6 +105,11 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
             snapshot: 0,
             shares: 0,
         });
+
+        if deposit.locked {
+            panic_with_error!(&e, &SCErrors::LockedDeposit)
+        }
+
         deposit.unlocks_at = e.ledger().timestamp() + (3600 * 48);
         deposit.shares = deposit.shares + shares_to_issue;
         e._set_deposit(&deposit);
