@@ -12,7 +12,7 @@ use crate::utils::payments::{
 };
 use crate::utils::vaults::{
     calculate_deposit_ratio, can_be_liquidated, create_and_insert_vault, get_vaults, search_vault,
-    withdraw_vault,
+    validate_prev_keys, withdraw_vault,
 };
 use num_integer::div_floor;
 use soroban_sdk::{contract, contractimpl, panic_with_error, Address, BytesN, Env, Symbol, Vec};
@@ -318,6 +318,7 @@ impl VaultsContractTrait for VaultsContract {
         };
 
         // In case prev value is not None, we confirm it exists and its index is not higher than the new Vault index
+        // We also check that the prev_key uses the same denomination to prevent people sending a prev_key from another denomination
         match prev_key.clone() {
             OptionalVaultKey::None => {}
             OptionalVaultKey::Some(value) => {
@@ -327,6 +328,10 @@ impl VaultsContractTrait for VaultsContract {
 
                 if e.vault(&value).is_none() {
                     panic_with_error!(&e, &SCErrors::PrevVaultDoesntExist);
+                }
+
+                if value.denomination != denomination {
+                    panic_with_error!(&e, &SCErrors::InvalidPrevKeyDenomination);
                 }
             }
         }
@@ -400,6 +405,14 @@ impl VaultsContractTrait for VaultsContract {
             return Vec::new(&e);
         }
 
+        if let OptionalVaultKey::Some(key) = &prev_key {
+            if key.denomination != denomination {
+                panic_with_error!(&e, &SCErrors::InvalidPrevKeyDenomination);
+            }
+        } else if OptionalVaultKey::None == vaults_info.lowest_key {
+            return Vec::new(&e);
+        }
+
         get_vaults(
             &e,
             &prev_key,
@@ -419,6 +432,9 @@ impl VaultsContractTrait for VaultsContract {
     ) {
         e.bump_instance();
         vault_key.account.require_auth();
+
+        // We check that the prev_key denominations are the same of the target vault
+        validate_prev_keys(&e, &prev_key, &vault_key, &new_prev_key);
 
         let currency: Currency = e
             .currency(&vault_key.denomination)
@@ -506,6 +522,9 @@ impl VaultsContractTrait for VaultsContract {
     ) {
         e.bump_instance();
         vault_key.account.require_auth();
+
+        // We check that the prev_key denominations are the same of the target vault
+        validate_prev_keys(&e, &prev_key, &vault_key, &new_prev_key);
 
         let currency: Currency = e
             .currency(&vault_key.denomination)
@@ -600,6 +619,9 @@ impl VaultsContractTrait for VaultsContract {
     ) {
         e.bump_instance();
         vault_key.account.require_auth();
+
+        // We check that the prev_key denominations are the same of the target vault
+        validate_prev_keys(&e, &prev_key, &vault_key, &new_prev_key);
 
         let currency: Currency = e
             .currency(&vault_key.denomination)
