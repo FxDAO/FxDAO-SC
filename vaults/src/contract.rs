@@ -14,7 +14,6 @@ use crate::utils::vaults::{
     calculate_deposit_ratio, can_be_liquidated, create_and_insert_vault, get_vaults, search_vault,
     validate_prev_keys, withdraw_vault,
 };
-use num_integer::div_floor;
 use soroban_sdk::{contract, contractimpl, panic_with_error, Address, BytesN, Env, Symbol, Vec};
 
 use crate::oracle::PriceData;
@@ -575,7 +574,7 @@ impl VaultsContractTrait for VaultsContract {
 
         let new_collateral_value: u128 = (rate.price as u128) * target_vault.total_collateral;
 
-        let new_deposit_rate: u128 = div_floor(new_collateral_value, new_debt_amount);
+        let new_deposit_rate: u128 = new_collateral_value / new_debt_amount;
 
         if new_deposit_rate < vaults_info.opening_col_rate {
             panic_with_error!(&e, SCErrors::CollateralRateUnderMinimum);
@@ -758,7 +757,7 @@ impl VaultsContractTrait for VaultsContract {
         // Update the redeemable vaults information
         let fee: u128 = calc_fee(&core_state.fee, &lowest_vault.total_collateral);
         let collateral_to_withdraw: u128 =
-            div_floor(lowest_vault.total_debt * 10000000, rate.price as u128) - fee;
+            ((lowest_vault.total_debt * 10000000) / (rate.price as u128)) - fee;
 
         vaults_info.total_vaults = vaults_info.total_vaults - 1;
         vaults_info.total_col = vaults_info.total_col - lowest_vault.total_collateral;

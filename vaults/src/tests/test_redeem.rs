@@ -7,7 +7,6 @@ use crate::tests::test_utils::{
     InitialVariables, TestData,
 };
 use crate::utils::payments::calc_fee;
-use num_integer::div_floor;
 use soroban_sdk::testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation};
 use soroban_sdk::{symbol_short, token, Address, Env, IntoVal};
 
@@ -217,7 +216,7 @@ fn test_redeem() {
         200_0000000 - depositor_2_debt
     );
 
-    let collateral_withdrew: u128 = div_floor(depositor_2_debt * 10000000, rate);
+    let collateral_withdrew: u128 = (depositor_2_debt * 10000000) / rate;
     assert_eq!(
         data.collateral_token_client.balance(&redeem_user) as u128,
         collateral_withdrew

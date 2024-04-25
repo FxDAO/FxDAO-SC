@@ -2,7 +2,6 @@ use crate::errors::SCErrors;
 use crate::storage::vaults::{
     OptionalVaultKey, Vault, VaultIndexKey, VaultKey, VaultsFunc, VaultsInfo,
 };
-use num_integer::div_floor;
 use soroban_sdk::{panic_with_error, Address, Env, Symbol, Vec};
 
 // Creates and insert a Vault into the storage while updating the prev vault in case it exists.
@@ -216,12 +215,12 @@ pub fn withdraw_vault(e: &Env, vault: &Vault, prev_key: &OptionalVaultKey) {
 }
 
 pub fn calculate_deposit_ratio(currency_rate: &u128, collateral: &u128, debt: &u128) -> u128 {
-    div_floor(currency_rate * collateral, debt.clone())
+    currency_rate * collateral / debt.clone()
 }
 
 pub fn can_be_liquidated(user_vault: &Vault, vaults_info: &VaultsInfo, rate: &u128) -> bool {
     let collateral_value: u128 = rate * user_vault.total_collateral;
-    let deposit_rate: u128 = div_floor(collateral_value, user_vault.total_debt);
+    let deposit_rate: u128 = collateral_value / user_vault.total_debt;
     deposit_rate < vaults_info.min_col_rate
 }
 
