@@ -218,6 +218,10 @@ impl VaultsContractTrait for VaultsContract {
         e.bump_instance();
         e.core_state().unwrap().admin.require_auth();
 
+        if opening_col_rate <= min_col_rate {
+            panic_with_error!(&e, &SCErrors::InvalidOpeningCollateralRatio);
+        }
+
         match e.vaults_info(&denomination) {
             None => {
                 e.set_vaults_info(&VaultsInfo {
