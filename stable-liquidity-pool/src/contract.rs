@@ -244,7 +244,7 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         let pool_profit: u128 = fee - protocol_share;
         let new_total_deposited: u128 = core_state.total_deposited + pool_profit;
         let new_share_price: u128 =
-            (new_total_deposited * core_state.share_price) / core_state.total_deposited;
+            (new_total_deposited * core_state.share_price).div_ceil(core_state.total_deposited);
 
         core_state.share_price = new_share_price;
         core_state.total_deposited = new_total_deposited;
