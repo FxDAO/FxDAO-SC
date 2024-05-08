@@ -3,31 +3,32 @@
 mod vaults_properties {
     extern crate std;
 
-    use soroban_sdk::{token, Address, Env};
     use soroban_sdk::testutils::Address as _;
-
-    use num_integer::div_floor;
+    use soroban_sdk::{token, Address, Env};
 
     use crate::storage::vaults::*;
 
     use crate::utils::payments::calc_fee;
 
-    use crate::tests::test_utils::{TestData, InitialVariables};
-    use crate::tests::test_utils::{create_base_data, create_base_variables, set_initial_state, update_oracle_price};
+    use crate::tests::test_utils::{
+        create_base_data, create_base_variables, set_initial_state, update_oracle_price,
+    };
+    use crate::tests::test_utils::{InitialVariables, TestData};
 
     use proptest::prelude::*;
-    
+
     // Constants for the calling
     const FEE: u128 = 50000;
-    const OPENING_COL_RATE: u128 = 1_1500000; 
+    const OPENING_COL_RATE: u128 = 1_1500000;
 
     const DEPOSITOR_COLLATERAL: u128 = 3000_0000000;
     const DEPOSITOR_DEBT: u128 = 100_0000000;
     const DEPOSITOR_INDEX: u128 = 2985_0000000;
 
-    const DEPOSITOR_COLLATERAL_MINUS_FEE: u128 = DEPOSITOR_COLLATERAL - u128::div_ceil(DEPOSITOR_COLLATERAL * FEE, 1_0000000);
-    const MAX_RATE:u128 = u128::MAX / DEPOSITOR_COLLATERAL_MINUS_FEE;
-    const MIN_RATE:u128 = 1 + (OPENING_COL_RATE * DEPOSITOR_DEBT / DEPOSITOR_COLLATERAL_MINUS_FEE); 
+    const DEPOSITOR_COLLATERAL_MINUS_FEE: u128 =
+        DEPOSITOR_COLLATERAL - u128::div_ceil(DEPOSITOR_COLLATERAL * FEE, 1_0000000);
+    const MAX_RATE: u128 = u128::MAX / DEPOSITOR_COLLATERAL_MINUS_FEE;
+    const MIN_RATE: u128 = 1 + (OPENING_COL_RATE * DEPOSITOR_DEBT / DEPOSITOR_COLLATERAL_MINUS_FEE);
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(100))]
@@ -117,7 +118,7 @@ mod vaults_properties {
     }
 
     const RATE: u128 = 1_000_000;
-    const MAX_COLLATERAL:u128 = (i128::MAX as u128) / 1_000_000_000;
+    const MAX_COLLATERAL: u128 = (i128::MAX as u128) / 1_000_000_000;
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(100))]
@@ -132,7 +133,7 @@ mod vaults_properties {
 
             let depositor_collateral_minus_fees = depositor_collateral - calc_fee(&data.fee, &depositor_collateral);
             let depositor_debt = depositor_collateral / 1_000_000_000; // Little unsure abou t this
-            
+
             update_oracle_price(
                 &env,
                 &data.oracle_contract_client,
@@ -146,7 +147,7 @@ mod vaults_properties {
                 &base_variables.opening_col_rate,
                 &data.stable_token_denomination,
             );
-            
+
             // Depositors funds
             let depositor: Address = Address::generate(&env);
             token::StellarAssetClient::new(&env, &data.collateral_token_client.address)
@@ -174,7 +175,7 @@ mod vaults_properties {
             let vaults_info: VaultsInfo = data.contract_client.get_vaults_info(&data.stable_token_denomination);
             assert_eq!(vaults_info.total_col, depositor_collateral_minus_fees);
 
-            let depositor_index = div_floor(1_000_000_000 * depositor_collateral_minus_fees, depositor_debt);
+            let depositor_index = 1_000_000_000 * depositor_collateral_minus_fees / depositor_debt;
             assert_eq!(depositor_vault.index, depositor_index);
 
             let vault_key = VaultKey { index: depositor_index, account:depositor.clone(), denomination: data.stable_token_denomination.clone() };
@@ -219,7 +220,7 @@ mod duplicate_currency {
     fn test_duplicate_currency() {
         let env = Env::default();
         env.mock_all_auths();
-        let data:TestData = create_base_data(&env);
+        let data: TestData = create_base_data(&env);
 
         data.contract_client.init(
             &data.contract_admin,
@@ -234,34 +235,35 @@ mod duplicate_currency {
         let denomination = symbol_short!("usd");
         let contract = data.stable_token_client.address;
 
-
         // Create the initial currency with "usd"
-        data.contract_client.create_currency(
-            &denomination,
-            &contract,
-        );
+        data.contract_client
+            .create_currency(&denomination, &contract);
 
         let currency = data.contract_client.get_currency(&denomination);
 
         assert_eq!(currency.denomination, symbol_short!("usd"));
         assert_eq!(currency.contract, contract);
 
-        // Attempt to create new currency with different address, but "usd", expect fail 
+        // Attempt to create new currency with different address, but "usd", expect fail
         let random_addr = Address::generate(&env);
 
-        let duplicate_denomination = data.contract_client.try_create_currency(
-            &denomination, 
-            &random_addr
-        )
-        .unwrap_err()
-        .unwrap();
- 
-        assert_eq!(duplicate_denomination, SCErrors::CurrencyAlreadyAdded.into());
+        let duplicate_denomination = data
+            .contract_client
+            .try_create_currency(&denomination, &random_addr)
+            .unwrap_err()
+            .unwrap();
 
+        assert_eq!(
+            duplicate_denomination,
+            SCErrors::CurrencyAlreadyAdded.into()
+        );
 
         // Attempt to create new currency using same address, but "USD", expect pass even though it is duplicate
         let denomination_capitalised = symbol_short!("USD");
-        let fake_currency = match data.contract_client.try_get_currency(&denomination_capitalised) {
+        let fake_currency = match data
+            .contract_client
+            .try_get_currency(&denomination_capitalised)
+        {
             Ok(_) => unreachable!(),
             Err(e) => e.unwrap(),
         };
@@ -281,8 +283,8 @@ mod duplicate_currency {
 }
 
 mod weak_fairness {
-    /* These tests are to demonstrate that multiple orderings are currently possible for vaults when vaults have duplicate 
-    vault indices. These 3 tests show 3 different positions of a duplicate vault, where the duplicate vault is able to be 
+    /* These tests are to demonstrate that multiple orderings are currently possible for vaults when vaults have duplicate
+    vault indices. These 3 tests show 3 different positions of a duplicate vault, where the duplicate vault is able to be
     positioned before, inbetween, and after duplicates. */
 
     extern crate std;
@@ -300,12 +302,12 @@ mod weak_fairness {
     #[test]
     fn test_weak_fairness_position_1() {
         let env = Env::default();
-        let data= create_base_data(&env);
+        let data = create_base_data(&env);
 
-        let depositor_1:&Address = &Address::generate(&env); // Index: 3233_7500000
-        let depositor_2:&Address = &Address::generate(&env); // Index: 3233_7500000
-        let depositor_3:&Address = &Address::generate(&env); // Index: 1747_6464285
-        let depositor_4:&Address = &Address::generate(&env); // Index: 5970_0000000
+        let depositor_1: &Address = &Address::generate(&env); // Index: 3233_7500000
+        let depositor_2: &Address = &Address::generate(&env); // Index: 3233_7500000
+        let depositor_3: &Address = &Address::generate(&env); // Index: 1747_6464285
+        let depositor_4: &Address = &Address::generate(&env); // Index: 5970_0000000
 
         let depositors = [depositor_1, depositor_2, depositor_3, depositor_4];
         create_base_state(&env, &data, &depositors);
@@ -313,7 +315,13 @@ mod weak_fairness {
         // Fifth depositor (duplicated) // Index: 3233_7500000
         let depositor_5 = Address::generate(&env);
 
-        let expected_depositors = [depositor_3, &depositor_5, depositor_2, depositor_1, depositor_4];
+        let expected_depositors = [
+            depositor_3,
+            &depositor_5,
+            depositor_2,
+            depositor_1,
+            depositor_4,
+        ];
         //                                                     ^^^^^^^^^^^^
 
         insert_and_check_order(&depositor_5, depositor_3, &expected_depositors, &data)
@@ -322,12 +330,12 @@ mod weak_fairness {
     #[test]
     fn test_weak_fairness_position_2() {
         let env = Env::default();
-        let data= create_base_data(&env);
+        let data = create_base_data(&env);
 
-        let depositor_1:&Address = &Address::generate(&env); // Index: 3233_7500000
-        let depositor_2:&Address = &Address::generate(&env); // Index: 3233_7500000
-        let depositor_3:&Address = &Address::generate(&env); // Index: 1747_6464285
-        let depositor_4:&Address = &Address::generate(&env); // Index: 5970_0000000
+        let depositor_1: &Address = &Address::generate(&env); // Index: 3233_7500000
+        let depositor_2: &Address = &Address::generate(&env); // Index: 3233_7500000
+        let depositor_3: &Address = &Address::generate(&env); // Index: 1747_6464285
+        let depositor_4: &Address = &Address::generate(&env); // Index: 5970_0000000
 
         let depositors = [depositor_1, depositor_2, depositor_3, depositor_4];
         create_base_state(&env, &data, &depositors);
@@ -335,7 +343,13 @@ mod weak_fairness {
         // Fifth depositor (duplicated) // Index: 3233_7500000
         let depositor_5 = Address::generate(&env);
 
-        let expected_depositors = [depositor_3, depositor_2, &depositor_5, depositor_1, depositor_4];
+        let expected_depositors = [
+            depositor_3,
+            depositor_2,
+            &depositor_5,
+            depositor_1,
+            depositor_4,
+        ];
         //                                                                  ^^^^^^^^^^^^
 
         insert_and_check_order(&depositor_5, depositor_2, &expected_depositors, &data)
@@ -344,12 +358,12 @@ mod weak_fairness {
     #[test]
     fn test_weak_fairness_position_3() {
         let env = Env::default();
-        let data= create_base_data(&env);
+        let data = create_base_data(&env);
 
-        let depositor_1:&Address = &Address::generate(&env); // Index: 3233_7500000
-        let depositor_2:&Address = &Address::generate(&env); // Index: 3233_7500000
-        let depositor_3:&Address = &Address::generate(&env); // Index: 1747_6464285
-        let depositor_4:&Address = &Address::generate(&env); // Index: 5970_0000000
+        let depositor_1: &Address = &Address::generate(&env); // Index: 3233_7500000
+        let depositor_2: &Address = &Address::generate(&env); // Index: 3233_7500000
+        let depositor_3: &Address = &Address::generate(&env); // Index: 1747_6464285
+        let depositor_4: &Address = &Address::generate(&env); // Index: 5970_0000000
 
         let depositors = [depositor_1, depositor_2, depositor_3, depositor_4];
         create_base_state(&env, &data, &depositors);
@@ -357,7 +371,13 @@ mod weak_fairness {
         // Fifth depositor (duplicated) // Index: 3233_7500000
         let depositor_5 = Address::generate(&env);
 
-        let expected_depositors = [depositor_3, depositor_2, depositor_1, &depositor_5, depositor_4];
+        let expected_depositors = [
+            depositor_3,
+            depositor_2,
+            depositor_1,
+            &depositor_5,
+            depositor_4,
+        ];
         //                                                                               ^^^^^^^^^^^^
 
         insert_and_check_order(&depositor_5, depositor_1, &expected_depositors, &data)
@@ -518,16 +538,21 @@ mod weak_fairness {
                 vault = data.contract_client.get_vault_from_key(&key)
             }
         }
-
     }
 
-    fn insert_and_check_order(new_depositor:&Address, prev_depositor:&Address, expected_depositors: &[&Address], data: &TestData) {
-
+    fn insert_and_check_order(
+        new_depositor: &Address,
+        prev_depositor: &Address,
+        expected_depositors: &[&Address],
+        data: &TestData,
+    ) {
         let new_depositor_debt: u128 = 100_0000000;
         let new_depositor_collateral_amount: u128 = 3250_0000000;
 
-        data.collateral_token_admin_client
-            .mint(&new_depositor, &(new_depositor_collateral_amount as i128 * 2));
+        data.collateral_token_admin_client.mint(
+            &new_depositor,
+            &(new_depositor_collateral_amount as i128 * 2),
+        );
 
         let depositor_1_vault: Vault = data
             .contract_client
@@ -550,7 +575,6 @@ mod weak_fairness {
             .get_vault(&new_depositor, &data.stable_token_denomination);
 
         assert_eq!(depositor_5_vault.index, 3233_7500000);
-
 
         let vault_info = data
             .contract_client
@@ -576,6 +600,5 @@ mod weak_fairness {
                 vault = data.contract_client.get_vault_from_key(&key)
             }
         }
-
     }
 }
