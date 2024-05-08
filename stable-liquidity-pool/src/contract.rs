@@ -2,7 +2,6 @@ use crate::errors::SCErrors;
 use crate::storage::core::{CoreState, CoreStorageFunc, LockingState};
 use crate::storage::deposits::{Deposit, DepositsStorageFunc};
 use crate::utils::deposits::{make_deposit, make_withdrawal, validate_deposit_asset};
-use num_integer::{div_ceil, div_floor};
 use soroban_sdk::{
     contract, contractimpl, panic_with_error, token, Address, BytesN, Env, Map, Vec,
 };
@@ -87,13 +86,17 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         caller.require_auth();
         let mut core_state: CoreState = e._core_state().unwrap();
 
+        if amount_deposit < 1_0000000 {
+            panic_with_error!(&e, &SCErrors::InvalidDepositAmount);
+        }
+
         if !validate_deposit_asset(&core_state.accepted_assets, &asset) {
             panic_with_error!(&e, &SCErrors::InvalidAsset);
         }
 
         make_deposit(&e, &caller, &asset, &amount_deposit);
 
-        let shares_to_issue: u128 = div_floor(amount_deposit * 1_0000000, core_state.share_price);
+        let shares_to_issue: u128 = (amount_deposit * 1_0000000) / core_state.share_price;
         let mut deposit: Deposit = e._deposit(&caller).unwrap_or(Deposit {
             depositor: caller.clone(),
             locked: false,
@@ -101,6 +104,11 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
             snapshot: 0,
             shares: 0,
         });
+
+        if deposit.locked {
+            panic_with_error!(&e, &SCErrors::LockedDeposit)
+        }
+
         deposit.unlocks_at = e.ledger().timestamp() + (3600 * 48);
         deposit.shares = deposit.shares + shares_to_issue;
         e._set_deposit(&deposit);
@@ -121,10 +129,8 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         e._bump_instance();
         caller.require_auth();
         let mut core_state: CoreState = e._core_state().unwrap();
-        let calculated_amount_to_withdraw: u128 = div_floor(
-            shares_to_redeem * core_state.total_deposited,
-            core_state.total_shares,
-        );
+        let calculated_amount_to_withdraw: u128 =
+            (shares_to_redeem * core_state.total_deposited) / core_state.total_shares;
 
         let mut deposit: Deposit = e._deposit(&caller).unwrap_or(Deposit {
             depositor: caller.clone(),
@@ -180,6 +186,11 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         }
 
         core_state.total_deposited = core_state.total_deposited - withdraw_amount;
+
+        if core_state.total_deposited > 0 && core_state.total_deposited < 1_0000000 {
+            panic_with_error!(&e, &SCErrors::InvalidWithdraw);
+        }
+
         core_state.total_shares = core_state.total_shares - shares_to_redeem;
         if core_state.total_deposited == 0 && core_state.total_shares == 0 {
             core_state.share_price = 1_0000000;
@@ -217,8 +228,8 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
             panic_with_error!(&e, &SCErrors::InvalidAsset);
         }
 
-        let fee: u128 = div_ceil(amount * core_state.fee_percentage, 1_0000000);
-        let protocol_share: u128 = div_ceil(fee, 2);
+        let fee: u128 = (amount * core_state.fee_percentage).div_ceil(1_0000000);
+        let protocol_share: u128 = fee.div_ceil(2);
         let amount_to_exchange: u128 = amount - fee;
 
         make_deposit(&e, &caller, &from_asset, &amount);
@@ -232,10 +243,8 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
 
         let pool_profit: u128 = fee - protocol_share;
         let new_total_deposited: u128 = core_state.total_deposited + pool_profit;
-        let new_share_price: u128 = div_floor(
-            new_total_deposited * core_state.share_price,
-            core_state.total_deposited,
-        );
+        let new_share_price: u128 =
+            (new_total_deposited * core_state.share_price).div_ceil(core_state.total_deposited);
 
         core_state.share_price = new_share_price;
         core_state.total_deposited = new_total_deposited;
@@ -286,10 +295,7 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         locking_state.total -= deposit.shares;
         e._set_locking_state(&locking_state);
 
-        let reward: u128 = div_floor(
-            deposit.shares * (locking_state.factor - deposit.snapshot),
-            1_0000000,
-        );
+        let reward: u128 = (deposit.shares * (locking_state.factor - deposit.snapshot)) / 1_0000000;
 
         deposit.locked = false;
         deposit.snapshot = 0;
@@ -317,7 +323,7 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
 
         make_deposit(&e, &caller, &core_state.governance_token, &amt);
 
-        locking_state.factor += div_floor(amt * 1_0000000, locking_state.total);
+        locking_state.factor += (amt * 1_0000000) / locking_state.total;
         e._set_locking_state(&locking_state);
     }
 }

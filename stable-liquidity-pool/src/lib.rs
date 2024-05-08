@@ -1,7 +1,7 @@
 #![no_std]
 
-mod contract;
-mod errors;
-mod storage;
-mod tests;
-mod utils;
+pub mod contract;
+pub mod errors;
+pub mod storage;
+pub mod tests;
+pub mod utils;

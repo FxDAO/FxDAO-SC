@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{token, vec, Address, Env, Vec};
+use soroban_sdk::{token, Address, Env, Vec};
 use token::Client as TokenClient;
 use token::StellarAssetClient as TokenAdminClient;
 

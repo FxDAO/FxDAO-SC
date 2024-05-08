@@ -11,7 +11,6 @@ use crate::tests::test_utils::{
 use crate::errors::SCErrors;
 use crate::utils::indexes::calculate_user_vault_index;
 use crate::utils::payments::calc_fee;
-use num_integer::div_floor;
 use soroban_sdk::testutils::arbitrary::std::println;
 use soroban_sdk::testutils::{
     Address as _, AuthorizedFunction, AuthorizedInvocation, Ledger, LedgerInfo, MockAuth,
@@ -323,10 +322,7 @@ fn test_new_vault() {
 
     assert_eq!(
         user_vault.index,
-        div_floor(
-            1000000000 * (collateral_amount - calc_fee(&data.fee, &collateral_amount)),
-            initial_debt,
-        )
+        (1000000000 * (collateral_amount - calc_fee(&data.fee, &collateral_amount))) / initial_debt
     );
     assert_eq!(
         user_vault.total_collateral,
@@ -409,10 +405,7 @@ fn test_new_vault() {
 
     assert_eq!(
         second_user_vault.index,
-        div_floor(
-            1000000000 * (collateral_amount - calc_fee(&data.fee, &collateral_amount)),
-            initial_debt,
-        )
+        (1000000000 * (collateral_amount - calc_fee(&data.fee, &collateral_amount))) / initial_debt
     );
     assert_eq!(
         second_user_vault.total_collateral,

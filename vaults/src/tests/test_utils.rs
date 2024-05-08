@@ -11,7 +11,7 @@ use soroban_sdk::{symbol_short, token, Address, Env, Symbol, Vec};
 use token::Client as TokenClient;
 use token::StellarAssetClient as TokenAdminClient;
 
-fn create_token_contract<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, TokenAdminClient<'a>) {
+pub fn create_token_contract<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, TokenAdminClient<'a>) {
     let contract_address = e.register_stellar_asset_contract(admin.clone());
     (
         TokenClient::new(e, &contract_address),
@@ -93,7 +93,7 @@ pub fn create_base_data(env: &Env) -> TestData {
         protocol_manager,
         contract_client,
         treasury: Address::generate(&env),
-        fee: 50000,
+        fee: 50000, // 0.5%
         collateral_token_admin,
         collateral_token_client,
         collateral_token_admin_client,

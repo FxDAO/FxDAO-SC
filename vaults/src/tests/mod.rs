@@ -5,3 +5,6 @@ pub mod test_redeem;
 pub mod test_utils;
 pub mod test_vaults;
 pub mod test_vaults_indexes;
+pub mod test_runtime_verification;
+pub mod both_contracts;
+pub mod test_utils_runtime_verification;
