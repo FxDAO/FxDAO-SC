@@ -13,9 +13,5 @@ testutils = []
 soroban-sdk = { workspace = true }
 proptest = "1.0.0"
 
-[dependencies.num-integer]
-version = "0.1.45"
-default-features = false
-
 [dev_dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

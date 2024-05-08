@@ -5,6 +5,7 @@ use crate::storage::core::CoreState;
 use crate::storage::deposits::Deposit;
 use crate::tests::test_utils::{create_test_data, init_contract, prepare_test_accounts, TestData};
 use soroban_sdk::testutils::arbitrary::std;
+use soroban_sdk::testutils::arbitrary::std::println;
 use soroban_sdk::testutils::{
     Address as _, AuthorizedFunction, AuthorizedInvocation, Ledger, LedgerInfo,
 };
@@ -402,4 +403,93 @@ fn test_simple_withdrawals() {
     assert_eq!(&last_core_state.share_price, &1_0000000);
     assert_eq!(&last_core_state.total_deposited, &0);
     assert_eq!(&last_core_state.total_shares, &0);
+}
+
+#[test]
+fn test_share_price_withdrawals() {
+    let env: Env = Env::default();
+    env.mock_all_auths();
+
+    let test_data: TestData = create_test_data(&env);
+    init_contract(&env, &test_data);
+
+    let total_liquidity_amount: u128 = 1234_5678987;
+
+    let depositor: Address = Address::generate(&env);
+    test_data
+        .usdx_token_admin_client
+        .mint(&depositor, &(total_liquidity_amount as i128));
+
+    let swapper: Address = Address::generate(&env);
+    test_data
+        .usdc_token_admin_client
+        .mint(&swapper, &(total_liquidity_amount as i128 * 11));
+
+    let attacker: Address = Address::generate(&env);
+    let attacker_deposit_amount: u128 = 100_0000000u128;
+    test_data
+        .usdt_token_admin_client
+        .mint(&attacker, &(attacker_deposit_amount as i128));
+
+    test_data.stable_liquidity_pool_contract_client.deposit(
+        &depositor,
+        &test_data.usdx_token_client.address,
+        &total_liquidity_amount,
+    );
+
+    for i in 0..10 {
+        let from_asset: Address = if i % 2 == 0 {
+            test_data.usdc_token_client.address.clone()
+        } else {
+            test_data.usdx_token_client.address.clone()
+        };
+
+        let to_asset: Address = if i % 2 == 0 {
+            test_data.usdx_token_client.address.clone()
+        } else {
+            test_data.usdc_token_client.address.clone()
+        };
+
+        // The (37037037 * i) is just a simple way to reduce the amount to swap because we know the protocol keeps the fees in the input asset
+        let swap_amount: u128 = total_liquidity_amount - (37037037 * i);
+
+        test_data.stable_liquidity_pool_contract_client.swap(
+            &swapper,
+            &from_asset,
+            &to_asset,
+            &swap_amount,
+        );
+    }
+
+    test_data.stable_liquidity_pool_contract_client.deposit(
+        &attacker,
+        &test_data.usdt_token_client.address,
+        &attacker_deposit_amount,
+    );
+
+    env.ledger().set(LedgerInfo {
+        timestamp: 3600 * 24 * 3,
+        protocol_version: 1,
+        sequence_number: env.ledger().sequence() + 1,
+        network_id: Default::default(),
+        base_reserve: 10,
+        min_temp_entry_ttl: 1,
+        min_persistent_entry_ttl: 1,
+        max_entry_ttl: u32::MAX,
+    });
+
+    let attacker_deposit: Deposit = test_data
+        .stable_liquidity_pool_contract_client
+        .get_deposit(&attacker);
+
+    let pool_core_state: CoreState = test_data
+        .stable_liquidity_pool_contract_client
+        .get_core_state();
+
+    // The attacker needs to only be able to withdraw its deposit initial value or a lower amount
+    assert!(
+        attacker_deposit_amount
+            >= (attacker_deposit.shares * pool_core_state.total_deposited)
+                / pool_core_state.total_shares
+    );
 }
