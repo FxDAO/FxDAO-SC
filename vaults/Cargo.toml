@@ -6,8 +6,13 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+testutils = []
+
 [dependencies]
 soroban-sdk = { workspace = true }
+proptest = "1.0.0"
+stable-liquidity-pool = { path = "../stable-liquidity-pool" }
 
 [dependencies.num-integer]
 version = "0.1.45"
@@ -15,3 +20,4 @@ default-features = false
 
 [dev_dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+stable-liquidity-pool = { path = "../stable-liquidity-pool", features = ["testutils"] }

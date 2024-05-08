@@ -8,7 +8,7 @@ use soroban_sdk::testutils::arbitrary::std;
 use soroban_sdk::testutils::{
     Address as _, AuthorizedFunction, AuthorizedInvocation, Ledger, LedgerInfo,
 };
-use soroban_sdk::{map, symbol_short, vec, Address, Env, IntoVal, Vec};
+use soroban_sdk::{map, symbol_short, Address, Env, IntoVal, Vec};
 
 #[test]
 pub fn test_deposits() {
