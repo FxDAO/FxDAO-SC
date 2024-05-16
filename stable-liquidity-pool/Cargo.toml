@@ -4,14 +4,14 @@ version = "0.3.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [features]
 testutils = []
 
 [dependencies]
 soroban-sdk = { workspace = true }
-proptest = "1.0.0"
 
 [dev_dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+proptest = "1.0.0"
