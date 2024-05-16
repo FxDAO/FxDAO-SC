@@ -126,6 +126,11 @@ impl VaultsContractTrait for VaultsContract {
             panic_with_error!(&e, &SCErrors::CoreAlreadySet);
         }
 
+        // The protocol should not have a fee higher than 1%
+        if fee > 100000 {
+            panic_with_error!(&e, &SCErrors::InvalidFee);
+        }
+
         e.set_core_state(&CoreState {
             col_token,
             stable_issuer,

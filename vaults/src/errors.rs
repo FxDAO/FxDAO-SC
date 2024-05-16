@@ -7,6 +7,7 @@ pub enum SCErrors {
     PanicModeEnabled = 20,
     UnexpectedError = 50,
     CoreAlreadySet = 100,
+    InvalidFee = 101,
     VaultsInfoHasNotStarted = 200,
     ThereAreNoVaults = 201,
     InvalidMinDebtAmount = 300,
