@@ -52,6 +52,12 @@ impl StableLiquidityPoolContractTrait for StableLiquidityPoolContract {
         if e._core_state().is_some() {
             panic_with_error!(&e, SCErrors::ContractAlreadyInitiated);
         }
+
+        // The protocol should not have a fee higher than 5%
+        if fee_percentage > 500000 {
+            panic_with_error!(&e, &SCErrors::InvalidFee);
+        }
+
         e._set_core(&CoreState {
             admin,
             manager,

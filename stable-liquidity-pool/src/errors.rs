@@ -5,6 +5,7 @@ use soroban_sdk::contracterror;
 pub enum SCErrors {
     // Core Errors
     ContractAlreadyInitiated = 11,
+    InvalidFee = 12,
 
     // Deposits
     InvalidAsset = 21,
