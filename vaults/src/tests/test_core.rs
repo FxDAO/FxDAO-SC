@@ -115,3 +115,30 @@ fn test_site_updates() {
     let updated_core_state: CoreState = data.contract_client.get_core_state();
     assert_eq!(&updated_core_state.protocol_manager, &new_protocol_manager);
 }
+
+#[test]
+fn test_invalid_protocol_fee() {
+    let env: Env = Env::default();
+    env.mock_all_auths();
+
+    // Create the contract
+    let data: TestData = create_base_data(&env);
+
+    let fee_error = data
+        .contract_client
+        .try_init(
+            &data.contract_admin,
+            &data.protocol_manager,
+            &data.collateral_token_client.address,
+            &data.stable_token_issuer,
+            &data.treasury,
+            &0_0200000,
+            &data.oracle,
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(fee_error, SCErrors::InvalidFee.into());
+
+    // TODO: in the future if we allow updating this fee, we should test it here too
+}
