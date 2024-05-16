@@ -5,7 +5,6 @@ use crate::storage::core::CoreState;
 use crate::storage::deposits::Deposit;
 use crate::tests::test_utils::{create_test_data, init_contract, prepare_test_accounts, TestData};
 use soroban_sdk::testutils::arbitrary::std;
-use soroban_sdk::testutils::arbitrary::std::println;
 use soroban_sdk::testutils::{
     Address as _, AuthorizedFunction, AuthorizedInvocation, Ledger, LedgerInfo,
 };

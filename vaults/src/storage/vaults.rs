@@ -58,9 +58,8 @@ pub enum VaultsDataKeys {
     // Symbol is the denomination, not the asset code.
     VaultsInfo(Symbol),
 
-    // By using the index and denomination (VaultKey) we can get a Vault, all Vaults' indexes are unique.
-    // In cases where the index (collateral / debt) is the same as one already created, we add 1 to it until is unique
-    Vault(VaultKey),
+    // This tuple is the owner and the currency symbol
+    Vault((Address, Symbol)),
 
     // By using the combination of the denomination and the address (VaultIndexKey) we can get
     // the index of the vault so the user doesn't need to know the index of its own vault at all time
@@ -83,7 +82,7 @@ pub trait VaultsFunc {
 impl VaultsFunc for Env {
     fn bump_vault(&self, vault_key: &VaultKey) {
         self.storage().persistent().extend_ttl(
-            &VaultsDataKeys::Vault(vault_key.clone()),
+            &VaultsDataKeys::Vault((vault_key.account.clone(), vault_key.denomination.clone())),
             PERSISTENT_BUMP_CONSTANT_THRESHOLD,
             PERSISTENT_BUMP_CONSTANT,
         );
@@ -111,26 +110,24 @@ impl VaultsFunc for Env {
     }
 
     fn vault(&self, vault_key: &VaultKey) -> Option<Vault> {
-        self.storage()
-            .persistent()
-            .get(&VaultsDataKeys::Vault(vault_key.clone()))
+        self.storage().persistent().get(&VaultsDataKeys::Vault((
+            vault_key.account.clone(),
+            vault_key.denomination.clone(),
+        )))
     }
 
     fn set_vault(&self, vault: &Vault) {
         self.storage().persistent().set(
-            &VaultsDataKeys::Vault(VaultKey {
-                index: vault.index.clone(),
-                account: vault.account.clone(),
-                denomination: vault.denomination.clone(),
-            }),
+            &VaultsDataKeys::Vault((vault.account.clone(), vault.denomination.clone())),
             vault,
         );
     }
 
     fn remove_vault(&self, vault_key: &VaultKey) {
-        self.storage()
-            .persistent()
-            .remove(&VaultsDataKeys::Vault(vault_key.clone()));
+        self.storage().persistent().remove(&VaultsDataKeys::Vault((
+            vault_key.account.clone(),
+            vault_key.denomination.clone(),
+        )));
     }
 
     fn set_vault_index(&self, vault_key: &VaultKey) {
