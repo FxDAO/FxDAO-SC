@@ -109,7 +109,7 @@ proptest! {
             )
             .unwrap_err()
             .unwrap();
-        
+
         // Locking period should still be in effect
         assert_eq!(locker_period_uncompleted, SCErrors::LockedPeriodUncompleted.into());
 
