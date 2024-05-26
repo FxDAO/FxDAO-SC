@@ -33,8 +33,7 @@ pub trait VaultsContractTrait {
 
     fn get_core_state(e: Env) -> CoreState;
 
-    fn set_admin(e: Env, address: Address);
-    fn set_protocol_manager(e: Env, address: Address);
+    fn set_address(e: Env, typ: u32, address: Address);
 
     fn upgrade(e: Env, hash: BytesN<32>);
     fn set_panic(e: Env, status: bool);
@@ -148,19 +147,23 @@ impl VaultsContractTrait for VaultsContract {
         e.core_state().unwrap()
     }
 
-    fn set_admin(e: Env, address: Address) {
+    fn set_address(e: Env, typ: u32, address: Address) {
         e.bump_instance();
         let mut core_state: CoreState = e.core_state().unwrap();
-        core_state.admin.require_auth();
-        core_state.admin = address;
-        e.set_core_state(&core_state);
-    }
 
-    fn set_protocol_manager(e: Env, address: Address) {
-        e.bump_instance();
-        let mut core_state: CoreState = e.core_state().unwrap();
-        core_state.protocol_manager.require_auth();
-        core_state.protocol_manager = address;
+        if typ == 0 {
+            core_state.admin.require_auth();
+            core_state.admin = address;
+        } else if typ == 1 {
+            core_state.protocol_manager.require_auth();
+            core_state.protocol_manager = address;
+        } else if typ == 2 {
+            core_state.protocol_manager.require_auth();
+            core_state.oracle = address;
+        } else {
+            panic!();
+        }
+
         e.set_core_state(&core_state);
     }
 
@@ -840,9 +843,10 @@ impl VaultsContractTrait for VaultsContract {
         e.set_vaults_info(&vaults_info);
         burn_stablecoin(&e, &currency, &liquidator, amount_to_deposit as i128);
 
-        let end_collateral: u128 =
-            collateral_to_withdraw - calc_fee(&core_state.fee, &collateral_to_withdraw);
+        let fee: u128 = calc_fee(&core_state.fee, &collateral_to_withdraw);
+        let end_collateral: u128 = collateral_to_withdraw - fee;
         withdraw_collateral(&e, &core_state, &liquidator, end_collateral as i128);
+        pay_fee(&e, &core_state, &e.current_contract_address(), fee as i128);
 
         vaults_to_liquidate
     }

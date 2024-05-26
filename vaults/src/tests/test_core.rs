@@ -73,7 +73,7 @@ fn test_site_updates() {
     assert_eq!(&core_state.admin, &data.contract_admin);
 
     let new_admin: Address = Address::generate(&env);
-    data.contract_client.set_admin(&new_admin);
+    data.contract_client.set_address(&0, &new_admin);
 
     assert_eq!(
         env.auths().first().unwrap(),
@@ -82,8 +82,8 @@ fn test_site_updates() {
             AuthorizedInvocation {
                 function: AuthorizedFunction::Contract((
                     data.contract_client.address.clone(),
-                    Symbol::new(&env, "set_admin"),
-                    (new_admin.clone(),).into_val(&env),
+                    Symbol::new(&env, "set_address"),
+                    (0, new_admin.clone()).into_val(&env),
                 )),
                 sub_invocations: std::vec![],
             }
@@ -94,8 +94,7 @@ fn test_site_updates() {
     assert_eq!(&updated_core_state.admin, &new_admin);
 
     let new_protocol_manager: Address = Address::generate(&env);
-    data.contract_client
-        .set_protocol_manager(&new_protocol_manager);
+    data.contract_client.set_address(&1, &new_protocol_manager);
 
     assert_eq!(
         env.auths().first().unwrap(),
@@ -104,8 +103,8 @@ fn test_site_updates() {
             AuthorizedInvocation {
                 function: AuthorizedFunction::Contract((
                     data.contract_client.address.clone(),
-                    Symbol::new(&env, "set_protocol_manager"),
-                    (new_protocol_manager.clone(),).into_val(&env),
+                    Symbol::new(&env, "set_address"),
+                    (1, new_protocol_manager.clone()).into_val(&env),
                 )),
                 sub_invocations: std::vec![],
             }
