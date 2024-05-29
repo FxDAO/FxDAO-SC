@@ -83,7 +83,7 @@ fn test_site_updates() {
                 function: AuthorizedFunction::Contract((
                     data.contract_client.address.clone(),
                     Symbol::new(&env, "set_address"),
-                    (0, new_admin.clone()).into_val(&env),
+                    (0u32, new_admin.clone()).into_val(&env),
                 )),
                 sub_invocations: std::vec![],
             }
@@ -104,7 +104,7 @@ fn test_site_updates() {
                 function: AuthorizedFunction::Contract((
                     data.contract_client.address.clone(),
                     Symbol::new(&env, "set_address"),
-                    (1, new_protocol_manager.clone()).into_val(&env),
+                    (1u32, new_protocol_manager.clone()).into_val(&env),
                 )),
                 sub_invocations: std::vec![],
             }
