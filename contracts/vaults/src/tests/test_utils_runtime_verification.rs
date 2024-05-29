@@ -15,7 +15,7 @@ use crate::tests::test_utils::{create_token_contract, update_oracle_price};
 
 mod stable_liquidity_pool {
     soroban_sdk::contractimport!(
-        file = "../target/wasm32-unknown-unknown/release/stable_liquidity_pool.wasm"
+        file = "../../target/wasm32-unknown-unknown/release/stable_liquidity_pool.wasm"
     );
 }
 use stable_liquidity_pool::Client as StableLiquidityPoolContractClient;

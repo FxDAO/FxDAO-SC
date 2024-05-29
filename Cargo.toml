@@ -3,8 +3,8 @@ resolver = "2"
 
 members = [
     #    "safety-pool",
-    "stable-liquidity-pool",
-    "vaults",
+    "contracts/stable-liquidity-pool",
+    "contracts/vaults",
     #    "governance",
 ]
 

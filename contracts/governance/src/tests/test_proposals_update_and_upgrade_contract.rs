@@ -17,12 +17,12 @@ use token::Client as TokenClient;
 use token::StellarAssetClient as TokenAdminClient;
 
 mod vaults {
-    soroban_sdk::contractimport!(file = "../target/wasm32-unknown-unknown/release/vaults.wasm");
+    soroban_sdk::contractimport!(file = "../../target/wasm32-unknown-unknown/release/vaults.wasm");
 }
 
 mod safety_pool {
     soroban_sdk::contractimport!(
-        file = "../target/wasm32-unknown-unknown/release/safety_pool.wasm"
+        file = "../../target/wasm32-unknown-unknown/release/safety_pool.wasm"
     );
 }
 
