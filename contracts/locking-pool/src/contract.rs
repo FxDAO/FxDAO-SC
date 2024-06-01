@@ -3,15 +3,16 @@ use crate::storage::core::{CoreDataKeys, CoreStorageFunc};
 use crate::storage::deposits::{Deposit, DepositsStorageFunc};
 use crate::storage::pools::{Pool, PoolsDataFunc};
 use crate::utils::core::validate;
-use log::error;
 use soroban_sdk::{contract, contractimpl, panic_with_error, token, Address, BytesN, Env};
 
 pub trait LockingPoolContractTrait {
     fn upgrade(e: Env, hash: BytesN<32>);
     fn set_admin(e: Env, address: Address);
     fn set_manager(e: Env, address: Address);
-    fn add_pool(e: Env, deposit_asset: Address, lock_period: u64, min_deposit: u128);
+    fn set_rewards_asset(e: Env, address: Address);
+    fn set_pool(e: Env, deposit_asset: Address, lock_period: u64, min_deposit: u128);
     fn toggle_pool(e: Env, deposit_asset: Address, status: bool);
+    fn remove_pool(e: Env, deposit_asset: Address);
     fn deposit(e: Env, deposit_asset: Address, caller: Address, amount: u128);
     fn withdraw(e: Env, deposit_asset: Address, caller: Address);
     fn distribute(e: Env, deposit_asset: Address, amount: u128);
@@ -46,18 +47,40 @@ impl LockingPoolContractTrait for LockingPoolContract {
         e._core().bump();
     }
 
-    fn add_pool(e: Env, deposit_asset: Address, lock_period: u64, min_deposit: u128) {
+    fn set_rewards_asset(e: Env, address: Address) {
+        if e._core().address(&CoreDataKeys::RewardsAsset).is_some() {
+            panic_with_error!(&e, &ContractErrors::CanNotUpdateRewardsAsset);
+        }
+
+        e._core().set_address(&CoreDataKeys::RewardsAsset, &address);
+        e._core().bump();
+    }
+
+    fn set_pool(e: Env, deposit_asset: Address, lock_period: u64, min_deposit: u128) {
         validate(&e, CoreDataKeys::Manager);
 
-        let new_pool: Pool = Pool {
-            active: false,
-            asset: deposit_asset,
-            balance: 0,
-            deposits: 0,
-            factor: 0,
-            lock_period,
-            min_deposit,
-        };
+        let new_pool: Pool;
+        if let Some(pool) = e._pools().pool(&deposit_asset) {
+            new_pool = Pool {
+                active: pool.active,
+                asset: pool.asset,
+                balance: pool.balance,
+                deposits: pool.deposits,
+                factor: pool.factor,
+                lock_period,
+                min_deposit,
+            };
+        } else {
+            new_pool = Pool {
+                active: false,
+                asset: deposit_asset,
+                balance: 0,
+                deposits: 0,
+                factor: 0,
+                lock_period,
+                min_deposit,
+            };
+        }
 
         e._pools().set_pool(&new_pool);
         e._pools().bump_pool(&new_pool.asset);
@@ -75,6 +98,22 @@ impl LockingPoolContractTrait for LockingPoolContract {
 
         e._pools().set_pool(&pool);
         e._pools().bump_pool(&pool.asset);
+        e._core().bump();
+    }
+
+    fn remove_pool(e: Env, deposit_asset: Address) {
+        validate(&e, CoreDataKeys::Manager);
+
+        let pool: Pool = e._pools().pool(&deposit_asset).unwrap_or_else(|| {
+            panic_with_error!(&e, &ContractErrors::PoolDoesntExist);
+        });
+
+        if pool.deposits > 0 {
+            panic_with_error!(&e, &ContractErrors::PoolCanNotBeDeleted);
+        }
+
+        e._pools().remove_pool(&deposit_asset);
+
         e._core().bump();
     }
 

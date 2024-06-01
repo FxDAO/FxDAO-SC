@@ -40,6 +40,13 @@ impl Pools {
             .set(&PoolDataKeys::Pool(pool.asset.clone()), pool);
     }
 
+    pub fn remove_pool(&self, address: &Address) {
+        self.env
+            .storage()
+            .persistent()
+            .remove(&PoolDataKeys::Pool(address.clone()));
+    }
+
     pub fn bump_pool(&self, address: &Address) {
         self.env.storage().persistent().extend_ttl(
             &PoolDataKeys::Pool(address.clone()),
