@@ -53,6 +53,11 @@ pub fn create_and_insert_vault(
                     OptionalVaultKey::Some(key) => key,
                 };
 
+                // If Prev key index is higher than the new vault index, we panic because the prev key index can not be higher than the enw vault's index
+                if new_vault_key.index < prev_key.index {
+                    panic_with_error!(&e, &SCErrors::InvalidPrevVaultIndex);
+                }
+
                 let mut prev_vault: Vault = e
                     .vault(&prev_key)
                     .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::PrevVaultDoesntExist));

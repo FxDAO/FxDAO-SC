@@ -67,9 +67,9 @@ pub fn create_test_data<'a>(e: &Env) -> TestData<'a> {
 }
 
 pub fn init_contract(test_data: &TestData) {
-    test_data.contract_client.set_admin(&test_data.admin);
-    test_data.contract_client.set_manager(&test_data.manager);
-    test_data
-        .contract_client
-        .set_rewards_asset(&test_data.rewards_asset_client.address);
+    test_data.contract_client.init(
+        &test_data.admin,
+        &test_data.manager,
+        &test_data.rewards_asset_client.address,
+    );
 }

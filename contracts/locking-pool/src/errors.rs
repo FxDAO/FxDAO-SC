@@ -16,7 +16,7 @@ pub enum ContractErrors {
     CantDistributeReward = 9,
     RewardsDepositFailed = 10,
     PoolDoesntAcceptDeposits = 11,
-    CanNotUpdateRewardsAsset = 12,
-    PoolAlreadyExists = 13,
-    PoolCanNotBeDeleted = 14,
+    PoolAlreadyExists = 12,
+    PoolCanNotBeDeleted = 13,
+    AlreadyStarted = 14,
 }

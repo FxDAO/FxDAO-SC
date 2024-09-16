@@ -63,15 +63,4 @@ pub fn test_core_updates_validations() {
             },
         }])
         .set_manager(&new_manager);
-
-    let reward_asset_cant_be_updated_error = test_data
-        .contract_client
-        .try_set_rewards_asset(&new_rewards_asset)
-        .unwrap_err()
-        .unwrap();
-
-    assert_eq!(
-        reward_asset_cant_be_updated_error,
-        ContractErrors::CanNotUpdateRewardsAsset.into()
-    );
 }

@@ -38,6 +38,8 @@ pub trait VaultsContractTrait {
     fn upgrade(e: Env, hash: BytesN<32>);
     fn set_panic(e: Env, status: bool);
 
+    fn set_next_key(e: Env, target_key: VaultKey, next_key: OptionalVaultKey);
+
     // Currencies methods
     fn create_currency(e: Env, denomination: Symbol, contract: Address);
     fn get_currency(e: Env, denomination: Symbol) -> Currency;
@@ -179,6 +181,24 @@ impl VaultsContractTrait for VaultsContract {
         let mut core_state: CoreState = e.core_state().unwrap();
         core_state.panic_mode = status;
         e.set_core_state(&core_state);
+    }
+
+    // This is an admin function, make sure the next key is correct before setting it.
+    fn set_next_key(e: Env, target_key: VaultKey, next_key: OptionalVaultKey) {
+        e.bump_instance();
+        e.core_state().unwrap().protocol_manager.require_auth();
+
+        validate_prev_keys(&e, &OptionalVaultKey::None, &target_key, &next_key);
+
+        let mut target_vault: Vault = e.vault(&target_key).unwrap();
+        target_vault.next_key = next_key;
+
+        e.set_vault(&target_vault);
+        e.bump_vault(&target_key);
+        e.bump_vault_index(&VaultIndexKey {
+            user: target_key.account.clone(),
+            denomination: target_key.denomination.clone(),
+        });
     }
 
     fn create_currency(e: Env, denomination: Symbol, contract: Address) {

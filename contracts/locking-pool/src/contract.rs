@@ -6,10 +6,10 @@ use crate::utils::core::validate;
 use soroban_sdk::{contract, contractimpl, panic_with_error, token, Address, BytesN, Env};
 
 pub trait LockingPoolContractTrait {
+    fn init(e: Env, admin: Address, manager: Address, reward_asset: Address);
     fn upgrade(e: Env, hash: BytesN<32>);
     fn set_admin(e: Env, address: Address);
     fn set_manager(e: Env, address: Address);
-    fn set_rewards_asset(e: Env, address: Address);
     fn set_pool(e: Env, deposit_asset: Address, lock_period: u64, min_deposit: u128);
     fn toggle_pool(e: Env, deposit_asset: Address, status: bool);
     fn remove_pool(e: Env, deposit_asset: Address);
@@ -23,6 +23,19 @@ pub struct LockingPoolContract;
 
 #[contractimpl]
 impl LockingPoolContractTrait for LockingPoolContract {
+    fn init(e: Env, admin: Address, manager: Address, reward_asset: Address) {
+        if e._core().address(&CoreDataKeys::Admin).is_some() {
+            panic_with_error!(&e, &ContractErrors::AlreadyStarted);
+        }
+
+        e._core().set_address(&CoreDataKeys::Admin, &admin);
+        e._core().set_address(&CoreDataKeys::Manager, &manager);
+        e._core()
+            .set_address(&CoreDataKeys::RewardsAsset, &reward_asset);
+
+        e._core().bump();
+    }
+
     fn upgrade(e: Env, hash: BytesN<32>) {
         validate(&e, CoreDataKeys::Manager);
         e.deployer().update_current_contract_wasm(hash);
@@ -44,15 +57,6 @@ impl LockingPoolContractTrait for LockingPoolContract {
         }
 
         e._core().set_address(&CoreDataKeys::Manager, &address);
-        e._core().bump();
-    }
-
-    fn set_rewards_asset(e: Env, address: Address) {
-        if e._core().address(&CoreDataKeys::RewardsAsset).is_some() {
-            panic_with_error!(&e, &ContractErrors::CanNotUpdateRewardsAsset);
-        }
-
-        e._core().set_address(&CoreDataKeys::RewardsAsset, &address);
         e._core().bump();
     }
 
