@@ -2,10 +2,9 @@
 resolver = "2"
 
 members = [
-    #    "safety-pool",
+    "contracts/locking-pool",
     "contracts/stable-liquidity-pool",
     "contracts/vaults",
-    #    "governance",
 ]
 
 [profile.release-with-logs]
@@ -23,4 +22,4 @@ codegen-units = 1
 lto = true
 
 [workspace.dependencies.soroban-sdk]
-version = "20.5.0"
+version = "21.5.0"
