@@ -1,6 +1,7 @@
 use soroban_sdk::{contracttype, Address, Env};
 
 #[contracttype]
+#[derive(Debug, PartialEq)]
 pub struct Pool {
     pub active: bool,
     pub asset: Address,

@@ -1,3 +1,4 @@
+mod test_cloning;
 mod test_core;
 mod test_deposits;
 mod test_distribute;

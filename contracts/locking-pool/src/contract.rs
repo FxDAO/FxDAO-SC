@@ -3,7 +3,7 @@ use crate::storage::core::{CoreDataKeys, CoreStorageFunc};
 use crate::storage::deposits::{Deposit, DepositsStorageFunc};
 use crate::storage::pools::{Pool, PoolsDataFunc};
 use crate::utils::core::validate;
-use soroban_sdk::{contract, contractimpl, panic_with_error, token, Address, BytesN, Env};
+use soroban_sdk::{contract, contractimpl, panic_with_error, token, Address, BytesN, Env, Vec};
 
 pub trait LockingPoolContractTrait {
     fn init(e: Env, admin: Address, manager: Address, reward_asset: Address);
@@ -11,8 +11,10 @@ pub trait LockingPoolContractTrait {
     fn set_admin(e: Env, address: Address);
     fn set_manager(e: Env, address: Address);
     fn set_pool(e: Env, deposit_asset: Address, lock_period: u64, min_deposit: u128);
+    fn clone_pool(e: Env, existing_asset: Address, new_asset: Address);
     fn toggle_pool(e: Env, deposit_asset: Address, status: bool);
     fn remove_pool(e: Env, deposit_asset: Address);
+    fn migrate_deposits(e: Env, old_asset: Address, new_asset: Address, depositors: Vec<Address>);
     fn deposit(e: Env, deposit_asset: Address, caller: Address, amount: u128);
     fn withdraw(e: Env, deposit_asset: Address, caller: Address);
     fn distribute(e: Env, deposit_asset: Address, amount: u128);
@@ -91,6 +93,27 @@ impl LockingPoolContractTrait for LockingPoolContract {
         e._core().bump();
     }
 
+    fn clone_pool(e: Env, existing_asset: Address, new_asset: Address) {
+        validate(&e, CoreDataKeys::Manager);
+        let existing_pool: Pool = e._pools().pool(&existing_asset).unwrap_or_else(|| {
+            panic_with_error!(&e, &ContractErrors::PoolDoesntExist);
+        });
+
+        let new_pool: Pool = Pool {
+            active: false,
+            asset: new_asset,
+            balance: existing_pool.balance,
+            deposits: existing_pool.deposits,
+            factor: existing_pool.factor,
+            lock_period: existing_pool.lock_period,
+            min_deposit: existing_pool.min_deposit,
+        };
+
+        e._pools().set_pool(&new_pool);
+        e._pools().bump_pool(&new_pool.asset);
+        e._core().bump();
+    }
+
     fn toggle_pool(e: Env, deposit_asset: Address, status: bool) {
         validate(&e, CoreDataKeys::Admin);
 
@@ -119,6 +142,31 @@ impl LockingPoolContractTrait for LockingPoolContract {
         e._pools().remove_pool(&deposit_asset);
 
         e._core().bump();
+    }
+
+    fn migrate_deposits(e: Env, old_asset: Address, new_asset: Address, depositors: Vec<Address>) {
+        validate(&e, CoreDataKeys::Manager);
+
+        e._pools().pool(&old_asset).unwrap_or_else(|| {
+            panic_with_error!(&e, &ContractErrors::PoolDoesntExist);
+        });
+
+        e._pools().pool(&new_asset).unwrap_or_else(|| {
+            panic_with_error!(&e, &ContractErrors::PoolDoesntExist);
+        });
+
+        for depositor in depositors.iter() {
+            let old_deposit: Deposit =
+                e._deposits()
+                    .get(&old_asset, &depositor)
+                    .unwrap_or_else(|| {
+                        panic_with_error!(&e, &ContractErrors::DepositDoesntExist);
+                    });
+
+            e._deposits().set(&new_asset, &depositor, &old_deposit);
+            e._deposits().bump(&new_asset, &depositor);
+            e._deposits().remove(&old_asset, &depositor);
+        }
     }
 
     fn deposit(e: Env, deposit_asset: Address, caller: Address, amount: u128) {

@@ -1,6 +1,5 @@
 #![cfg(test)]
 
-use crate::errors::ContractErrors;
 use crate::storage::core::{CoreDataKeys, CoreStorageFunc};
 use crate::tests::test_utils::{create_test_data, init_contract, TestData};
 use soroban_sdk::testutils::{Address as _, MockAuth, MockAuthInvoke};
@@ -30,7 +29,6 @@ pub fn test_core_updates_validations() {
 
     let new_admin: Address = Address::generate(&e);
     let new_manager: Address = Address::generate(&e);
-    let new_rewards_asset: Address = Address::generate(&e);
 
     let no_admin_signature_error = test_data.contract_client.try_set_admin(&new_admin);
     assert!(no_admin_signature_error.is_err());

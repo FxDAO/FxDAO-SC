@@ -1,6 +1,7 @@
 use soroban_sdk::{contracttype, Address, Env};
 
 #[contracttype]
+#[derive(Debug)]
 pub struct Deposit {
     pub amount: u128,
     pub unlocks_at: u64,
