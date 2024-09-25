@@ -17,6 +17,9 @@ use crate::utils::vaults::{
 use soroban_sdk::{contract, contractimpl, panic_with_error, Address, BytesN, Env, Symbol, Vec};
 
 use crate::oracle::PriceData;
+use crate::utils::validations::{
+    assert_col_rate_under_min, assert_regular_vault_updates_validations,
+};
 
 // TODO: Explain each function here
 pub trait VaultsContractTrait {
@@ -73,6 +76,13 @@ pub trait VaultsContractTrait {
         only_to_liquidate: bool,
     ) -> Vec<Vault>;
     fn increase_collateral(
+        e: Env,
+        prev_key: OptionalVaultKey,
+        vault_key: VaultKey,
+        new_prev_key: OptionalVaultKey,
+        amount: u128,
+    );
+    fn withdraw_collateral(
         e: Env,
         prev_key: OptionalVaultKey,
         vault_key: VaultKey,
@@ -464,9 +474,6 @@ impl VaultsContractTrait for VaultsContract {
         e.bump_instance();
         vault_key.account.require_auth();
 
-        // We check that the prev_key denominations are the same of the target vault
-        validate_prev_keys(&e, &prev_key, &vault_key, &new_prev_key);
-
         let currency: Currency = e
             .currency(&vault_key.denomination)
             .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::CurrencyDoesntExist));
@@ -490,11 +497,6 @@ impl VaultsContractTrait for VaultsContract {
         let (target_vault, target_vault_key, _) =
             search_vault(&e, &vault_key.account, &vault_key.denomination);
 
-        // TODO: Test this
-        if target_vault.index != vault_key.index {
-            panic_with_error!(&e, &SCErrors::IndexProvidedIsNotTheOneSaved);
-        }
-
         let mut vaults_info: VaultsInfo = e.vaults_info(&target_vault_key.denomination).unwrap();
 
         let lowest_key = match vaults_info.lowest_key.clone() {
@@ -503,10 +505,15 @@ impl VaultsContractTrait for VaultsContract {
             OptionalVaultKey::Some(key) => key,
         };
 
-        // If prev_key is None, the target Vault needs to be the lowest vault otherwise panic
-        if prev_key == OptionalVaultKey::None && target_vault_key != lowest_key {
-            panic_with_error!(&e, &SCErrors::PrevVaultCantBeNone);
-        }
+        assert_regular_vault_updates_validations(
+            &e,
+            &target_vault,
+            &target_vault_key,
+            &prev_key,
+            &vault_key,
+            &new_prev_key,
+            &lowest_key,
+        );
 
         withdraw_vault(&e, &target_vault, &prev_key);
 
@@ -544,7 +551,7 @@ impl VaultsContractTrait for VaultsContract {
         e.bump_vault_index(&updated_target_vault_index_key);
     }
 
-    fn increase_debt(
+    fn withdraw_collateral(
         e: Env,
         prev_key: OptionalVaultKey,
         vault_key: VaultKey,
@@ -553,9 +560,6 @@ impl VaultsContractTrait for VaultsContract {
     ) {
         e.bump_instance();
         vault_key.account.require_auth();
-
-        // We check that the prev_key denominations are the same of the target vault
-        validate_prev_keys(&e, &prev_key, &vault_key, &new_prev_key);
 
         let currency: Currency = e
             .currency(&vault_key.denomination)
@@ -567,11 +571,6 @@ impl VaultsContractTrait for VaultsContract {
 
         let (target_vault, target_vault_key, _) =
             search_vault(&e, &vault_key.account, &vault_key.denomination);
-
-        // TODO: Test this
-        if target_vault.index != vault_key.index {
-            panic_with_error!(&e, &SCErrors::IndexProvidedIsNotTheOneSaved);
-        }
 
         let core_state: CoreState = e.core_state().unwrap();
 
@@ -590,10 +589,110 @@ impl VaultsContractTrait for VaultsContract {
             OptionalVaultKey::Some(key) => key,
         };
 
-        // If prev_key is None, the target Vault needs to be the lowest vault otherwise panic
-        if prev_key == OptionalVaultKey::None && target_vault_key != lowest_key {
-            panic_with_error!(&e, &SCErrors::PrevVaultCantBeNone);
+        assert_regular_vault_updates_validations(
+            &e,
+            &target_vault,
+            &target_vault_key,
+            &prev_key,
+            &vault_key,
+            &new_prev_key,
+            &lowest_key,
+        );
+
+        withdraw_vault(&e, &target_vault, &prev_key);
+
+        // If the target vault is the lowest, we update the lowest value
+        if lowest_key == target_vault_key {
+            vaults_info.lowest_key = target_vault.next_key.clone();
         }
+
+        let new_collateral_amount: u128 = target_vault.total_collateral.saturating_sub(amount);
+
+        assert_col_rate_under_min(
+            &e,
+            &rate.price,
+            &target_vault.total_debt,
+            &new_collateral_amount,
+            &vaults_info.opening_col_rate,
+        );
+
+        // We send the remaining collateral to the owner of the Vault
+        withdraw_collateral(&e, &core_state, &vault_key.account, amount as i128);
+
+        let new_vault_key: VaultKey = VaultKey {
+            index: calculate_user_vault_index(
+                target_vault.total_debt.clone(),
+                new_collateral_amount.clone(),
+            ),
+            account: target_vault.account,
+            denomination: target_vault.denomination,
+        };
+
+        let (_, updated_target_vault_key, updated_target_vault_index_key, updated_lowest_key) =
+            create_and_insert_vault(
+                &e,
+                &vaults_info.lowest_key,
+                &new_vault_key,
+                &new_prev_key,
+                target_vault.total_debt.clone(),
+                new_collateral_amount.clone(),
+            );
+
+        vaults_info.lowest_key = updated_lowest_key;
+        vaults_info.total_col = vaults_info.total_col - amount;
+        e.set_vaults_info(&vaults_info);
+
+        e.bump_vault(&updated_target_vault_key);
+        e.bump_vault_index(&updated_target_vault_index_key);
+    }
+
+    fn increase_debt(
+        e: Env,
+        prev_key: OptionalVaultKey,
+        vault_key: VaultKey,
+        new_prev_key: OptionalVaultKey,
+        amount: u128,
+    ) {
+        e.bump_instance();
+        vault_key.account.require_auth();
+
+        let currency: Currency = e
+            .currency(&vault_key.denomination)
+            .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::CurrencyDoesntExist));
+
+        if !currency.active {
+            panic_with_error!(&e, &SCErrors::CurrencyIsInactive);
+        }
+
+        let (target_vault, target_vault_key, _) =
+            search_vault(&e, &vault_key.account, &vault_key.denomination);
+
+        let core_state: CoreState = e.core_state().unwrap();
+
+        let rate: PriceData = get_currency_rate(&e, &core_state, &target_vault.denomination);
+
+        // If price of the collateral hasn't been updated in more than 20 minutes or the protocol is in panic mode we throw
+        if core_state.panic_mode || rate.timestamp < e.ledger().timestamp().saturating_sub(1200) {
+            panic_with_error!(&e, &SCErrors::PanicModeEnabled);
+        }
+
+        let mut vaults_info: VaultsInfo = e.vaults_info(&target_vault.denomination).unwrap();
+
+        let lowest_key = match vaults_info.lowest_key.clone() {
+            // It should be impossible to reach this case, but just in case we panic if it happens.
+            OptionalVaultKey::None => panic_with_error!(&e, &SCErrors::ThereAreNoVaults),
+            OptionalVaultKey::Some(key) => key,
+        };
+
+        assert_regular_vault_updates_validations(
+            &e,
+            &target_vault,
+            &target_vault_key,
+            &prev_key,
+            &vault_key,
+            &new_prev_key,
+            &lowest_key,
+        );
 
         withdraw_vault(&e, &target_vault, &prev_key);
 
@@ -604,13 +703,13 @@ impl VaultsContractTrait for VaultsContract {
 
         let new_debt_amount: u128 = target_vault.total_debt + amount;
 
-        let new_collateral_value: u128 = (rate.price as u128) * target_vault.total_collateral;
-
-        let new_deposit_rate: u128 = new_collateral_value / new_debt_amount;
-
-        if new_deposit_rate < vaults_info.opening_col_rate {
-            panic_with_error!(&e, SCErrors::CollateralRateUnderMinimum);
-        }
+        assert_col_rate_under_min(
+            &e,
+            &rate.price,
+            &new_debt_amount,
+            &target_vault.total_collateral,
+            &vaults_info.opening_col_rate,
+        );
 
         mint_stablecoin(&e, &currency, &target_vault.account, amount as i128);
 
@@ -651,24 +750,12 @@ impl VaultsContractTrait for VaultsContract {
         e.bump_instance();
         vault_key.account.require_auth();
 
-        // We check that the prev_key denominations are the same of the target vault
-        validate_prev_keys(&e, &prev_key, &vault_key, &new_prev_key);
-
         let currency: Currency = e
             .currency(&vault_key.denomination)
             .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::CurrencyDoesntExist));
 
-        if !currency.active {
-            panic_with_error!(&e, &SCErrors::CurrencyIsInactive);
-        }
-
         let (target_vault, target_vault_key, _) =
             search_vault(&e, &vault_key.account, &vault_key.denomination);
-
-        // TODO: Test this
-        if target_vault.index != vault_key.index {
-            panic_with_error!(&e, &SCErrors::IndexProvidedIsNotTheOneSaved);
-        }
 
         let mut vaults_info: VaultsInfo = e.vaults_info(&target_vault_key.denomination).unwrap();
 
@@ -678,10 +765,15 @@ impl VaultsContractTrait for VaultsContract {
             OptionalVaultKey::Some(key) => key,
         };
 
-        // If prev_key is None, the target Vault needs to be the lowest vault otherwise panic
-        if prev_key == OptionalVaultKey::None && target_vault_key != lowest_key {
-            panic_with_error!(&e, &SCErrors::PrevVaultCantBeNone);
-        }
+        assert_regular_vault_updates_validations(
+            &e,
+            &target_vault,
+            &target_vault_key,
+            &prev_key,
+            &vault_key,
+            &new_prev_key,
+            &lowest_key,
+        );
 
         if amount > target_vault.total_debt {
             panic_with_error!(&e, SCErrors::DepositAmountIsMoreThanTotalDebt);
