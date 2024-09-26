@@ -1103,6 +1103,170 @@ fn test_pay_debt() {
 }
 
 #[test]
+fn test_withdraw_collateral() {
+    let env: Env = Env::default();
+    let data: TestData = create_base_data(&env);
+    let base_variables: InitialVariables = create_base_variables(&env, &data);
+    set_initial_state(&env, &data, &base_variables);
+
+    let collateral_to_use: u128 = 1000_000_0000000;
+
+    data.contract_client.mock_all_auths().set_vault_conditions(
+        &base_variables.min_col_rate,
+        &base_variables.min_debt_creation,
+        &base_variables.opening_col_rate,
+        &data.stable_token_denomination,
+    );
+
+    update_oracle_price(
+        &env,
+        &data.oracle_contract_client,
+        &data.stable_token_denomination,
+        &(base_variables.currency_price as i128),
+    );
+
+    data.collateral_token_admin_client
+        .mock_all_auths()
+        .mint(&base_variables.depositor, &(collateral_to_use as i128 * 5));
+
+    data.stable_token_admin_client.mock_all_auths().mint(
+        &base_variables.contract_address,
+        &(base_variables.initial_debt as i128 * 5),
+    );
+
+    // It should fail if the user doesn't have a Vault open
+    let no_vault_open_error = data
+        .contract_client
+        .mock_all_auths()
+        .try_withdraw_collateral(
+            &OptionalVaultKey::None,
+            &VaultKey {
+                index: calculate_user_vault_index(
+                    base_variables.initial_debt.clone(),
+                    collateral_to_use.clone(),
+                ),
+                account: base_variables.depositor.clone(),
+                denomination: data.stable_token_denomination.clone(),
+            },
+            &OptionalVaultKey::None,
+            &(collateral_to_use / 10),
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(no_vault_open_error, SCErrors::VaultDoesntExist.into());
+
+    data.contract_client.mock_all_auths().new_vault(
+        &OptionalVaultKey::None,
+        &base_variables.depositor,
+        &(base_variables.initial_debt * 2),
+        &collateral_to_use,
+        &data.stable_token_denomination,
+    );
+
+    let current_vaults_info: VaultsInfo = data
+        .contract_client
+        .mock_all_auths()
+        .get_vaults_info(&data.stable_token_denomination);
+
+    assert_eq!(current_vaults_info.total_vaults, 1);
+    assert_eq!(
+        current_vaults_info.total_debt,
+        base_variables.initial_debt * 2
+    );
+    assert_eq!(
+        current_vaults_info.total_col,
+        collateral_to_use - calc_fee(&data.fee, &collateral_to_use)
+    );
+    assert_eq!(
+        data.stable_token_client.balance(&base_variables.depositor),
+        (base_variables.initial_debt * 2) as i128
+    );
+
+    let mut vault: Vault = data
+        .contract_client
+        .mock_all_auths()
+        .get_vault(&base_variables.depositor, &data.stable_token_denomination);
+
+    assert!(data
+        .contract_client
+        .try_withdraw_collateral(
+            &OptionalVaultKey::None,
+            &VaultKey {
+                index: vault.index.clone(),
+                account: vault.account.clone(),
+                denomination: vault.denomination.clone(),
+            },
+            &OptionalVaultKey::None,
+            &(collateral_to_use / 10),
+        )
+        .is_err());
+
+    data.contract_client.mock_all_auths().withdraw_collateral(
+        &OptionalVaultKey::None,
+        &VaultKey {
+            index: vault.index.clone(),
+            account: vault.account.clone(),
+            denomination: vault.denomination.clone(),
+        },
+        &OptionalVaultKey::None,
+        &(collateral_to_use / 10),
+    );
+
+    let updated_vaults_info: VaultsInfo = data
+        .contract_client
+        .mock_all_auths()
+        .get_vaults_info(&data.stable_token_denomination);
+
+    assert_eq!(updated_vaults_info.total_vaults, 1);
+    assert_eq!(
+        updated_vaults_info.total_debt,
+        base_variables.initial_debt * 2
+    );
+    assert_eq!(
+        updated_vaults_info.total_col,
+        collateral_to_use - calc_fee(&data.fee, &collateral_to_use) - (collateral_to_use / 10),
+    );
+
+    assert_eq!(
+        data.stable_token_client.balance(&base_variables.depositor) as u128,
+        base_variables.initial_debt * 2
+    );
+    assert_eq!(
+        data.collateral_token_client
+            .balance(&base_variables.contract_address) as u128,
+        collateral_to_use - calc_fee(&data.fee, &collateral_to_use) - (collateral_to_use / 10)
+    );
+
+    vault = data
+        .contract_client
+        .mock_all_auths()
+        .get_vault(&base_variables.depositor, &data.stable_token_denomination);
+
+    // If the vault will be below the min col ratio it should fail
+    let min_col_rate_error = data
+        .contract_client
+        .mock_all_auths()
+        .try_withdraw_collateral(
+            &OptionalVaultKey::None,
+            &VaultKey {
+                index: vault.index.clone(),
+                account: vault.account.clone(),
+                denomination: vault.denomination.clone(),
+            },
+            &OptionalVaultKey::None,
+            &(collateral_to_use - (collateral_to_use / 10)),
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(
+        min_col_rate_error,
+        SCErrors::CollateralRateUnderMinimum.into()
+    );
+}
+
+#[test]
 fn get_vaults() {
     let env: Env = Env::default();
     env.mock_all_auths();

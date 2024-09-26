@@ -185,18 +185,35 @@ fn usdx_low_solvent_no_liquidity() {
     );
 
     // 2. Actor 5 redeems
-    data.contract_client.redeem(actor_5, &symbol_short!("usd"));
+    data.contract_client.redeem(
+        actor_5,
+        &symbol_short!("usd"),
+        &OptionalVaultKey::None,
+        &140_0000000,
+    );
     assert_eq!(9860_0000000, data_stable.usdx_token_client.balance(actor_5));
-    data.contract_client.redeem(actor_5, &symbol_short!("usd"));
+    data.contract_client.redeem(
+        actor_5,
+        &symbol_short!("usd"),
+        &OptionalVaultKey::None,
+        &100_0000000,
+    );
     assert_eq!(9760_0000000, data_stable.usdx_token_client.balance(actor_5));
-    data.contract_client.redeem(actor_5, &symbol_short!("usd"));
+    data.contract_client.redeem(
+        actor_5,
+        &symbol_short!("usd"),
+        &OptionalVaultKey::None,
+        &100_0000000,
+    );
     assert_eq!(9660_0000000, data_stable.usdx_token_client.balance(actor_5));
 
-    let cannot_redeem = data
-        .contract_client
-        .try_redeem(actor_5, &symbol_short!("usd"));
-
-    assert!(cannot_redeem.is_err()) // BLOCKED BY LARGE VAULT
+    data.contract_client.redeem(
+        actor_5,
+        &symbol_short!("usd"),
+        &OptionalVaultKey::None,
+        &660_0000000,
+    );
+    assert_eq!(9000_0000000, data_stable.usdx_token_client.balance(actor_5));
 }
 
 #[test]

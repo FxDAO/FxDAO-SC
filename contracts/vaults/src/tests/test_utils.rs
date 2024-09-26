@@ -11,7 +11,10 @@ use soroban_sdk::{symbol_short, token, Address, Env, Symbol, Vec};
 use token::Client as TokenClient;
 use token::StellarAssetClient as TokenAdminClient;
 
-pub fn create_token_contract<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, TokenAdminClient<'a>) {
+pub fn create_token_contract<'a>(
+    e: &Env,
+    admin: &Address,
+) -> (TokenClient<'a>, TokenAdminClient<'a>) {
     let contract_address = e.register_stellar_asset_contract(admin.clone());
     (
         TokenClient::new(e, &contract_address),
@@ -88,7 +91,7 @@ pub fn create_base_data(env: &Env) -> TestData {
     let oracle_contract_client: OracleClient = OracleClient::new(&env, &oracle);
     let oracle_contract_admin: Address = Address::generate(&env);
 
-    return TestData {
+    TestData {
         contract_admin,
         protocol_manager,
         contract_client,
@@ -108,7 +111,7 @@ pub fn create_base_data(env: &Env) -> TestData {
         oracle,
         oracle_contract_client,
         oracle_contract_admin,
-    };
+    }
 }
 
 pub fn create_base_variables(env: &Env, data: &TestData) -> InitialVariables {

@@ -229,20 +229,12 @@ pub fn can_be_liquidated(user_vault: &Vault, vaults_info: &VaultsInfo, rate: &u1
     deposit_rate < vaults_info.min_col_rate
 }
 
-pub fn validate_prev_keys(
-    e: &Env,
-    prev_key: &OptionalVaultKey,
-    vault_key: &VaultKey,
-    new_prev_key: &OptionalVaultKey,
-) {
-    if let OptionalVaultKey::Some(key) = prev_key {
-        if key.denomination != vault_key.denomination {
-            panic_with_error!(&e, &SCErrors::InvalidPrevKeyDenomination);
-        }
-    }
-    if let OptionalVaultKey::Some(key) = new_prev_key {
-        if key.denomination != vault_key.denomination {
-            panic_with_error!(&e, &SCErrors::InvalidPrevKeyDenomination);
+pub fn validate_prev_keys(e: &Env, target_vault_key: &VaultKey, prev_keys: &Vec<OptionalVaultKey>) {
+    for prev_key in prev_keys.iter() {
+        if let OptionalVaultKey::Some(key) = prev_key {
+            if key.denomination != target_vault_key.denomination {
+                panic_with_error!(&e, &SCErrors::InvalidPrevKeyDenomination);
+            }
         }
     }
 }
