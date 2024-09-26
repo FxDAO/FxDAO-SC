@@ -1,6 +1,7 @@
 #![cfg(test)]
 extern crate std;
 
+use crate::errors::SCErrors;
 use crate::storage::vaults::*;
 use crate::tests::test_utils::{
     create_base_data, create_base_variables, set_initial_state, update_oracle_price,
@@ -146,25 +147,25 @@ fn test_redeem() {
     token::Client::new(&env, &data.stable_token_client.address).transfer(
         &depositor_1,
         &redeem_user,
-        &50_0000000,
+        &(depositor_1_debt as i128),
     );
 
     token::Client::new(&env, &data.stable_token_client.address).transfer(
         &depositor_2,
         &redeem_user,
-        &50_0000000,
+        &(depositor_2_debt as i128),
     );
 
     token::Client::new(&env, &data.stable_token_client.address).transfer(
         &depositor_3,
         &redeem_user,
-        &50_0000000,
+        &(depositor_3_debt as i128),
     );
 
     token::Client::new(&env, &data.stable_token_client.address).transfer(
         &depositor_4,
         &redeem_user,
-        &50_0000000,
+        &(depositor_4_debt as i128),
     );
 
     // Before redeeming
@@ -185,8 +186,12 @@ fn test_redeem() {
             + (depositor_4_collateral - calc_fee(&data.fee, &depositor_4_collateral))
     );
 
-    data.contract_client
-        .redeem(&redeem_user, &data.stable_token_denomination);
+    data.contract_client.redeem(
+        &redeem_user,
+        &data.stable_token_denomination,
+        &OptionalVaultKey::None,
+        &depositor_2_debt,
+    );
 
     // Check the function is requiring the sender approved this operation
     assert_eq!(
@@ -197,7 +202,13 @@ fn test_redeem() {
                 function: AuthorizedFunction::Contract((
                     data.contract_client.address.clone(),
                     symbol_short!("redeem"),
-                    (redeem_user.clone(), data.stable_token_denomination.clone()).into_val(&env),
+                    (
+                        redeem_user.clone(),
+                        data.stable_token_denomination.clone(),
+                        OptionalVaultKey::None,
+                        depositor_2_debt.clone()
+                    )
+                        .into_val(&env),
                 )),
                 sub_invocations: std::vec![AuthorizedInvocation {
                     function: AuthorizedFunction::Contract((
@@ -213,23 +224,24 @@ fn test_redeem() {
 
     assert_eq!(
         data.stable_token_client.balance(&redeem_user) as u128,
-        200_0000000 - depositor_2_debt
+        depositor_1_debt + depositor_3_debt + depositor_4_debt
     );
 
-    let collateral_withdrew: u128 = (depositor_2_debt * 10000000) / rate;
+    let collateral_withdrew: u128 = (depositor_2_debt * 1_0000000) / rate;
+
     assert_eq!(
         data.collateral_token_client.balance(&redeem_user) as u128,
-        collateral_withdrew
-            - calc_fee(
-                &data.fee,
-                &(depositor_2_collateral - calc_fee(&data.fee, &depositor_2_collateral))
-            )
+        collateral_withdrew - calc_fee(&data.fee, &collateral_withdrew)
     );
 
     assert_eq!(
         data.collateral_token_client.balance(&depositor_2) as u128,
         (depositor_2_collateral - calc_fee(&data.fee, &depositor_2_collateral))
-            - collateral_withdrew,
+            - collateral_withdrew
+            - calc_fee(
+                &data.fee,
+                &(depositor_2_vault.total_collateral - collateral_withdrew),
+            ),
     );
 
     // After redeeming
@@ -242,10 +254,77 @@ fn test_redeem() {
         vaults_info.total_debt,
         depositor_1_debt + depositor_3_debt + depositor_4_debt
     );
+
     assert_eq!(
         vaults_info.total_col,
         (depositor_1_collateral - calc_fee(&data.fee, &depositor_1_collateral))
             + (depositor_3_collateral - calc_fee(&data.fee, &depositor_3_collateral))
             + (depositor_4_collateral - calc_fee(&data.fee, &depositor_4_collateral))
+    );
+
+    let invalid_min_debt_amount_error = data
+        .contract_client
+        .try_redeem(
+            &redeem_user,
+            &data.stable_token_denomination,
+            &OptionalVaultKey::None,
+            &(depositor_3_debt - 1),
+        )
+        .unwrap_err()
+        .unwrap();
+
+    assert_eq!(
+        invalid_min_debt_amount_error,
+        SCErrors::InvalidMinDebtAmount.into()
+    );
+
+    // We are going to redeem 25_0000000 from depositor_3's vault
+    // this will move the lowest key to the second place in the list after depositor_4's vault
+
+    data.contract_client.redeem(
+        &redeem_user,
+        &data.stable_token_denomination,
+        &OptionalVaultKey::Some(VaultKey {
+            index: depositor_4_index,
+            account: depositor_4,
+            denomination: data.stable_token_denomination.clone(),
+        }),
+        &25_0000000,
+    );
+
+    // We check if the lowest vault is now the 4's depositor and its updated values
+    let lowest_vault = data
+        .contract_client
+        .get_vaults(
+            &OptionalVaultKey::None,
+            &data.stable_token_denomination,
+            &1,
+            &false,
+        )
+        .get(0)
+        .unwrap();
+
+    assert_eq!(lowest_vault.account, depositor_4_vault.account);
+
+    let updated_depositor_3_vault: Vault = data
+        .contract_client
+        .get_vault(&depositor_3, &data.stable_token_denomination);
+
+    assert_eq!(
+        updated_depositor_3_vault.total_debt,
+        depositor_3_vault.total_debt - 25_0000000,
+    );
+
+    assert_eq!(
+        updated_depositor_3_vault.total_collateral,
+        depositor_3_vault.total_collateral - ((25_0000000 * 1_0000000) / rate),
+    );
+
+    assert_eq!(
+        data.contract_client
+            .get_vaults_info(&data.stable_token_denomination)
+            .total_col,
+        data.collateral_token_client
+            .balance(&data.contract_client.address) as u128,
     );
 }
