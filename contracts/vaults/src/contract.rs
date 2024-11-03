@@ -38,6 +38,8 @@ pub trait VaultsContractTrait {
 
     fn set_address(e: Env, typ: u32, address: Address);
 
+    fn set_fee(e: Env, new_fee: u128);
+
     fn upgrade(e: Env, hash: BytesN<32>);
     fn set_panic(e: Env, status: bool);
 
@@ -182,6 +184,14 @@ impl VaultsContractTrait for VaultsContract {
             panic!();
         }
 
+        e.set_core_state(&core_state);
+    }
+
+    fn set_fee(e: Env, new_fee: u128) {
+        e.bump_instance();
+        let mut core_state: CoreState = e.core_state().unwrap();
+        core_state.admin.require_auth();
+        core_state.fee = new_fee;
         e.set_core_state(&core_state);
     }
 
