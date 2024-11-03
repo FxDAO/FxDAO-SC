@@ -209,7 +209,7 @@ impl VaultsContractTrait for VaultsContract {
         e.set_core_state(&core_state);
     }
 
-    // This is an admin function, make sure the next key is correct before setting it.
+    // This is a management function, make sure the next key is correct before setting it.
     fn set_next_key(e: Env, target_key: VaultKey, next_key: OptionalVaultKey) {
         e.bump_instance();
         e.core_state().unwrap().protocol_manager.require_auth();
