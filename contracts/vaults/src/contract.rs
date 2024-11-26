@@ -912,7 +912,15 @@ impl VaultsContractTrait for VaultsContract {
 
         // We withdraw the caller redeemed collateral and pay the fee to the protocol
         let collateral_to_redeem: u128 = (amount * 10000000) / (rate.price as u128);
-        let fee: u128 = calc_fee(&core_state.fee, &collateral_to_redeem);
+
+        // If the redeem amount is the same as the vault total debt, it gets the lower fee
+        // If the amount is lower than the full debt amount then the fee is 75 times higher
+        // This is done to prevent 'burning only arbitragers'. This type of arbitrager should do it with its own vault instead.
+        let fee: u128 = if amount == lowest_vault.total_debt {
+            calc_fee(&core_state.fee, &collateral_to_redeem)
+        } else {
+            calc_fee(&core_state.fee, &collateral_to_redeem) * 75
+        };
         let collateral_to_withdraw: u128 = collateral_to_redeem - fee;
 
         withdraw_collateral(&e, &core_state, &caller, collateral_to_withdraw as i128);

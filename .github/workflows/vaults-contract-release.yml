@@ -7,10 +7,6 @@ on:
         required: true
         type: string
 
-  push:
-    tags:
-      - vaults-v*
-
 jobs:
   release-vaults-contract:
     uses: stellar-expert/soroban-build-workflow/.github/workflows/release.yml@4d0117fd348fb90cc36e2cd8c774f822802752af
