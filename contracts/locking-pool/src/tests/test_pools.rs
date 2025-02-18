@@ -187,7 +187,7 @@ pub fn test_remove_pool() {
 
     e.ledger().set(LedgerInfo {
         timestamp: test_data.lock_period * 2,
-        protocol_version: 20,
+        protocol_version: 22,
         sequence_number: e.ledger().sequence(),
         network_id: Default::default(),
         base_reserve: 10,

@@ -181,7 +181,7 @@ fn test_indexes_orders() {
     // 2nd part of the test
     // We are going to get the lowest vault and we should be able to go from lowest to higher
     // ----------------------------------------
-    env.budget().reset_default();
+    env.cost_estimate().budget().reset_default();
 
     let latest_vaults_info: VaultsInfo = data
         .contract_client
@@ -267,7 +267,7 @@ fn test_indexes_orders() {
     // 3rd phase of the test
     // We are going to start increasing the collateral and increasing/paying the debt
     // ----------------------------------------
-    env.budget().reset_default();
+    env.cost_estimate().budget().reset_default();
 
     // TODO: we need to finish this test
 }

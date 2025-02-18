@@ -12,7 +12,6 @@ testutils = []
 [dependencies]
 soroban-sdk = { workspace = true }
 
-[dev_dependencies]
+[dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-stable-liquidity-pool = { path = "../stable-liquidity-pool", features = ["testutils"] }
 proptest = "1.0.0"

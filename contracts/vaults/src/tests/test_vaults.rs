@@ -1460,7 +1460,7 @@ fn panic_mode_enabled() {
 
     env.ledger().set(LedgerInfo {
         timestamp: env.ledger().timestamp() + 1201,
-        protocol_version: 20,
+        protocol_version: 22,
         sequence_number: env.ledger().sequence(),
         network_id: Default::default(),
         base_reserve: 10,

@@ -7,14 +7,9 @@ test-optimized: build-optimized
 	cargo test
 
 build:
-	soroban contract build --package vaults
-	soroban contract build
-
-build-optimized:
-	soroban contract build --package vaults
-	soroban contract build
-	soroban contract optimize --wasm ./target/wasm32-unknown-unknown/release/vaults.wasm --wasm-out ./target/wasm32-unknown-unknown/release/vaults.wasm
-	soroban contract optimize --wasm ./target/wasm32-unknown-unknown/release/stable_liquidity_pool.wasm --wasm-out ./target/wasm32-unknown-unknown/release/stable_liquidity_pool.wasm
+	stellar contract build --package vaults
+	stellar contract optimize --wasm ./target/wasm32-unknown-unknown/release/vaults.wasm
+	stellar contract optimize --wasm ./target/wasm32-unknown-unknown/release/locking_pool.wasm
 
 watch:
 	cargo watch --clear --watch-when-idle --shell '$(MAKE)'

@@ -129,7 +129,7 @@ fn test_distribute_and_withdraw() {
 
     e.ledger().set(LedgerInfo {
         timestamp: test_data.lock_period * 3,
-        protocol_version: 20,
+        protocol_version: 22,
         sequence_number: e.ledger().sequence(),
         network_id: Default::default(),
         base_reserve: 10,

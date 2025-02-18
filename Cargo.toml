@@ -3,7 +3,6 @@ resolver = "2"
 
 members = [
     "contracts/locking-pool",
-    "contracts/stable-liquidity-pool",
     "contracts/vaults",
 ]
 
@@ -22,4 +21,4 @@ codegen-units = 1
 lto = true
 
 [workspace.dependencies.soroban-sdk]
-version = "21.7.7"
+version = "22.0.7"
