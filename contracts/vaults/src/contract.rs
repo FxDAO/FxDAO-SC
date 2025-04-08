@@ -105,6 +105,7 @@ pub trait VaultsContractTrait {
         new_prev_key: OptionalVaultKey,
         amount: u128,
     );
+    fn transfer_debt(e: Env, prev_key: OptionalVaultKey, vault_key: VaultKey, destination: Address);
 
     // Redeeming
     // fn redeem(
@@ -866,6 +867,56 @@ impl VaultsContractTrait for VaultsContract {
 
         vaults_info.total_debt = vaults_info.total_debt - amount;
         e.set_vaults_info(&vaults_info);
+    }
+
+    fn transfer_debt(
+        e: Env,
+        prev_key: OptionalVaultKey,
+        vault_key: VaultKey,
+        destination: Address,
+    ) {
+        e.bump_instance();
+        vault_key.account.require_auth();
+
+        let (mut target_vault, mut target_vault_key, _) =
+            search_vault(&e, &vault_key.account, &vault_key.denomination);
+
+        let vaults_info: VaultsInfo = e.vaults_info(&target_vault_key.denomination).unwrap();
+
+        let lowest_key = match vaults_info.lowest_key.clone() {
+            // It should be impossible to reach this case, but just in case we panic if it happens.
+            OptionalVaultKey::None => panic_with_error!(&e, &SCErrors::ThereAreNoVaults),
+            OptionalVaultKey::Some(key) => key,
+        };
+
+        assert_regular_vault_updates_validations(
+            &e,
+            &target_vault,
+            &target_vault_key,
+            &prev_key,
+            &vault_key,
+            &prev_key,
+            &lowest_key,
+        );
+
+        // We remove the vault so we can update it to the new owner
+        withdraw_vault(&e, &target_vault, &prev_key);
+
+        target_vault.account = destination.clone();
+        target_vault_key.account = destination;
+
+        let (_, updated_target_vault_key, updated_target_vault_index_key, updated_lowest_key) =
+            create_and_insert_vault(
+                &e,
+                &vaults_info.lowest_key,
+                &target_vault_key,
+                &prev_key,
+                target_vault.total_debt.clone(),
+                target_vault.total_collateral.clone(),
+            );
+
+        e.bump_vault(&updated_target_vault_key);
+        e.bump_vault_index(&updated_target_vault_index_key);
     }
 
     // fn redeem(
