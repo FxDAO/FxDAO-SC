@@ -11,6 +11,10 @@ build:
 	stellar contract optimize --wasm ./target/wasm32-unknown-unknown/release/vaults.wasm
 	stellar contract optimize --wasm ./target/wasm32-unknown-unknown/release/locking_pool.wasm
 
+build-vaults:
+	stellar contract build --package vaults
+	stellar contract optimize --wasm ./target/wasm32-unknown-unknown/release/vaults.wasm
+
 watch:
 	cargo watch --clear --watch-when-idle --shell '$(MAKE)'
 

@@ -15,6 +15,6 @@ jobs:
       release_description: 'Vaults contract'
       relative_path: '["contracts/vaults"]'
       package: 'vaults'
-      make_target: 'build'
+      make_target: 'build-vaults'
     secrets: # the authentication token will be automatically created by GitHub
       release_token: ${{ secrets.RELEASE_TOKEN }}
