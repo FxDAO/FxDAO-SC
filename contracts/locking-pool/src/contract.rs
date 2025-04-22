@@ -286,11 +286,7 @@ impl LockingPoolContractTrait for LockingPoolContract {
 
         let result =
             token::Client::new(&e, &e._core().address(&CoreDataKeys::RewardsAsset).unwrap())
-                .try_transfer(
-                    &e._core().address(&CoreDataKeys::Manager).unwrap(),
-                    &e.current_contract_address(),
-                    &(amount as i128),
-                );
+                .try_transfer(&caller, &e.current_contract_address(), &(amount as i128));
 
         if result.is_err() {
             panic_with_error!(&e, &ContractErrors::RewardsDepositFailed);

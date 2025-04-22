@@ -8,6 +8,7 @@ test-optimized: build-optimized
 
 build:
 	stellar contract build --package vaults
+	stellar contract build --package locking-pool
 	stellar contract optimize --wasm ./target/wasm32-unknown-unknown/release/vaults.wasm
 	stellar contract optimize --wasm ./target/wasm32-unknown-unknown/release/locking_pool.wasm
 
