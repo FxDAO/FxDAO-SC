@@ -37,6 +37,7 @@ fn test_distribute_and_withdraw() {
     assert!(test_data
         .contract_client
         .try_distribute(
+            &test_data.manager,
             &test_data.staking_asset_client.address,
             &test_data.min_deposit
         )
@@ -46,6 +47,7 @@ fn test_distribute_and_withdraw() {
         .contract_client
         .mock_all_auths()
         .try_distribute(
+            &test_data.manager,
             &test_data.staking_asset_client.address,
             &test_data.min_deposit,
         )
@@ -67,6 +69,7 @@ fn test_distribute_and_withdraw() {
         .contract_client
         .mock_all_auths()
         .try_distribute(
+            &test_data.manager,
             &test_data.staking_asset_client.address,
             &(test_data.min_deposit * 10),
         )
@@ -86,6 +89,7 @@ fn test_distribute_and_withdraw() {
                 contract: &test_data.contract_client.address,
                 fn_name: "distribute",
                 args: (
+                    test_data.manager.clone(),
                     test_data.staking_asset_client.address.clone(),
                     test_data.min_deposit.clone(),
                 )
@@ -104,6 +108,7 @@ fn test_distribute_and_withdraw() {
             },
         }])
         .distribute(
+            &test_data.manager,
             &test_data.staking_asset_client.address,
             &test_data.min_deposit,
         );

@@ -17,7 +17,7 @@ pub trait LockingPoolContractTrait {
     fn migrate_deposits(e: Env, old_asset: Address, new_asset: Address, depositors: Vec<Address>);
     fn deposit(e: Env, deposit_asset: Address, caller: Address, amount: u128);
     fn withdraw(e: Env, deposit_asset: Address, caller: Address);
-    fn distribute(e: Env, deposit_asset: Address, amount: u128);
+    fn distribute(e: Env, caller: Address, deposit_asset: Address, amount: u128);
 }
 
 #[contract]
@@ -269,8 +269,12 @@ impl LockingPoolContractTrait for LockingPoolContract {
         e._core().bump();
     }
 
-    fn distribute(e: Env, deposit_asset: Address, amount: u128) {
-        validate(&e, CoreDataKeys::Manager);
+    fn distribute(e: Env, caller: Address, deposit_asset: Address, amount: u128) {
+        caller.require_auth();
+
+        if amount < 100_0000000 {
+            panic_with_error!(&e, &ContractErrors::CantDistributeReward);
+        }
 
         let mut pool: Pool = e._pools().pool(&deposit_asset).unwrap_or_else(|| {
             panic_with_error!(&e, &ContractErrors::PoolDoesntExist);

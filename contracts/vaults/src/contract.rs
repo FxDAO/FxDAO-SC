@@ -43,6 +43,7 @@ pub trait VaultsContractTrait {
     fn upgrade(e: Env, hash: BytesN<32>);
     fn set_panic(e: Env, status: bool);
 
+    fn set_lowest_key(e: Env, denomination: Symbol, next_key: OptionalVaultKey);
     fn set_next_key(e: Env, target_key: VaultKey, next_key: OptionalVaultKey);
 
     // Currencies methods
@@ -208,6 +209,26 @@ impl VaultsContractTrait for VaultsContract {
         let mut core_state: CoreState = e.core_state().unwrap();
         core_state.panic_mode = status;
         e.set_core_state(&core_state);
+    }
+
+    // This is a management method, make sure the next key is correct before setting it.
+    fn set_lowest_key(e: Env, denomination: Symbol, next_key: OptionalVaultKey) {
+        e.bump_instance();
+        e.core_state().unwrap().protocol_manager.require_auth();
+
+        let mut vaults_info: VaultsInfo = e.vaults_info(&denomination).unwrap();
+
+        match vaults_info.lowest_key {
+            OptionalVaultKey::None => {
+                // TODO: maybe we should panic to avoid an mistake from the manager
+            }
+            OptionalVaultKey::Some(target_key) => {
+                validate_prev_keys(&e, &target_key, &Vec::from_array(&e, [next_key.clone()]));
+            }
+        };
+
+        vaults_info.lowest_key = next_key;
+        e.set_vaults_info(&vaults_info);
     }
 
     // This is a management function, make sure the next key is correct before setting it.
@@ -878,10 +899,19 @@ impl VaultsContractTrait for VaultsContract {
         e.bump_instance();
         vault_key.account.require_auth();
 
+        if e.vault_index(&VaultIndexKey {
+            user: destination.clone(),
+            denomination: vault_key.denomination.clone(),
+        })
+        .is_some()
+        {
+            panic_with_error!(&e, &SCErrors::UserAlreadyHasDenominationVault);
+        }
+
         let (mut target_vault, mut target_vault_key, _) =
             search_vault(&e, &vault_key.account, &vault_key.denomination);
 
-        let vaults_info: VaultsInfo = e.vaults_info(&target_vault_key.denomination).unwrap();
+        let mut vaults_info: VaultsInfo = e.vaults_info(&target_vault_key.denomination).unwrap();
 
         let lowest_key = match vaults_info.lowest_key.clone() {
             // It should be impossible to reach this case, but just in case we panic if it happens.
@@ -902,6 +932,11 @@ impl VaultsContractTrait for VaultsContract {
         // We remove the vault so we can update it to the new owner
         withdraw_vault(&e, &target_vault, &prev_key);
 
+        // If the target vault is the lowest, we update the lowest value
+        if lowest_key == target_vault_key {
+            vaults_info.lowest_key = target_vault.next_key.clone();
+        }
+
         target_vault.account = destination.clone();
         target_vault_key.account = destination;
 
@@ -914,6 +949,10 @@ impl VaultsContractTrait for VaultsContract {
                 target_vault.total_debt.clone(),
                 target_vault.total_collateral.clone(),
             );
+
+        vaults_info.lowest_key = updated_lowest_key;
+
+        e.set_vaults_info(&vaults_info);
 
         e.bump_vault(&updated_target_vault_key);
         e.bump_vault_index(&updated_target_vault_index_key);
