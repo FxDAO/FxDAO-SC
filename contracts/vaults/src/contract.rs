@@ -109,13 +109,13 @@ pub trait VaultsContractTrait {
     fn transfer_debt(e: Env, prev_key: OptionalVaultKey, vault_key: VaultKey, destination: Address);
 
     // Redeeming
-    // fn redeem(
-    //     e: Env,
-    //     caller: Address,
-    //     denomination: Symbol,
-    //     new_prev_key: OptionalVaultKey,
-    //     amount: u128,
-    // );
+    fn redeem(
+        e: Env,
+        caller: Address,
+        denomination: Symbol,
+        new_prev_key: OptionalVaultKey,
+        amount: u128,
+    );
 
     // Liquidation
     fn liquidate(
@@ -958,147 +958,150 @@ impl VaultsContractTrait for VaultsContract {
         e.bump_vault_index(&updated_target_vault_index_key);
     }
 
-    // fn redeem(
-    //     e: Env,
-    //     caller: Address,
-    //     denomination: Symbol,
-    //     new_prev_key: OptionalVaultKey,
-    //     amount: u128,
-    // ) {
-    //     e.bump_instance();
-    //     caller.require_auth();
-    //
-    //     let currency: Currency = e
-    //         .currency(&denomination)
-    //         .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::CurrencyDoesntExist));
-    //
-    //     if !currency.active {
-    //         panic_with_error!(&e, &SCErrors::CurrencyIsInactive);
-    //     }
-    //
-    //     let core_state: CoreState = e.core_state().unwrap();
-    //     let rate: PriceData = get_currency_rate(&e, &core_state, &denomination);
-    //     let mut vaults_info: VaultsInfo = e.vaults_info(&denomination).unwrap();
-    //
-    //     let lowest_key = match vaults_info.lowest_key.clone() {
-    //         // It should be impossible to reach this case, but just in case we panic if it happens.
-    //         OptionalVaultKey::None => panic_with_error!(&e, &SCErrors::ThereAreNoVaults),
-    //         OptionalVaultKey::Some(key) => key,
-    //     };
-    //
-    //     validate_prev_keys(
-    //         &e,
-    //         &lowest_key,
-    //         &Vec::from_array(&e, [new_prev_key.clone()]),
-    //     );
-    //
-    //     let lowest_vault: Vault = e.vault(&lowest_key).unwrap();
-    //
-    //     if amount > lowest_vault.total_debt {
-    //         panic_with_error!(&e, SCErrors::DepositAmountIsMoreThanTotalDebt);
-    //     }
-    //
-    //     burn_stablecoin(&e, &currency, &caller, amount as i128);
-    //
-    //     // We withdraw the caller redeemed collateral and pay the fee to the protocol
-    //     let collateral_to_redeem: u128 = (amount * 10000000) / (rate.price as u128);
-    //
-    //     // If the redeem amount is the same as the vault total debt, it gets the lower fee
-    //     // If the amount is lower than the full debt amount then the fee is 75 times higher
-    //     // This is done to prevent 'burning only arbitragers'. This type of arbitrager should do it with its own vault instead.
-    //     let fee: u128 = if amount == lowest_vault.total_debt {
-    //         calc_fee(&core_state.fee, &collateral_to_redeem)
-    //     } else {
-    //         calc_fee(&core_state.fee, &collateral_to_redeem) * 75
-    //     };
-    //     let collateral_to_withdraw: u128 = collateral_to_redeem - fee;
-    //
-    //     withdraw_collateral(&e, &core_state, &caller, collateral_to_withdraw as i128);
-    //     pay_fee(&e, &core_state, &e.current_contract_address(), fee as i128);
-    //
-    //     vaults_info.total_col = vaults_info.total_col - collateral_to_redeem;
-    //     vaults_info.total_debt = vaults_info.total_debt - amount;
-    //
-    //     // If the amount is equal to the debt it means it is a full redeem, so we release the collateral and remove the vault
-    //     if amount == lowest_vault.total_debt {
-    //         // If new_prev_key is not None, we panic because we are removing the vault
-    //         if let OptionalVaultKey::Some(_) = new_prev_key {
-    //             panic_with_error!(&e, &SCErrors::NextPrevVaultShouldBeNone);
-    //         }
-    //
-    //         withdraw_vault(&e, &lowest_vault, &OptionalVaultKey::None);
-    //         vaults_info.total_vaults = vaults_info.total_vaults - 1;
-    //         vaults_info.lowest_key = lowest_vault.next_key.clone();
-    //
-    //         let extra_fee: u128 = calc_fee(
-    //             &core_state.fee,
-    //             &(lowest_vault.total_collateral - collateral_to_redeem),
-    //         );
-    //
-    //         // We update the total_col again because we are reducing the collateral in the remaining of the collateral from the removed vault
-    //         vaults_info.total_col =
-    //             vaults_info.total_col - (lowest_vault.total_collateral - collateral_to_redeem);
-    //
-    //         // We send the remaining collateral to the owner of the Vault and pay the fee
-    //         withdraw_collateral(
-    //             &e,
-    //             &core_state,
-    //             &lowest_vault.account,
-    //             (lowest_vault.total_collateral - collateral_to_redeem - extra_fee) as i128,
-    //         );
-    //         pay_fee(
-    //             &e,
-    //             &core_state,
-    //             &e.current_contract_address(),
-    //             extra_fee as i128,
-    //         );
-    //     } else {
-    //         // If amount is not enough to pay all the debt, we check the debt value is not lower than the minimum and if is ok we just updated the stats of the user's vault
-    //         let new_vault_debt: u128 = lowest_vault.total_debt - amount;
-    //         if new_vault_debt < vaults_info.min_debt_creation {
-    //             panic_with_error!(&e, &SCErrors::InvalidMinDebtAmount);
-    //         }
-    //         let new_vault_collateral: u128 = lowest_vault.total_collateral - collateral_to_redeem;
-    //         let new_vault_index: u128 =
-    //             calculate_user_vault_index(new_vault_debt.clone(), new_vault_collateral.clone());
-    //
-    //         // In theory the collateral rate should not go down
-    //         // But we still check the col rate is not under min ratio
-    //         assert_col_rate_under_min(
-    //             &e,
-    //             &rate.price,
-    //             &new_vault_debt,
-    //             &new_vault_collateral,
-    //             &vaults_info.min_col_rate,
-    //         );
-    //
-    //         withdraw_vault(&e, &lowest_vault, &OptionalVaultKey::None);
-    //
-    //         // We are working with the lowest vault so we update the lowest value
-    //         vaults_info.lowest_key = lowest_vault.next_key.clone();
-    //
-    //         let (_, updated_target_vault_key, updated_target_vault_index_key, updated_lowest_key) =
-    //             create_and_insert_vault(
-    //                 &e,
-    //                 &vaults_info.lowest_key,
-    //                 &VaultKey {
-    //                     index: new_vault_index.clone(),
-    //                     account: lowest_vault.account.clone(),
-    //                     denomination: lowest_vault.denomination.clone(),
-    //                 },
-    //                 &new_prev_key,
-    //                 new_vault_debt.clone(),
-    //                 new_vault_collateral.clone(),
-    //             );
-    //
-    //         vaults_info.lowest_key = updated_lowest_key;
-    //
-    //         e.bump_vault(&updated_target_vault_key);
-    //         e.bump_vault_index(&updated_target_vault_index_key);
-    //     }
-    //
-    //     e.set_vaults_info(&vaults_info);
-    // }
+    fn redeem(
+        e: Env,
+        caller: Address,
+        denomination: Symbol,
+        new_prev_key: OptionalVaultKey,
+        amount: u128,
+    ) {
+        e.bump_instance();
+        caller.require_auth();
+
+        let currency: Currency = e
+            .currency(&denomination)
+            .unwrap_or_else(|| panic_with_error!(&e, &SCErrors::CurrencyDoesntExist));
+
+        if !currency.active {
+            panic_with_error!(&e, &SCErrors::CurrencyIsInactive);
+        }
+
+        let core_state: CoreState = e.core_state().unwrap();
+        let rate: PriceData = get_currency_rate(&e, &core_state, &denomination);
+        let mut vaults_info: VaultsInfo = e.vaults_info(&denomination).unwrap();
+
+        let lowest_key = match vaults_info.lowest_key.clone() {
+            // It should be impossible to reach this case, but just in case we panic if it happens.
+            OptionalVaultKey::None => panic_with_error!(&e, &SCErrors::ThereAreNoVaults),
+            OptionalVaultKey::Some(key) => key,
+        };
+
+        validate_prev_keys(
+            &e,
+            &lowest_key,
+            &Vec::from_array(&e, [new_prev_key.clone()]),
+        );
+
+        let lowest_vault: Vault = e.vault(&lowest_key).unwrap();
+
+        if amount > lowest_vault.total_debt {
+            panic_with_error!(&e, SCErrors::DepositAmountIsMoreThanTotalDebt);
+        }
+
+        burn_stablecoin(&e, &currency, &caller, amount as i128);
+
+        // We withdraw the caller redeemed collateral and pay the fee to the protocol
+        let collateral_to_redeem: u128 = (amount * 10000000) / (rate.price as u128);
+
+        // redeem fee is 1% or 2.5% based on the condition, half is sent to the treasury and half to the vault owner
+        let fee: u128 = if amount < lowest_vault.total_debt
+            && lowest_vault.next_key != OptionalVaultKey::None
+        {
+            calc_fee(&250000, &collateral_to_redeem)
+        } else {
+            calc_fee(&100000, &collateral_to_redeem)
+        };
+        let collateral_to_withdraw: u128 = collateral_to_redeem - fee; // This is the amount the depositor will receive
+        let vault_owner_side: u128 = fee / 2;
+        let treasury_side: u128 = fee.saturating_sub(vault_owner_side);
+
+        // We release the collateral to the depositor and pay the vault owner fee and protocol fee
+        withdraw_collateral(&e, &core_state, &caller, collateral_to_withdraw as i128);
+        withdraw_collateral(
+            &e,
+            &core_state,
+            &lowest_vault.account,
+            vault_owner_side as i128,
+        );
+        pay_fee(
+            &e,
+            &core_state,
+            &e.current_contract_address(),
+            treasury_side as i128,
+        );
+
+        vaults_info.total_col = vaults_info.total_col - collateral_to_redeem;
+        vaults_info.total_debt = vaults_info.total_debt - amount;
+
+        // If the amount is equal to the debt it means it is a full redeem, so we release the collateral and remove the vault
+        if amount == lowest_vault.total_debt {
+            // If new_prev_key is not None, we panic because we are removing the vault
+            if let OptionalVaultKey::Some(_) = new_prev_key {
+                panic_with_error!(&e, &SCErrors::NextPrevVaultShouldBeNone);
+            }
+
+            withdraw_vault(&e, &lowest_vault, &OptionalVaultKey::None);
+            vaults_info.total_vaults = vaults_info.total_vaults - 1;
+            vaults_info.lowest_key = lowest_vault.next_key.clone();
+
+            // We update the total_col again because we are reducing the collateral in the remaining of the collateral from the removed vault
+            vaults_info.total_col =
+                vaults_info.total_col - (lowest_vault.total_collateral - collateral_to_redeem);
+
+            // We send the remaining collateral to the owner of the Vault
+            withdraw_collateral(
+                &e,
+                &core_state,
+                &lowest_vault.account,
+                (lowest_vault.total_collateral - collateral_to_redeem) as i128,
+            );
+        } else {
+            // If amount is not enough to pay all the debt, we check the debt value is not lower than the minimum and if is ok we just updated the stats of the user's vault
+            let new_vault_debt: u128 = lowest_vault.total_debt - amount;
+            if new_vault_debt < vaults_info.min_debt_creation {
+                panic_with_error!(&e, &SCErrors::InvalidMinDebtAmount);
+            }
+            let new_vault_collateral: u128 = lowest_vault.total_collateral - collateral_to_redeem;
+            let new_vault_index: u128 =
+                calculate_user_vault_index(new_vault_debt.clone(), new_vault_collateral.clone());
+
+            // In theory the collateral rate should not go down
+            // But we still check the col rate is not under min ratio
+            assert_col_rate_under_min(
+                &e,
+                &rate.price,
+                &new_vault_debt,
+                &new_vault_collateral,
+                &vaults_info.min_col_rate,
+            );
+
+            withdraw_vault(&e, &lowest_vault, &OptionalVaultKey::None);
+
+            // We are working with the lowest vault so we update the lowest value
+            vaults_info.lowest_key = lowest_vault.next_key.clone();
+
+            let (_, updated_target_vault_key, updated_target_vault_index_key, updated_lowest_key) =
+                create_and_insert_vault(
+                    &e,
+                    &vaults_info.lowest_key,
+                    &VaultKey {
+                        index: new_vault_index.clone(),
+                        account: lowest_vault.account.clone(),
+                        denomination: lowest_vault.denomination.clone(),
+                    },
+                    &new_prev_key,
+                    new_vault_debt.clone(),
+                    new_vault_collateral.clone(),
+                );
+
+            vaults_info.lowest_key = updated_lowest_key;
+
+            e.bump_vault(&updated_target_vault_key);
+            e.bump_vault_index(&updated_target_vault_index_key);
+        }
+
+        e.set_vaults_info(&vaults_info);
+    }
 
     fn liquidate(
         e: Env,

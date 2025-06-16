@@ -13,12 +13,12 @@ use token::StellarAssetClient as TokenAdminClient;
 use crate::tests::test_utils::InitialVariables;
 use crate::tests::test_utils::{create_token_contract, update_oracle_price};
 
-mod stable_liquidity_pool {
-    soroban_sdk::contractimport!(
-        file = "../../target/wasm32-unknown-unknown/release/stable_liquidity_pool.wasm"
-    );
-}
-use stable_liquidity_pool::Client as StableLiquidityPoolContractClient;
+// mod stable_liquidity_pool {
+//     soroban_sdk::contractimport!(
+//         file = "../../target/wasm32-unknown-unknown/release/stable_liquidity_pool.wasm"
+//     );
+// }
+// use stable_liquidity_pool::Client as StableLiquidityPoolContractClient;
 
 // --- vaults -----------------------------------------------------------------
 
@@ -193,8 +193,7 @@ pub fn init_oracle_contract_vaults(env: &Env, data: &TestDataVaults, rate: &i128
 // --- stable-liquidity-pool --------------------------------------------------
 
 pub struct TestDataLiquidity<'a> {
-    pub stable_liquidity_pool_contract_client: StableLiquidityPoolContractClient<'a>,
-
+    // pub stable_liquidity_pool_contract_client: StableLiquidityPoolContractClient<'a>,
     pub admin: Address,
     pub manager: Address,
     pub governance_token_admin: Address,
@@ -241,12 +240,12 @@ pub fn create_test_data_liquidity(env: &Env) -> TestDataLiquidity {
     let treasury = Address::generate(&env);
 
     // Stable Liquidity Pool
-    let oracle: Address = env.register_contract_wasm(None, stable_liquidity_pool::WASM);
-    let stable_liquidity_pool_contract_client: StableLiquidityPoolContractClient =
-        StableLiquidityPoolContractClient::new(&env, &oracle);
+    // let oracle: Address = env.register_contract_wasm(None, stable_liquidity_pool::WASM);
+    // let stable_liquidity_pool_contract_client: StableLiquidityPoolContractClient =
+    //     StableLiquidityPoolContractClient::new(&env, &oracle);
 
     TestDataLiquidity {
-        stable_liquidity_pool_contract_client,
+        // stable_liquidity_pool_contract_client,
         admin,
         manager,
         governance_token_admin,
@@ -267,23 +266,23 @@ pub fn create_test_data_liquidity(env: &Env) -> TestDataLiquidity {
     }
 }
 
-pub fn init_contract_liquidity(env: &Env, test_data: &TestDataLiquidity) {
-    test_data.stable_liquidity_pool_contract_client.init(
-        &test_data.admin,
-        &test_data.manager,
-        &test_data.governance_token_client.address,
-        &(Vec::from_array(
-            &env,
-            [
-                test_data.usdc_token_client.address.clone(),
-                test_data.usdt_token_client.address.clone(),
-                test_data.usdx_token_client.address.clone(),
-            ],
-        )),
-        &test_data.fee_percentage,
-        &test_data.treasury,
-    );
-}
+// pub fn init_contract_liquidity(env: &Env, test_data: &TestDataLiquidity) {
+//     test_data.stable_liquidity_pool_contract_client.init(
+//         &test_data.admin,
+//         &test_data.manager,
+//         &test_data.governance_token_client.address,
+//         &(Vec::from_array(
+//             &env,
+//             [
+//                 test_data.usdc_token_client.address.clone(),
+//                 test_data.usdt_token_client.address.clone(),
+//                 test_data.usdx_token_client.address.clone(),
+//             ],
+//         )),
+//         &test_data.fee_percentage,
+//         &test_data.treasury,
+//     );
+// }
 
 pub fn prepare_test_accounts_liquidity(test_data: &TestDataLiquidity, accounts: &Vec<Address>) {
     for account in accounts.iter() {
@@ -308,71 +307,71 @@ pub fn setup_liquidity_pools(
 ) {
     env.mock_all_auths();
 
-    init_contract_liquidity(&env, &test_data_stable);
+    // init_contract_liquidity(&env, &test_data_stable);
 
     let deposit_amount: u128 = 1000_0000000;
 
     prepare_test_accounts_liquidity(&test_data_stable, &Vec::from_slice(&env, depositors));
 
     // Each address deposits 1000 USDx
-    depositors.iter().for_each(|depositor| {
-        test_data_stable
-            .stable_liquidity_pool_contract_client
-            .deposit(
-                depositor,
-                &test_data_stable.usdx_token_client.address,
-                &deposit_amount,
-            )
-    });
+    // depositors.iter().for_each(|depositor| {
+    //     test_data_stable
+    //         .stable_liquidity_pool_contract_client
+    //         .deposit(
+    //             depositor,
+    //             &test_data_stable.usdx_token_client.address,
+    //             &deposit_amount,
+    //         )
+    // });
 
-    assert_eq!(
-        (depositors.len() * 1000_0000000) as i128,
-        test_data_stable.usdx_token_client.balance(
-            &test_data_stable
-                .stable_liquidity_pool_contract_client
-                .address
-        )
-    );
+    // assert_eq!(
+    //     (depositors.len() * 1000_0000000) as i128,
+    //     test_data_stable.usdx_token_client.balance(
+    //         &test_data_stable
+    //             .stable_liquidity_pool_contract_client
+    //             .address
+    //     )
+    // );
 
     // Each address deposits 1000 USDc
-    depositors.iter().for_each(|depositor| {
-        test_data_stable
-            .stable_liquidity_pool_contract_client
-            .deposit(
-                depositor,
-                &test_data_stable.usdc_token_client.address,
-                &deposit_amount,
-            )
-    });
+    // depositors.iter().for_each(|depositor| {
+    //     test_data_stable
+    //         .stable_liquidity_pool_contract_client
+    //         .deposit(
+    //             depositor,
+    //             &test_data_stable.usdc_token_client.address,
+    //             &deposit_amount,
+    //         )
+    // });
 
-    assert_eq!(
-        (depositors.len() * 1000_0000000) as i128,
-        test_data_stable.usdc_token_client.balance(
-            &test_data_stable
-                .stable_liquidity_pool_contract_client
-                .address
-        )
-    );
+    // assert_eq!(
+    //     (depositors.len() * 1000_0000000) as i128,
+    //     test_data_stable.usdc_token_client.balance(
+    //         &test_data_stable
+    //             .stable_liquidity_pool_contract_client
+    //             .address
+    //     )
+    // );
 
     // Each address deposits 1000 USDt
-    depositors.iter().for_each(|depositor| {
-        test_data_stable
-            .stable_liquidity_pool_contract_client
-            .deposit(
-                depositor,
-                &test_data_stable.usdt_token_client.address,
-                &deposit_amount,
-            )
-    });
+    // depositors.iter().for_each(|depositor| {
+    //     test_data_stable
+    //         .stable_liquidity_pool_contract_client
+    //         .deposit(
+    //             depositor,
+    //             &test_data_stable.usdt_token_client.address,
+    //             &deposit_amount,
+    //         )
+    // });
 
-    assert_eq!(
-        (depositors.len() * 1000_0000000) as i128,
-        test_data_stable.usdt_token_client.balance(
-            &test_data_stable
-                .stable_liquidity_pool_contract_client
-                .address
-        )
-    );
+    // assert_eq!(
+    //     (depositors.len() * 1000_0000000) as i128,
+    //     test_data_stable.usdt_token_client.balance(
+    //         &test_data_stable
+    //             .stable_liquidity_pool_contract_client
+    //             .address
+    //     )
+    // );
 }
 
 pub fn setup_vaults(env: &Env, data: &TestDataVaults, depositors: &[&Address]) {

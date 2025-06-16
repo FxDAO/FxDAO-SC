@@ -231,17 +231,14 @@ fn test_redeem() {
 
     assert_eq!(
         data.collateral_token_client.balance(&redeem_user) as u128,
-        collateral_withdrew - calc_fee(&data.fee, &collateral_withdrew)
+        collateral_withdrew - calc_fee(&100000, &collateral_withdrew)
     );
 
     assert_eq!(
         data.collateral_token_client.balance(&depositor_2) as u128,
         (depositor_2_collateral - calc_fee(&data.fee, &depositor_2_collateral))
             - collateral_withdrew
-            - calc_fee(
-                &data.fee,
-                &(depositor_2_vault.total_collateral - collateral_withdrew),
-            ),
+            + (calc_fee(&100000, &collateral_withdrew) / 2),
     );
 
     // After redeeming
